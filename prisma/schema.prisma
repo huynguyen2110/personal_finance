@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Tiền VND lưu dạng BigInt (số nguyên đồng). Khi trả JSON đổi sang Number (xem src/lib/money.ts).
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum AccountType {
+  BANK
+  CASH
+}
+
+model Account {
+  id             Int         @id @default(autoincrement())
+  type           AccountType @default(BANK)
+  name           String
+  bankName       String?
+  accountNumber  String?     @unique
+  // Số dư hiện tại = số dư đầu kỳ + tổng thu − tổng chi của tài khoản,
+  // trừ khi ngân hàng có báo số dư (VD email ACB) → dùng số dư ngân hàng báo gần nhất
+  openingBalance BigInt      @default(0)
+  bankBalance    BigInt?
+  bankBalanceAt  DateTime?
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  transactions Transaction[]
+}
+
+enum CategoryKind {
+  EXPENSE
+  INCOME
+}
+
+model Category {
+  id        Int          @id @default(autoincrement())
+  name      String
+  kind      CategoryKind
+  icon      String       @default("Tag")
+  color     String       @default("#64748B")
+  isSystem  Boolean      @default(false)
+  sortOrder Int          @default(0)
+  createdAt DateTime     @default(now())
+
+  transactions Transaction[]
+  rules        CategoryRule[]
+  budgets      Budget[]
+
+  @@unique([name, kind])
+}
+
+enum MatchType {
+  CONTAINS
+  REGEX
+}
+
+// Quy tắc chỉ áp dụng cho giao dịch cùng chiều với loại danh mục (chi ↔ OUT, thu ↔ IN)
+model CategoryRule {
+  id         Int       @id @default(autoincrement())
+  // CONTAINS: một hoặc nhiều từ khóa, ngăn cách bằng dấu phẩy (khớp nguyên từ, không phân biệt dấu/hoa thường)
+  // REGEX: biểu thức chính quy, chạy trên nội dung đã bỏ dấu + viết hoa
+  pattern    String
+  matchType  MatchType @default(CONTAINS)
+  categoryId Int
+  priority   Int       @default(100) // số nhỏ chạy trước
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+enum TxnSource {
+  EMAIL // đọc từ email thông báo của ngân hàng (Vietcombank, Cake…)
+  MANUAL // nhập tay
+  IMPORT // nhập từ file / dữ liệu có sẵn (VD dữ liệu demo)
+}
+
+enum TxnDirection {
+  IN
+  OUT
+}
+
+enum CategorizedBy {
+  RULE
+  MANUAL
+  NONE
+}
+
+model Transaction {
+  id               Int           @id @default(autoincrement())
+  accountId        Int
+  // Khóa chống trùng theo nguồn, VD "vcb-email:<số lệnh giao dịch>", "cake-email:<mã giao dịch>"
+  externalId       String?       @unique @db.VarChar(100)
+  source           TxnSource
+  direction        TxnDirection
+  amount           BigInt
+  content          String        @db.Text
+  referenceCode    String?
+  transactionDate  DateTime
+  categoryId       Int?
+  categorizedBy    CategorizedBy @default(NONE)
+  note             String?       @db.Text
+  // Loại khỏi thống kê (VD: chuyển tiền giữa các tài khoản của chính mình)
+  excludeFromStats Boolean       @default(false)
+  // Chuyển khoản nội bộ: hai giao dịch (ra ở TK này, vào ở TK kia) trỏ vào nhau
+  transferPairId   Int?          @unique
+  // Người dùng xác nhận "không phải chuyển nội bộ" → không tự ghép lại nữa
+  transferIgnored  Boolean       @default(false)
+  rawPayload       Json?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  account  Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  transferPair   Transaction? @relation("TransferPair", fields: [transferPairId], references: [id], onDelete: SetNull)
+  transferPairOf Transaction? @relation("TransferPair")
+
+  @@index([transactionDate])
+  @@index([amount, transactionDate])
+  @@index([categoryId, transactionDate])
+  @@index([accountId, transactionDate])
+}
+
+model Budget {
+  id         Int     @id @default(autoincrement())
+  categoryId Int
+  // "YYYY-MM", hoặc "*" = ngân sách mặc định áp dụng cho tháng chưa đặt riêng
+  month      String   @db.VarChar(7)
+  amount     BigInt
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, month])
+}
+
+// Trạng thái nội bộ dạng key–value (VD: UID email đã đọc tới đâu, kết quả lần đọc email gần nhất)
+model AppState {
+  key       String   @id @db.VarChar(100)
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}
