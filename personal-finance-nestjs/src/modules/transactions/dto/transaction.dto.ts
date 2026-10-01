@@ -27,6 +27,7 @@ export class TransactionFilterDto {
   @IsOptional() @IsString() categoryId?: string; // số | "none"
   @IsOptional() @IsString() q?: string;
   @IsOptional() @IsString() source?: string;
+  @IsOptional() @IsString() categorizedBy?: string; // RULE | MANUAL | NONE
   @IsOptional() @IsString() excluded?: string; // "1"
   @IsOptional() @IsString() transfer?: string; // "1"
   @IsOptional() @IsString() min?: string;

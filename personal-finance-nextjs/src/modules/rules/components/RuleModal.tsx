@@ -12,17 +12,20 @@ import type { RuleDTO } from '../types';
 export default function RuleModal({
   rule,
   categories,
+  defaultCategoryId = null,
   onClose,
   onSaved,
 }: {
   rule: RuleDTO | null;
   categories: CategoryDTO[];
+  // Danh mục chọn sẵn khi tạo quy tắc từ Cây danh mục
+  defaultCategoryId?: number | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [pattern, setPattern] = useState(rule?.pattern ?? '');
   const [matchType, setMatchType] = useState<RuleDTO['matchType']>(rule?.matchType ?? 'CONTAINS');
-  const [categoryId, setCategoryId] = useState<number | null>(rule?.categoryId ?? null);
+  const [categoryId, setCategoryId] = useState<number | null>(rule?.categoryId ?? defaultCategoryId);
   const [priority, setPriority] = useState(String(rule?.priority ?? 100));
   const [saving, setSaving] = useState(false);
 

@@ -46,6 +46,11 @@ export class CreateGoalDto {
   @IsIn(GOAL_PRIORITIES)
   priority?: GoalPriority;
 
+  // Quỹ duy trì: tiêu bớt thì quay lại tích lũy (mặc định: true với hũ An toàn tài chính)
+  @IsOptional()
+  @IsBoolean()
+  ongoing?: boolean;
+
   @IsInt({ message: 'Số tiền mục tiêu không hợp lệ' })
   @IsPositive({ message: 'Số tiền mục tiêu phải lớn hơn 0' })
   @Max(1e13)
@@ -112,7 +117,8 @@ export class ArchiveGoalDto {
   archived: boolean;
 }
 
-export const CONTRIBUTION_KINDS = ['DEPOSIT', 'WITHDRAW', 'INTEREST'] as const;
+// SPEND: tiêu tiền của quỹ cho đúng mục đích (không làm giảm tiến độ tích lũy)
+export const CONTRIBUTION_KINDS = ['DEPOSIT', 'WITHDRAW', 'INTEREST', 'SPEND'] as const;
 export type ContributionInputKind = (typeof CONTRIBUTION_KINDS)[number];
 
 export class CreateContributionDto {

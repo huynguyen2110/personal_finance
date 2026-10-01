@@ -5,26 +5,17 @@ import toast from 'react-hot-toast';
 import Modal from '@/components/shared/Modal';
 import CategorySelect from '@/components/shared/CategorySelect';
 import { errorMessage } from '@/lib/api-client';
-import { normalizeText } from '@/lib/text';
 import type { CategoryDTO } from '@/modules/categories/types';
 import { updateTransaction } from '@/modules/transactions/lib';
 import type { TransactionDTO } from '@/modules/transactions/types';
 import { createRule, reapplyRules } from '../lib';
+import { suggestKeyword } from '../utils/suggest-keyword';
 
 interface Props {
   transaction: TransactionDTO | null;
   categories: CategoryDTO[];
   onClose: () => void;
   onDone: () => void;
-}
-
-// Gợi ý từ khóa: bỏ các từ chung chung của nội dung chuyển khoản, lấy 2 từ có nghĩa đầu tiên
-const STOP = new Set(['CK', 'CHUYEN', 'TIEN', 'DEN', 'TU', 'THANH', 'TOAN', 'CHO', 'NOI', 'DUNG', 'GD', 'MBVCB', 'IBFT', 'FT', 'TRANSFER', 'QR', 'DON', 'HANG']);
-function suggestKeyword(content: string): string {
-  const words = normalizeText(content)
-    .split(/[^A-Z0-9.!&-]+/)
-    .filter((w) => w.length >= 2 && !STOP.has(w) && !/^\d+$/.test(w));
-  return words.slice(0, 2).join(' ');
 }
 
 export default function RuleFromTxnModal(props: Props) {

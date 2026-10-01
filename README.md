@@ -41,6 +41,7 @@ cp .env.example .env        # điền JWT_SECRET, ADMIN_PASSWORD, IMAP_USER, IMA
 npm run prisma:deploy       # tạo bảng
 npm run seed                # tài khoản đăng nhập, danh mục mặc định, quy tắc mẫu, ví tiền mặt
 npm run seed:demo           # (tùy chọn) ~6 tháng giao dịch giả để xem thống kê
+npm run seed:goals          # (tùy chọn) mục tiêu tiết kiệm mẫu; xóa: npm run seed:goals -- --clear
 npm run build && npm run start:prod   # API ở http://localhost:4000
 ```
 
@@ -107,6 +108,7 @@ Kiểm tra bộ đọc email: `npm test -- providers` trong `personal-finance-ne
   - Kế hoạch nạp định kỳ (số tiền + ngày trong tháng): nhắc khi tới ngày mà tháng đó chưa nạp đủ; huy hiệu "kỷ luật tài chính" so thực nạp với kế hoạch 3 tháng gần nhất.
   - Quỹ khẩn cấp: gợi ý số tiền bằng 6 tháng chi tiêu thực tế, vạch mốc an toàn 3 tháng, hiển thị số tháng chi tiêu đã đủ.
   - Gợi ý trích thặng dư tháng này (thu − chi − đã nạp) để về đích mục tiêu ưu tiên nhất.
+  - Ghi **chi tiêu từ quỹ** khi đã dùng tiền cho đúng mục đích: không làm giảm tiến độ (quỹ đã đạt vẫn là hoàn thành), chỉ giảm số còn trong quỹ. Lọc quỹ **chưa tiêu / đã tiêu** (gồm tiêu một phần), xem tổng còn trong quỹ và đã tiêu.
   - Lần nạp/rút có thể gắn với giao dịch chuyển tiền đã ghi nhận và loại giao dịch đó khỏi thống kê chi tiêu; xóa lần nạp thì giao dịch được tính lại.
 - **Danh mục & Quy tắc**
   - Quy tắc theo từ khóa (khớp nguyên từ, không phân biệt dấu) hoặc regex, có độ ưu tiên.

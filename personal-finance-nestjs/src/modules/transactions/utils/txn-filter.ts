@@ -27,6 +27,10 @@ export function buildTxnWhere(sp: URLSearchParams): Prisma.TransactionWhereInput
   const source = sp.get('source');
   if (source === 'EMAIL' || source === 'MANUAL' || source === 'IMPORT') and.push({ source });
 
+  // Cách giao dịch được phân loại: RULE (tự động) | MANUAL (người dùng chọn) | NONE (chưa phân loại)
+  const categorizedBy = sp.get('categorizedBy');
+  if (categorizedBy === 'RULE' || categorizedBy === 'MANUAL' || categorizedBy === 'NONE') and.push({ categorizedBy });
+
   if (sp.get('excluded') === '1') and.push({ excludeFromStats: true });
   if (sp.get('transfer') === '1') and.push({ transferPairId: { not: null } });
 

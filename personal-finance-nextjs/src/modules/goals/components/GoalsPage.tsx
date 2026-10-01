@@ -3,20 +3,24 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowDownUp, BadgeCheck, PiggyBank, PlusCircle } from 'lucide-react';
+import { ArrowDownUp, BadgeCheck, PiggyBank, PlusCircle, ShoppingCart, Wallet } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { errorMessage } from '@/lib/api-client';
+import { formatVND } from '@/lib/money';
 import { invalidateFinanceData } from '@/lib/query-client';
 import { archiveGoal, useGoalsPage } from '../lib';
-import type { GoalDTO } from '../types';
+import type { ContributionInput, GoalDTO } from '../types';
 import { PRIORITIES } from '../utils/goal-meta';
 import GoalCard from './GoalCard';
+import GoalsOverview from './GoalsOverview';
 import GoalFormModal from './GoalFormModal';
 import ContributionModal from './ContributionModal';
 import HistoryModal from './HistoryModal';
 
 type Tab = 'all' | 'active' | 'done' | 'long' | 'short' | 'archived';
 type Sort = 'priority' | 'nearest' | 'amount' | 'progress';
+// Tình trạng sử dụng tiền của quỹ: 'spent' gồm cả quỹ đã tiêu một phần
+type SpendFilter = 'all' | 'unspent' | 'spent';
 
 const SORTS: { value: Sort; label: string }[] = [
   { value: 'priority', label: 'Ưu tiên cao nhất' },
@@ -50,7 +54,8 @@ export default function GoalsPage() {
   const [tab, setTab] = useState<Tab>('all');
   const [sort, setSort] = useState<Sort>('priority');
   const [editing, setEditing] = useState<GoalDTO | 'new' | null>(null);
-  const [depositing, setDepositing] = useState<{ goal: GoalDTO; preset?: number } | null>(null);
+  const [spendFilter, setSpendFilter] = useState<SpendFilter>('all');
+  const [depositing, setDepositing] = useState<{ goal: GoalDTO; preset?: number; kind?: ContributionInput['kind'] } | null>(null);
   const [history, setHistory] = useState<GoalDTO | null>(null);
 
   const reload = () => invalidateFinanceData(qc);
@@ -69,8 +74,23 @@ export default function GoalsPage() {
     } satisfies Record<Tab, GoalDTO[]>;
   }, [goals]);
 
+  const inTab = groups[tab];
+  const unspent = inTab.filter((g) => g.spendStatus === 'unspent');
+  const spent = inTab.filter((g) => g.spendStatus !== 'unspent');
+  const filtered = spendFilter === 'unspent' ? unspent : spendFilter === 'spent' ? spent : inTab;
+  const totals = {
+    balance: filtered.reduce((s, g) => s + g.balance, 0),
+    spent: filtered.reduce((s, g) => s + g.spent, 0),
+  };
+
   // Mục tiêu đã xong luôn xuống cuối
-  const list = [...groups[tab]].sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done') || COMPARE[sort](a, b));
+  const list = [...filtered].sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done') || COMPARE[sort](a, b));
+
+  const spendOptions: { value: SpendFilter; label: string }[] = [
+    { value: 'all', label: 'Tất cả' },
+    { value: 'unspent', label: `Chưa tiêu (${unspent.length})` },
+    { value: 'spent', label: `Đã tiêu (${spent.length})` },
+  ];
 
   const tabs: { value: Tab; label: string; hideOnMobile?: boolean }[] = [
     { value: 'all', label: `Tất cả mục tiêu (${groups.all.length})` },
@@ -118,7 +138,10 @@ export default function GoalsPage() {
         }
       />
 
-      <div className="px-4 md:px-6 pb-8 max-w-[1600px] flex flex-col gap-4 md:gap-6">
+      <div className="px-4 md:px-6 pb-8 flex flex-col gap-4 md:gap-6">
+        {/* Thống kê: đang tiết kiệm bao nhiêu, quỹ duy trì, mục tiêu một lần, sức khỏe tài chính */}
+        {data && goals.length > 0 && <GoalsOverview data={data.overview} />}
+
         {/* Bộ lọc + sắp xếp */}
         <div className="fin-card p-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
           <div className="flex items-center gap-1 overflow-x-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Lọc mục tiêu">
@@ -150,6 +173,45 @@ export default function GoalsPage() {
           </label>
         </div>
 
+        {/* Quỹ nào đã tiêu, quỹ nào chưa */}
+        {goals.length > 0 && (
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 -mt-1 md:-mt-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-slate-500">Tình trạng tiêu:</span>
+              <div className="inline-flex p-1 rounded-lg bg-white border border-slate-200 shadow-sm" role="radiogroup" aria-label="Lọc theo tình trạng tiêu">
+                {spendOptions.map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={spendFilter === o.value}
+                    onClick={() => setSpendFilter(o.value)}
+                    className={`px-3 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
+                      spendFilter === o.value
+                        ? o.value === 'spent'
+                          ? 'bg-violet-600 text-white'
+                          : 'bg-slate-800 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 fin-num">
+              <span className="inline-flex items-center gap-1.5">
+                <Wallet className="w-3.5 h-3.5 text-teal-700" aria-hidden />
+                Còn trong {filtered.length} quỹ: <strong className="text-slate-900">{formatVND(totals.balance)}</strong>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <ShoppingCart className="w-3.5 h-3.5 text-violet-600" aria-hidden />
+                Đã tiêu: <strong className="text-violet-700">{formatVND(totals.spent)}</strong>
+              </span>
+            </p>
+          </div>
+        )}
+
         {isLoading || !data ? (
           <div className="flex flex-col gap-4">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -173,7 +235,13 @@ export default function GoalsPage() {
             </button>
           </section>
         ) : list.length === 0 ? (
-          <p className="fin-card p-6 text-sm text-slate-500 text-center">Không có mục tiêu nào trong mục này.</p>
+          <p className="fin-card p-6 text-sm text-slate-500 text-center">
+            {spendFilter === 'unspent'
+              ? 'Không có quỹ nào chưa tiêu trong mục này.'
+              : spendFilter === 'spent'
+                ? 'Chưa có quỹ nào được tiêu trong mục này.'
+                : 'Không có mục tiêu nào trong mục này.'}
+          </p>
         ) : (
           <div className="flex flex-col gap-4">
             {list.map((g) => (
@@ -183,6 +251,7 @@ export default function GoalsPage() {
                 month={data.month}
                 suggestion={suggestion && suggestion.goalId === g.id ? { amount: suggestion.amount, available: data.surplus.available } : null}
                 onDeposit={(goal, preset) => setDepositing({ goal, preset })}
+                onSpend={(goal) => setDepositing({ goal, kind: 'SPEND' })}
                 onEdit={setEditing}
                 onHistory={setHistory}
                 onArchive={onArchive}
@@ -202,7 +271,13 @@ export default function GoalsPage() {
         />
       )}
       {depositing && (
-        <ContributionModal goal={depositing.goal} preset={depositing.preset} onClose={() => setDepositing(null)} onSaved={reload} />
+        <ContributionModal
+          goal={depositing.goal}
+          preset={depositing.preset}
+          initialKind={depositing.kind}
+          onClose={() => setDepositing(null)}
+          onSaved={reload}
+        />
       )}
       {history && <HistoryModal goal={history} onClose={() => setHistory(null)} onChanged={reload} />}
     </div>

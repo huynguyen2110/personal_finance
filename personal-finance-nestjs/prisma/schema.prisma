@@ -190,6 +190,9 @@ model SavingsGoal {
   icon             String       @default("PiggyBank")
   jar              GoalJar      @default(OTHER)
   priority         GoalPriority @default(NORMAL)
+  // Quỹ duy trì (VD quỹ khẩn cấp): tiến độ tính theo số còn trong quỹ → tiêu bớt thì quay lại tích lũy.
+  // false = quỹ một lần (VD mua điện thoại): đạt là xong, tiêu không làm giảm tiến độ.
+  ongoing          Boolean      @default(false)
   targetAmount     BigInt
   // Tháng cần đạt "YYYY-MM" (null = không đặt hạn)
   deadline         String?      @db.VarChar(7)
@@ -218,6 +221,7 @@ enum ContributionKind {
   DEPOSIT // nạp thêm
   WITHDRAW // rút ra
   INTEREST // tiền lãi nhận được
+  SPEND // tiêu tiền của quỹ cho đúng mục đích (VD đã mua laptop) — không làm giảm tiến độ tích lũy
 }
 
 model GoalContribution {

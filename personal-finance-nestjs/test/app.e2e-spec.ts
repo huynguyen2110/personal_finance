@@ -140,6 +140,10 @@ describe('Personal Finance API (e2e)', () => {
         .send({ name: `${username} quỹ`, targetAmount: 10_000_000, initialAmount: 2_000_000, monthlyPlan: 1_000_000, deadline: addMonths(month, 11), interestRate: 0 })
         .expect(201);
       goalId = r.body.data.id;
+      const page = (await authed('get', '/api/goals').expect(200)).body.data;
+      expect(page.overview).toEqual(
+        expect.objectContaining({ totalBalance: expect.any(Number), ongoing: expect.any(Object), health: expect.objectContaining({ factors: expect.any(Array) }) }),
+      );
       const g = await view();
       expect(g).toMatchObject({ saved: 2_000_000, remaining: 8_000_000, projectedMonths: 8, projectedMonth: addMonths(month, 8), status: 'on_track', horizon: 'short', monthsLeft: 12, completedAt: null });
       expect(g.thisMonth.due).toBe(1_000_000);
@@ -149,7 +153,7 @@ describe('Personal Finance API (e2e)', () => {
       await authed('post', `/api/goals/${goalId}/contributions`).send({ kind: 'DEPOSIT', amount: 1_000_000 }).expect(201);
       expect((await view()).thisMonth).toMatchObject({ deposited: 1_000_000, due: 0 });
       const r = await authed('post', `/api/goals/${goalId}/contributions`).send({ kind: 'WITHDRAW', amount: 50_000_000 }).expect(400);
-      expect(r.body.message).toBe('Số tiền rút lớn hơn số đã tích lũy');
+      expect(r.body.message).toBe('Số tiền rút lớn hơn số còn trong quỹ');
     });
 
     it('chạm mục tiêu → hoàn thành; rút bớt → bỏ hoàn thành', async () => {
@@ -181,6 +185,40 @@ describe('Personal Finance API (e2e)', () => {
       expect(linked).toMatchObject({ amount: 300_000, excludedTxn: true });
       await authed('delete', `/api/goals/contributions/${linked.id}`).expect(200);
       expect((await prisma.transaction.findUniqueOrThrow({ where: { id: txn.id } })).excludeFromStats).toBe(false);
+    });
+
+    it('tiêu tiền của quỹ: vẫn hoàn thành, giảm số còn trong quỹ; tiêu quá số còn → 400', async () => {
+      await authed('post', `/api/goals/${goalId}/contributions`).send({ kind: 'SPEND', amount: 4_000_000, note: 'Đã dùng' }).expect(201);
+      let g = await view();
+      expect(g).toMatchObject({ saved: 10_000_000, spent: 4_000_000, balance: 6_000_000, spendStatus: 'partial', status: 'done' });
+      expect(g.completedAt).not.toBeNull();
+      const r = await authed('post', `/api/goals/${goalId}/contributions`).send({ kind: 'SPEND', amount: 7_000_000 }).expect(400);
+      expect(r.body.message).toBe('Số tiền tiêu lớn hơn số còn trong quỹ');
+      await authed('post', `/api/goals/${goalId}/contributions`).send({ kind: 'SPEND', amount: 6_000_000 }).expect(201);
+      g = await view();
+      expect(g).toMatchObject({ balance: 0, spendStatus: 'spent', status: 'done' });
+      // Hết tiền trong quỹ thì không rút được nữa
+      await authed('post', `/api/goals/${goalId}/contributions`).send({ kind: 'WITHDRAW', amount: 1 }).expect(400);
+    });
+
+    it('quỹ duy trì: tiêu bớt thì quay lại tích lũy, nạp bù đầy thì hoàn thành lại', async () => {
+      const r = await authed('post', '/api/goals')
+        .send({ name: `${username} khẩn cấp`, jar: 'SAFETY', targetAmount: 1_000_000, initialAmount: 1_000_000 })
+        .expect(201);
+      const id = r.body.data.id;
+      const get = async () => (await authed('get', '/api/goals').expect(200)).body.data.goals.find((g: { id: number }) => g.id === id);
+      expect(await get()).toMatchObject({ ongoing: true, status: 'done', current: 1_000_000 });
+      await authed('post', `/api/goals/${id}/contributions`).send({ kind: 'SPEND', amount: 400_000 }).expect(201);
+      let g = await get();
+      expect(g).toMatchObject({ saved: 1_000_000, current: 600_000, remaining: 400_000, completedAt: null });
+      expect(g.status).not.toBe('done');
+      await authed('post', `/api/goals/${id}/contributions`).send({ kind: 'DEPOSIT', amount: 400_000 }).expect(201);
+      g = await get();
+      expect(g).toMatchObject({ current: 1_000_000, status: 'done' });
+      // Chuyển sang quỹ một lần: tiến độ tính theo số đã tích lũy (1,4tr) → vẫn hoàn thành
+      await authed('patch', `/api/goals/${id}`).send({ ongoing: false }).expect(200);
+      expect(await get()).toMatchObject({ ongoing: false, current: 1_400_000, status: 'done' });
+      await authed('delete', `/api/goals/${id}`).expect(200);
     });
 
     it('lưu trữ rồi xóa mục tiêu', async () => {

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { CalendarDays, ChartSpline, Landmark, PlusCircle, Save, Trash2 } from 'lucide-react';
+import { CalendarDays, ChartSpline, Infinity as InfinityIcon, Landmark, PlusCircle, Save, Target, Trash2 } from 'lucide-react';
 import Modal from '@/components/shared/Modal';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import { errorMessage } from '@/lib/api-client';
@@ -47,6 +47,9 @@ export default function GoalFormModal({ goal, month, avgMonthlyExpense, onClose,
   const [initial, setInitial] = useState<number | null>(null);
   const [deadline, setDeadline] = useState(goal?.deadline ?? '');
   const [priority, setPriority] = useState<GoalPriority>(goal?.priority ?? 'NORMAL');
+  // Quỹ duy trì mặc định theo hũ (An toàn tài chính) cho tới khi người dùng tự chọn
+  const [ongoing, setOngoing] = useState(goal?.ongoing ?? true);
+  const [ongoingTouched, setOngoingTouched] = useState(editing);
   const [monthlyPlan, setMonthlyPlan] = useState<number | null>(goal?.monthlyPlan ?? null);
   const [planDay, setPlanDay] = useState(goal?.planDay ? String(goal.planDay) : '');
   const [sourceAccountId, setSourceAccountId] = useState<number | null>(goal?.sourceAccount?.id ?? null);
@@ -61,7 +64,8 @@ export default function GoalFormModal({ goal, month, avgMonthlyExpense, onClose,
 
   const rateNum = rate.trim() ? Number(rate.replace(',', '.')) : null;
   const rateValid = rateNum === null || (Number.isFinite(rateNum) && rateNum >= 0 && rateNum <= 100);
-  const saved = editing ? goal.saved : (initial ?? 0);
+  // Số tính tiến độ: quỹ duy trì = còn trong quỹ, quỹ một lần = đã tích lũy
+  const saved = editing ? (ongoing ? goal.balance : goal.saved) : (initial ?? 0);
   const remaining = Math.max(0, (target ?? 0) - saved);
 
   // Tính ngay khi nhập: cần nạp bao nhiêu/tháng, dự kiến đạt khi nào, lãi đến khi đạt
@@ -75,6 +79,7 @@ export default function GoalFormModal({ goal, month, avgMonthlyExpense, onClose,
   function pickJar(j: GoalJar) {
     setJar(j);
     if (!iconTouched) setIcon(JARS[j].defaultIcon);
+    if (!ongoingTouched) setOngoing(j === 'SAFETY');
   }
 
   async function submit(e: React.FormEvent) {
@@ -90,6 +95,7 @@ export default function GoalFormModal({ goal, month, avgMonthlyExpense, onClose,
       icon,
       jar,
       priority,
+      ongoing,
       targetAmount: target,
       deadline: deadline || null,
       monthlyPlan: monthlyPlan || null,
@@ -206,6 +212,42 @@ export default function GoalFormModal({ goal, month, avgMonthlyExpense, onClose,
           </div>
         </div>
 
+        {/* Loại quỹ */}
+        <div>
+          <Label hint="Ảnh hưởng khi bạn tiêu tiền của quỹ">Loại quỹ</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Loại quỹ">
+            {(
+              [
+                [true, 'Quỹ duy trì (tích lũy trọn đời)', 'VD quỹ khẩn cấp. Tiêu bớt thì quỹ quay lại tích lũy để nạp bù cho đầy.', InfinityIcon],
+                [false, 'Quỹ một lần', 'VD mua điện thoại. Đạt mục tiêu là xong, tiêu tiền không làm giảm tiến độ.', Target],
+              ] as const
+            ).map(([value, title, desc, Icon]) => {
+              const active = ongoing === value;
+              return (
+                <button
+                  key={String(value)}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => {
+                    setOngoing(value);
+                    setOngoingTouched(true);
+                  }}
+                  className={`flex items-start gap-2.5 p-3 rounded-xl text-left transition-colors ${
+                    active ? 'border-2 border-teal-700 bg-teal-50' : 'border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${active ? 'text-teal-700' : 'text-slate-400'}`} aria-hidden />
+                  <span>
+                    <span className={`block text-[13px] font-semibold ${active ? 'text-teal-800' : 'text-slate-800'}`}>{title}</span>
+                    <span className="block text-xs text-slate-500 mt-0.5 leading-snug">{desc}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Số tiền */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -236,8 +278,8 @@ export default function GoalFormModal({ goal, month, avgMonthlyExpense, onClose,
           </div>
           {editing ? (
             <div>
-              <Label>Đã tích lũy</Label>
-              <p className="input-field !bg-slate-50 fin-num !text-[18px] !font-bold !py-2.5 text-teal-700">{formatVND(goal.saved)}</p>
+              <Label>{ongoing ? 'Đang có trong quỹ' : 'Đã tích lũy'}</Label>
+              <p className="input-field !bg-slate-50 fin-num !text-[18px] !font-bold !py-2.5 text-teal-700">{formatVND(saved)}</p>
               <p className="text-xs text-slate-500 pt-1.5">Thay đổi bằng nút Nạp tiền / Lịch sử nạp rút.</p>
             </div>
           ) : (

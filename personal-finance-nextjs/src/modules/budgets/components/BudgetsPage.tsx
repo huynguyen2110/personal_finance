@@ -172,7 +172,7 @@ export default function BudgetsPage() {
         }
       />
 
-      <div className={`px-4 md:px-6 pb-8 max-w-[1600px] flex flex-col gap-4 md:gap-6 transition-opacity ${loading && data ? 'opacity-60' : ''}`}>
+      <div className={`px-4 md:px-6 pb-8 flex flex-col gap-4 md:gap-6 transition-opacity ${loading && data ? 'opacity-60' : ''}`}>
         {!data ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (

@@ -16,6 +16,7 @@ const KIND: Record<ContributionKind, { label: string; badge: string; sign: 1 | -
   DEPOSIT: { label: 'Nạp', badge: 'bg-emerald-50 text-emerald-700', sign: 1 },
   INTEREST: { label: 'Tiền lãi', badge: 'bg-teal-50 text-teal-700', sign: 1 },
   WITHDRAW: { label: 'Rút', badge: 'bg-rose-50 text-rose-600', sign: -1 },
+  SPEND: { label: 'Đã tiêu', badge: 'bg-violet-50 text-violet-700', sign: -1 },
 };
 
 export default function HistoryModal({ goal, onClose, onChanged }: { goal: GoalDTO; onClose: () => void; onChanged: () => void }) {
@@ -35,13 +36,14 @@ export default function HistoryModal({ goal, onClose, onChanged }: { goal: GoalD
   }
 
   return (
-    <Modal isOpen onClose={onClose} title={`Lịch sử nạp/rút: ${goal.name}`} size="lg">
+    <Modal isOpen onClose={onClose} title={`Lịch sử nạp/rút/tiêu: ${goal.name}`} size="lg">
       <div className="flex flex-col gap-4 font-jakarta">
-        <div className="grid grid-cols-3 gap-2 fin-num">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 fin-num">
           {[
             ['Đã nạp', sum(['OPENING', 'DEPOSIT']), 'text-slate-900'],
             ['Tiền lãi', sum(['INTEREST']), 'text-teal-700'],
             ['Đã rút', sum(['WITHDRAW']), 'text-rose-600'],
+            ['Đã tiêu', sum(['SPEND']), 'text-violet-700'],
           ].map(([label, v, cls]) => (
             <div key={label as string} className="rounded-xl bg-slate-50 p-3">
               <p className="fin-label">{label}</p>
@@ -49,6 +51,12 @@ export default function HistoryModal({ goal, onClose, onChanged }: { goal: GoalD
             </div>
           ))}
         </div>
+
+        <p className="text-xs text-slate-500 fin-num -mt-1">
+          Còn trong quỹ: <strong className="text-slate-900">{formatVND(goal.balance)}</strong> · Đã tích lũy:{' '}
+          <strong className="text-slate-900">{formatVND(goal.saved)}</strong> · Tiến độ tính theo{' '}
+          {goal.ongoing ? 'số còn trong quỹ (quỹ duy trì)' : 'số đã tích lũy (quỹ một lần)'}
+        </p>
 
         {isLoading ? (
           <div className="h-24 rounded-xl bg-slate-100 animate-pulse" />
@@ -71,7 +79,9 @@ export default function HistoryModal({ goal, onClose, onChanged }: { goal: GoalD
                       </p>
                     )}
                   </div>
-                  <span className={`text-sm font-semibold fin-num shrink-0 ${k.sign < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                  <span
+                    className={`text-sm font-semibold fin-num shrink-0 ${r.kind === 'SPEND' ? 'text-violet-700' : k.sign < 0 ? 'text-rose-600' : 'text-emerald-700'}`}
+                  >
                     {k.sign < 0 ? '−' : '+'}
                     {formatVND(r.amount)}
                   </span>

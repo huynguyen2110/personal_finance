@@ -16,6 +16,11 @@ import {
   disciplineMonths,
   goalHorizon,
   goalStatus,
+  EMERGENCY_TARGET_MONTHS,
+  GOOD_SAVINGS_RATE,
+  healthFactors,
+  healthLevel,
+  healthScore,
   monthDiff,
   monthsLeftUntil,
   projectMonth,
@@ -23,9 +28,13 @@ import {
 } from '../utils/goal-insights';
 
 // Mỗi mục tiêu là một "hũ" ảo: số đã tích lũy = tổng các lần nạp/rút/lãi đã ghi.
+// Tiêu tiền của quỹ cho đúng mục đích (SPEND):
+//  - quỹ một lần (VD mua điện thoại): không làm giảm tiến độ — đạt là xong, chỉ giảm số còn trong quỹ;
+//  - quỹ duy trì (ongoing, VD quỹ khẩn cấp): tiến độ tính theo số còn trong quỹ → tiêu bớt thì quay lại tích lũy.
 // Web không tự chuyển tiền; kế hoạch nạp định kỳ chỉ để nhắc và dự báo.
 
-const SIGN: Record<ContributionKind, 1 | -1> = { OPENING: 1, DEPOSIT: 1, INTEREST: 1, WITHDRAW: -1 };
+// Ảnh hưởng tới số đã tích lũy (tiến độ). SPEND = 0: tính riêng vào "đã tiêu".
+const SIGN: Record<ContributionKind, 1 | -1 | 0> = { OPENING: 1, DEPOSIT: 1, INTEREST: 1, WITHDRAW: -1, SPEND: 0 };
 // Tốc độ nạp thực tế tính trên 3 tháng gần nhất (kể cả tháng hiện tại)
 const PACE_MONTHS = 3;
 // Mốc an toàn của quỹ khẩn cấp: 3 tháng chi tiêu
@@ -47,7 +56,18 @@ type GoalWithRelations = Prisma.SavingsGoalGetPayload<{ include: typeof goalIncl
 
 // Nạp/rút ròng (bỏ số dư ban đầu và tiền lãi) — dùng để đo tốc độ và kỷ luật nạp
 const netDeposit = (c: ContributionRow) => (c.kind === 'DEPOSIT' ? Number(c.amount) : c.kind === 'WITHDRAW' ? -Number(c.amount) : 0);
-const savedOf = (cs: ContributionRow[]) => cs.reduce((s, c) => s + SIGN[c.kind] * Number(c.amount), 0);
+// Tiền để dành thêm trong kỳ: nạp + lãi − rút (bỏ số dư ban đầu và khoản tiêu)
+const newSavings = (c: Pick<ContributionRow, 'kind' | 'amount'>) =>
+  c.kind === 'DEPOSIT' || c.kind === 'INTEREST' ? Number(c.amount) : c.kind === 'WITHDRAW' ? -Number(c.amount) : 0;
+const savedOf = (cs: Pick<ContributionRow, 'kind' | 'amount'>[]) => cs.reduce((s, c) => s + SIGN[c.kind] * Number(c.amount), 0);
+const spentOf = (cs: Pick<ContributionRow, 'kind' | 'amount'>[]) =>
+  cs.reduce((s, c) => s + (c.kind === 'SPEND' ? Number(c.amount) : 0), 0);
+
+export type SpendStatus = 'unspent' | 'partial' | 'spent';
+
+// Số tiền dùng để tính tiến độ / hoàn thành
+const progressAmount = (ongoing: boolean, cs: Pick<ContributionRow, 'kind' | 'amount'>[]) =>
+  ongoing ? Math.max(0, savedOf(cs) - spentOf(cs)) : savedOf(cs);
 
 function daysInMonth(month: string): number {
   return Number(monthRange(month).to.slice(8));
@@ -65,10 +85,12 @@ export class GoalsService {
   async getPage() {
     const month = currentMonthVN();
     const today = todayVN();
-    const [goals, avgMonthlyExpense, summary] = await Promise.all([
+    const [goals, avgMonthlyExpense, summary, last3] = await Promise.all([
       this.prisma.savingsGoal.findMany({ include: goalInclude, orderBy: { id: 'asc' } }),
       this.avgMonthlyExpense(month),
       this.stats.getSummary(monthRange(month)),
+      // Tỷ lệ tiết kiệm trên 3 tháng đã trọn vẹn gần nhất
+      this.stats.getSummary({ from: monthRange(addMonths(month, -3)).from, to: monthRange(addMonths(month, -1)).to }),
     ]);
 
     const views = goals.map((g) => this.toView(g, month, today, avgMonthlyExpense));
@@ -87,11 +109,14 @@ export class GoalsService {
       .filter((v) => !v.archivedAt && v.status !== 'done' && v.remaining > 0 && v.remaining <= available)
       .sort((a, b) => rank[a.priority] - rank[b.priority] || a.remaining - b.remaining)[0];
 
+    const discipline = this.discipline(goals, month, today);
+
     return {
       month,
       today,
       goals: views,
       avgMonthlyExpense,
+      overview: this.overview(goals, views, month, avgMonthlyExpense, last3.savingsRate, discipline?.ratio ?? null),
       surplus: {
         income: summary.income,
         expense: summary.expense,
@@ -99,14 +124,92 @@ export class GoalsService {
         available,
         suggestion: candidate ? { goalId: candidate.id, amount: candidate.remaining } : null,
       },
-      discipline: this.discipline(goals, month, today),
+      discipline,
+    };
+  }
+
+  // Thống kê đầu trang: đang tiết kiệm bao nhiêu, phần quỹ duy trì, mục tiêu một lần, sức khỏe tài chính.
+  // Chỉ tính mục tiêu chưa lưu trữ.
+  private overview(
+    goals: GoalWithRelations[],
+    views: ReturnType<GoalsService['toView']>[],
+    month: string,
+    avgMonthlyExpense: number | null,
+    savingsRate: number | null,
+    disciplineRatio: number | null,
+  ) {
+    const live = views.filter((v) => !v.archivedAt);
+    const liveIds = new Set(live.map((v) => v.id));
+    const contributions = goals.filter((g) => liveIds.has(g.id)).flatMap((g) => g.contributions);
+    const savedIn = (m: string) => contributions.filter((c) => toVNMonthString(c.date) === m).reduce((s, c) => s + newSavings(c), 0);
+    const sum = (xs: typeof live, f: (v: (typeof live)[number]) => number) => xs.reduce((s, v) => s + f(v), 0);
+
+    const ongoing = live.filter((v) => v.ongoing);
+    const oneTime = live.filter((v) => !v.ongoing && v.status !== 'done');
+    const totalBalance = sum(live, (v) => v.balance);
+    const ongoingBalance = sum(ongoing, (v) => v.balance);
+
+    // Quỹ khẩn cấp đủ chi tiêu bao nhiêu tháng (hũ An toàn tài chính); chưa có quỹ nào thì là 0 tháng
+    const safetyBalance = sum(live.filter((v) => v.jar === 'SAFETY'), (v) => v.balance);
+    const emergencyMonths = avgMonthlyExpense ? safetyBalance / avgMonthlyExpense : null;
+
+    // Mục tiêu có hạn: bao nhiêu cái đang đúng lộ trình
+    const tracked = live.filter((v) => v.status === 'on_track' || v.status === 'behind' || v.status === 'overdue');
+    const onTrack = { ok: tracked.filter((v) => v.status === 'on_track').length, total: tracked.length };
+
+    const factors = healthFactors({ emergencyMonths, savingsRate, disciplineRatio, onTrack });
+    const score = healthScore(factors);
+
+    return {
+      totalBalance,
+      totalSaved: sum(live, (v) => v.saved),
+      totalSpent: sum(live, (v) => v.spent),
+      savedThisMonth: savedIn(month),
+      savedLastMonth: savedIn(addMonths(month, -1)),
+      ongoing: {
+        count: ongoing.length,
+        balance: ongoingBalance,
+        target: sum(ongoing, (v) => v.targetAmount),
+        share: totalBalance > 0 ? ongoingBalance / totalBalance : 0,
+        // Cần nạp bù cho đầy các quỹ duy trì
+        refill: sum(ongoing, (v) => v.remaining),
+      },
+      oneTime: {
+        count: oneTime.length,
+        current: sum(oneTime, (v) => v.current),
+        target: sum(oneTime, (v) => v.targetAmount),
+        done: live.filter((v) => !v.ongoing && v.status === 'done').length,
+      },
+      statusCounts: {
+        on_track: live.filter((v) => v.status === 'on_track').length,
+        behind: live.filter((v) => v.status === 'behind').length,
+        overdue: live.filter((v) => v.status === 'overdue').length,
+      },
+      health: {
+        score,
+        level: score === null ? null : healthLevel(score),
+        factors: factors.map((f) => ({ ...f })),
+        emergencyMonths,
+        emergencyTargetMonths: EMERGENCY_TARGET_MONTHS,
+        savingsRate,
+        goodSavingsRate: GOOD_SAVINGS_RATE,
+        disciplineRatio,
+        onTrack,
+      },
     };
   }
 
   private toView(g: GoalWithRelations, month: string, today: string, avgMonthlyExpense: number | null) {
     const target = Number(g.targetAmount);
     const saved = savedOf(g.contributions);
-    const remaining = Math.max(0, target - saved);
+    // Đã tiêu cho mục đích của quỹ, và số tiền thực còn nằm trong quỹ
+    const spent = spentOf(g.contributions);
+    const balance = Math.max(0, saved - spent);
+    // Số tính tiến độ: quỹ duy trì = số còn trong quỹ, quỹ một lần = số đã tích lũy
+    const current = g.ongoing ? balance : saved;
+    const remaining = Math.max(0, target - current);
+    const spendStatus: SpendStatus = spent <= 0 ? 'unspent' : balance > 0 ? 'partial' : 'spent';
+    const spendDates = g.contributions.filter((c) => c.kind === 'SPEND').map((c) => c.date.getTime());
     const interestRate = g.interestRateBp !== null ? g.interestRateBp / 100 : null;
     const monthlyPlan = g.monthlyPlan !== null ? Number(g.monthlyPlan) : null;
 
@@ -119,9 +222,9 @@ export class GoalsService {
 
     // Dự báo theo kế hoạch nạp nếu có, không thì theo tốc độ thực tế
     const monthlyRate = monthlyPlan && monthlyPlan > 0 ? monthlyPlan : pace;
-    const sim = simulateGoal(saved, target, monthlyRate, interestRate);
+    const sim = simulateGoal(current, target, monthlyRate, interestRate);
     const projectedMonth = remaining === 0 ? null : projectMonth(month, sim.months);
-    const status = goalStatus({ saved, target, deadline: g.deadline, currentMonth: month, projectedMonth, monthlyRate });
+    const status = goalStatus({ saved: current, target, deadline: g.deadline, currentMonth: month, projectedMonth, monthlyRate });
     const monthsLeft = g.deadline && g.deadline >= month ? monthsLeftUntil(month, g.deadline) : null;
 
     // Kế hoạch tháng này: đã nạp bao nhiêu, còn thiếu bao nhiêu, đã tới ngày nạp chưa
@@ -141,6 +244,7 @@ export class GoalsService {
       icon: g.icon,
       jar: g.jar,
       priority: g.priority,
+      ongoing: g.ongoing,
       targetAmount: target,
       deadline: g.deadline,
       monthlyPlan,
@@ -155,8 +259,13 @@ export class GoalsService {
       createdAt: g.createdAt,
 
       saved,
+      current,
       remaining,
-      progress: target > 0 ? saved / target : 0,
+      progress: target > 0 ? current / target : 0,
+      spent,
+      balance,
+      spendStatus,
+      lastSpentAt: spendDates.length ? new Date(Math.max(...spendDates)) : null,
       contributionCount: g.contributions.length,
       lastContributionAt: dates.length ? new Date(Math.max(...dates)) : null,
 
@@ -170,7 +279,8 @@ export class GoalsService {
       status,
       horizon: status === 'done' ? null : goalHorizon(month, g.deadline, sim.months),
 
-      monthlyInterest: interestRate ? Math.round((saved * interestRate) / 100 / 12) : 0,
+      // Lãi tính trên số tiền thực còn trong quỹ
+      monthlyInterest: interestRate ? Math.round((balance * interestRate) / 100 / 12) : 0,
       interestToFinish: remaining > 0 && sim.months !== null ? sim.interest : 0,
 
       thisMonth: {
@@ -180,9 +290,9 @@ export class GoalsService {
       },
       milestone:
         milestoneAmount !== null && milestoneAmount < target
-          ? { amount: milestoneAmount, label: `Mốc an toàn ${SAFETY_MILESTONE_MONTHS} tháng chi tiêu`, reached: saved >= milestoneAmount }
+          ? { amount: milestoneAmount, label: `Mốc an toàn ${SAFETY_MILESTONE_MONTHS} tháng chi tiêu`, reached: current >= milestoneAmount }
           : null,
-      coverMonths: isSafety ? saved / avgMonthlyExpense : null,
+      coverMonths: isSafety ? balance / avgMonthlyExpense : null,
     };
   }
 
@@ -226,6 +336,7 @@ export class GoalsService {
     if (dto.icon !== undefined) data.icon = dto.icon;
     if (dto.jar !== undefined) data.jar = dto.jar;
     if (dto.priority !== undefined) data.priority = dto.priority;
+    if (dto.ongoing !== undefined) data.ongoing = dto.ongoing;
     if (dto.targetAmount !== undefined) data.targetAmount = BigInt(dto.targetAmount);
     if (dto.deadline !== undefined) data.deadline = dto.deadline || null;
     if (dto.monthlyPlan !== undefined) data.monthlyPlan = dto.monthlyPlan ? BigInt(dto.monthlyPlan) : null;
@@ -255,6 +366,8 @@ export class GoalsService {
         icon: 'PiggyBank',
         jar: 'OTHER',
         priority: 'NORMAL',
+        // Quỹ khẩn cấp mặc định là quỹ duy trì
+        ongoing: dto.jar === 'SAFETY',
         ...(this.toData(rest) as unknown as Partial<Prisma.SavingsGoalUncheckedCreateInput>),
         contributions: initialAmount
           ? { create: { kind: 'OPENING', amount: BigInt(initialAmount), date: new Date(), note: 'Số tiền đã có khi tạo mục tiêu' } }
@@ -297,11 +410,10 @@ export class GoalsService {
   private async syncCompletion(goalId: number) {
     const goal = await this.prisma.savingsGoal.findUnique({
       where: { id: goalId },
-      select: { targetAmount: true, completedAt: true, contributions: { select: { kind: true, amount: true } } },
+      select: { targetAmount: true, ongoing: true, completedAt: true, contributions: { select: { kind: true, amount: true } } },
     });
     if (!goal) return;
-    const saved = goal.contributions.reduce((s, c) => s + SIGN[c.kind] * Number(c.amount), 0);
-    const reached = saved >= Number(goal.targetAmount);
+    const reached = progressAmount(goal.ongoing, goal.contributions) >= Number(goal.targetAmount);
     if (reached && !goal.completedAt) {
       await this.prisma.savingsGoal.update({ where: { id: goalId }, data: { completedAt: new Date() } });
     } else if (!reached && goal.completedAt) {
@@ -346,9 +458,13 @@ export class GoalsService {
 
     const amount = dto.amount ?? (txn ? Number(txn.amount) : 0);
     if (amount <= 0) throw new BadRequestException('Nhập số tiền');
-    if (dto.kind === 'WITHDRAW') {
-      const saved = goal.contributions.reduce((s, c) => s + SIGN[c.kind] * Number(c.amount), 0);
-      if (amount > saved) throw new BadRequestException('Số tiền rút lớn hơn số đã tích lũy');
+    if (dto.kind === 'WITHDRAW' || dto.kind === 'SPEND') {
+      const balance = savedOf(goal.contributions) - spentOf(goal.contributions);
+      if (amount > balance) {
+        throw new BadRequestException(
+          dto.kind === 'SPEND' ? 'Số tiền tiêu lớn hơn số còn trong quỹ' : 'Số tiền rút lớn hơn số còn trong quỹ',
+        );
+      }
     }
 
     // Ngày: theo giao dịch gắn kèm; hôm nay → thời điểm hiện tại; ngày khác → 12:00 ngày đó

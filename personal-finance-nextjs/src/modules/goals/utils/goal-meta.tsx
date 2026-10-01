@@ -15,7 +15,10 @@ import {
   GraduationCap,
   HeartHandshake,
   House,
+  Infinity as InfinityIcon,
   Laptop,
+  ShoppingCart,
+  Wallet,
   Palmtree,
   PiggyBank,
   Plane,
@@ -28,7 +31,14 @@ import {
   Umbrella,
   type LucideIcon,
 } from 'lucide-react';
-import type { GoalDTO, GoalJar, GoalPriority, GoalStatus } from '../types';
+import type { GoalDTO, GoalJar, GoalPriority, GoalStatus, SpendStatus } from '../types';
+
+// Thẻ nổi trên nền trang: viền rõ hơn .fin-card mặc định + bóng đổ nhiều lớp, nhấc nhẹ khi rê chuột
+export const CARD =
+  'relative overflow-hidden bg-white rounded-2xl border border-slate-200/90 ' +
+  'shadow-[0_1px_2px_rgba(15,23,42,0.06),0_6px_20px_-6px_rgba(15,23,42,0.12)] ' +
+  'transition-[box-shadow,border-color,transform] duration-200 ' +
+  'hover:border-slate-300 hover:shadow-[0_2px_4px_rgba(15,23,42,0.06),0_14px_32px_-10px_rgba(15,23,42,0.18)] hover:-translate-y-px';
 
 // Icon chọn được cho mục tiêu (tên lưu trong DB)
 export const GOAL_ICONS: Record<string, LucideIcon> = {
@@ -61,6 +71,34 @@ export const STATUS: Record<GoalStatus, { label: string; badge: string; fill: st
   no_deadline: { label: 'Không đặt hạn', badge: 'bg-slate-100 text-slate-600 border-slate-200', fill: '#0f766e', Icon: CircleDashed },
   no_plan: { label: 'Chưa có kế hoạch nạp', badge: 'bg-slate-100 text-slate-500 border-slate-200', fill: '#94a3b8', Icon: CircleDashed },
 };
+
+// Tình trạng sử dụng tiền của quỹ (màu tím: tách khỏi màu trạng thái tích lũy)
+export const SPEND_STATUS: Record<SpendStatus, { label: string; badge: string; Icon: LucideIcon }> = {
+  unspent: { label: 'Chưa tiêu', badge: 'bg-white text-slate-600 border-slate-200', Icon: Wallet },
+  partial: { label: 'Đã tiêu một phần', badge: 'bg-violet-50 text-violet-700 border-violet-200', Icon: ShoppingCart },
+  spent: { label: 'Đã tiêu hết', badge: 'bg-violet-100 text-violet-800 border-violet-300', Icon: ShoppingCart },
+};
+
+export function SpendBadge({ goal }: { goal: Pick<GoalDTO, 'spendStatus'> }) {
+  const s = SPEND_STATUS[goal.spendStatus];
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold ${s.badge}`}>
+      <s.Icon className="w-3 h-3" aria-hidden /> {s.label}
+    </span>
+  );
+}
+
+// Quỹ duy trì: tiêu bớt thì quay lại tích lũy
+export function OngoingBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold bg-sky-50 text-sky-700 border-sky-200"
+      title="Quỹ duy trì: tiến độ tính theo số tiền còn trong quỹ — tiêu bớt thì tự quay lại tích lũy"
+    >
+      <InfinityIcon className="w-3.5 h-3.5" aria-hidden /> Quỹ duy trì
+    </span>
+  );
+}
 
 export function GoalIcon({ goal, size = 'lg' }: { goal: Pick<GoalDTO, 'icon' | 'jar'>; size?: 'md' | 'lg' }) {
   const Icon = GOAL_ICONS[goal.icon] ?? JARS[goal.jar].icon;

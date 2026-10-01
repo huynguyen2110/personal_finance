@@ -24,7 +24,7 @@ export interface TransactionDTO {
 
 // Bộ lọc danh sách (query string) — khóa giống API
 export type TransactionFilters = Partial<
-  Record<'from' | 'to' | 'accountId' | 'direction' | 'categoryId' | 'q' | 'source' | 'excluded' | 'transfer' | 'min' | 'max' | 'sort', string>
+  Record<'from' | 'to' | 'accountId' | 'direction' | 'categoryId' | 'categorizedBy' | 'q' | 'source' | 'excluded' | 'transfer' | 'min' | 'max' | 'sort', string>
 >;
 
 export interface TransactionInput {

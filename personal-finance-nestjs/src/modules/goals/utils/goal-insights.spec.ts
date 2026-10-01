@@ -3,6 +3,9 @@ import {
   disciplineMonths,
   goalHorizon,
   goalStatus,
+  healthFactors,
+  healthLevel,
+  healthScore,
   monthDiff,
   monthsLeftUntil,
   projectMonth,
@@ -67,5 +70,17 @@ describe('goal-insights', () => {
     expect(disciplineMonths('2026-07', '2026-10', false)).toEqual(['2026-09', '2026-08']);
     // vừa tạo tháng này → chưa chấm
     expect(disciplineMonths('2026-10', '2026-10', true)).toEqual([]);
+  });
+
+  it('healthScore: trung bình có trọng số, bỏ yếu tố thiếu dữ liệu', () => {
+    // Đủ cả 4 yếu tố tối đa → 100
+    expect(healthScore(healthFactors({ emergencyMonths: 6, savingsRate: 0.25, disciplineRatio: 1.2, onTrack: { ok: 2, total: 2 } }))).toBe(100);
+    // Quỹ khẩn cấp 3/6 tháng (0,5), tiết kiệm 10%/20% (0,5), kỷ luật 1, đúng lộ trình 1/2 (0,5)
+    // = (35·0,5 + 30·0,5 + 20·1 + 15·0,5) / 100 = 60
+    expect(healthScore(healthFactors({ emergencyMonths: 3, savingsRate: 0.1, disciplineRatio: 1, onTrack: { ok: 1, total: 2 } }))).toBe(60);
+    // Chỉ có quỹ khẩn cấp + tiết kiệm âm → (35·1 + 30·0) / 65 ≈ 54
+    expect(healthScore(healthFactors({ emergencyMonths: 8, savingsRate: -0.3, disciplineRatio: null, onTrack: { ok: 0, total: 0 } }))).toBe(54);
+    expect(healthScore(healthFactors({ emergencyMonths: null, savingsRate: null, disciplineRatio: null, onTrack: { ok: 0, total: 0 } }))).toBeNull();
+    expect([healthLevel(85), healthLevel(60), healthLevel(45), healthLevel(10)]).toEqual(['excellent', 'stable', 'improve', 'alert']);
   });
 });

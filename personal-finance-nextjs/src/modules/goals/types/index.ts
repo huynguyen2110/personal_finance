@@ -3,7 +3,9 @@ import type { Direction } from '@/types/common';
 export type GoalJar = 'SAFETY' | 'PURCHASE' | 'EXPERIENCE' | 'INVESTMENT' | 'SELF' | 'OTHER';
 export type GoalPriority = 'HIGH' | 'NORMAL' | 'FLEXIBLE';
 export type GoalStatus = 'done' | 'overdue' | 'on_track' | 'behind' | 'no_deadline' | 'no_plan';
-export type ContributionKind = 'OPENING' | 'DEPOSIT' | 'WITHDRAW' | 'INTEREST';
+// SPEND: tiêu tiền của quỹ cho đúng mục đích — không làm giảm tiến độ, chỉ giảm số còn trong quỹ
+export type ContributionKind = 'OPENING' | 'DEPOSIT' | 'WITHDRAW' | 'INTEREST' | 'SPEND';
+export type SpendStatus = 'unspent' | 'partial' | 'spent';
 
 export interface GoalDTO {
   id: number;
@@ -11,6 +13,8 @@ export interface GoalDTO {
   icon: string;
   jar: GoalJar;
   priority: GoalPriority;
+  // Quỹ duy trì (VD quỹ khẩn cấp): tiến độ tính theo số còn trong quỹ → tiêu bớt thì quay lại tích lũy
+  ongoing: boolean;
   targetAmount: number;
   deadline: string | null; // "YYYY-MM"
   monthlyPlan: number | null;
@@ -24,9 +28,14 @@ export interface GoalDTO {
   archivedAt: string | null;
   createdAt: string;
 
-  saved: number;
+  saved: number; // đã tích lũy (nạp + lãi − rút)
+  current: number; // số tính tiến độ: quỹ duy trì = còn trong quỹ, quỹ một lần = đã tích lũy
   remaining: number;
   progress: number; // 0..1+
+  spent: number; // đã tiêu từ quỹ
+  balance: number; // còn trong quỹ = đã tích lũy − đã tiêu
+  spendStatus: SpendStatus;
+  lastSpentAt: string | null;
   contributionCount: number;
   lastContributionAt: string | null;
 
@@ -47,11 +56,38 @@ export interface GoalDTO {
   coverMonths: number | null; // quỹ khẩn cấp: đủ chi tiêu bao nhiêu tháng
 }
 
+export type HealthFactorKey = 'emergency' | 'savingsRate' | 'discipline' | 'onTrack';
+export type HealthLevel = 'excellent' | 'stable' | 'improve' | 'alert';
+
+// Thống kê đầu trang (chỉ tính mục tiêu chưa lưu trữ)
+export interface GoalsOverviewData {
+  totalBalance: number; // đang nằm trong các quỹ
+  totalSaved: number;
+  totalSpent: number;
+  savedThisMonth: number; // nạp + lãi − rút trong tháng
+  savedLastMonth: number;
+  ongoing: { count: number; balance: number; target: number; share: number; refill: number };
+  oneTime: { count: number; current: number; target: number; done: number };
+  statusCounts: { on_track: number; behind: number; overdue: number };
+  health: {
+    score: number | null; // 0..100
+    level: HealthLevel | null;
+    factors: { key: HealthFactorKey; weight: number; score: number | null }[];
+    emergencyMonths: number | null;
+    emergencyTargetMonths: number;
+    savingsRate: number | null;
+    goodSavingsRate: number;
+    disciplineRatio: number | null;
+    onTrack: { ok: number; total: number };
+  };
+}
+
 export interface GoalsPageData {
   month: string;
   today: string;
   goals: GoalDTO[];
   avgMonthlyExpense: number | null;
+  overview: GoalsOverviewData;
   surplus: {
     income: number;
     expense: number;
@@ -67,6 +103,7 @@ export interface GoalInput {
   icon?: string;
   jar?: GoalJar;
   priority?: GoalPriority;
+  ongoing?: boolean;
   targetAmount?: number;
   deadline?: string | null;
   monthlyPlan?: number | null;

@@ -13,7 +13,7 @@ export function useCategories() {
   });
 }
 
-export const createCategory = (payload: CategoryInput) => apiClient({ method: 'post', url: BASE_URL, payload });
+export const createCategory = (payload: CategoryInput) => apiClient<CategoryDTO>({ method: 'post', url: BASE_URL, payload });
 export const updateCategory = (id: number, payload: Partial<CategoryInput>) =>
   apiClient({ method: 'patch', url: `${BASE_URL}/${id}`, payload });
 export const deleteCategory = (id: number) => apiClient({ method: 'delete', url: `${BASE_URL}/${id}` });
