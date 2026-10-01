@@ -184,6 +184,7 @@ export default function ReportsPage() {
                   >
                     {data.expenseRows.map((r) => (
                       <option key={String(r.categoryId)} value={String(r.categoryId)}>
+                        {r.parentId !== null ? '   └ ' : ''}
                         {r.name}
                       </option>
                     ))}
@@ -245,7 +246,9 @@ export default function ReportsPage() {
 function Matrix({ months, rows, color }: { months: string[]; rows: Row[]; color: string }) {
   if (!rows.length) return <p className="p-8 text-center text-sm text-text-muted">Chưa có dữ liệu trong khoảng này</p>;
   const max = Math.max(...rows.flatMap((r) => r.values), 1);
-  const colTotals = months.map((_, i) => rows.reduce((s, r) => s + r.values[i], 0));
+  // Tổng chỉ cộng dòng cấp cao nhất (dòng cha đã gộp con)
+  const tops = rows.filter((r) => r.parentId === null);
+  const colTotals = months.map((_, i) => tops.reduce((s, r) => s + r.values[i], 0));
   const grand = colTotals.reduce((s, v) => s + v, 0);
   const alpha = (v: number) => (v <= 0 ? 0 : 0.08 + 0.42 * (v / max));
 
@@ -264,11 +267,12 @@ function Matrix({ months, rows, color }: { months: string[]; rows: Row[]; color:
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={String(r.categoryId)} className="border-b border-slate-100">
-              <td className="px-3 py-1.5 sticky left-0 bg-white">
+            <tr key={String(r.categoryId)} className={`border-b border-slate-100 ${r.parentId !== null ? 'bg-slate-50/60 text-text-secondary' : ''}`}>
+              <td className={`px-3 py-1.5 sticky left-0 ${r.parentId !== null ? 'bg-[#FAFBFD] pl-8' : 'bg-white'}`}>
                 <span className="flex items-center gap-2">
+                  {r.parentId !== null && <span className="text-text-muted" aria-hidden>└</span>}
                   <CategoryIcon icon={r.icon} color={r.color} size="sm" />
-                  <span className="text-text truncate">{r.name}</span>
+                  <span className={`truncate ${r.parentId !== null ? 'text-text-secondary' : 'text-text font-medium'}`}>{r.name}</span>
                 </span>
               </td>
               {r.values.map((v, i) => (

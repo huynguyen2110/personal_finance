@@ -6,7 +6,7 @@ import CategoryIcon from '@/components/shared/CategoryIcon';
 import { qs } from '@/lib/url';
 import { formatCompactVND, formatVND } from '@/lib/money';
 import { formatMonthLabel, monthRange } from '@/lib/dates';
-import { budgetState, projectedSpend, type BudgetState, type MonthClock } from '../utils/budget-insights';
+import { budgetState, childrenOverCeiling, projectedSpend, type BudgetState, type MonthClock } from '../utils/budget-insights';
 import type { BudgetLine } from '../types';
 
 // Màu trạng thái theo DESIGN.md: teal = trong tầm kiểm soát, amber = sắp chạm, rose = vượt.
@@ -68,12 +68,17 @@ export function ProgressTrack({
 
 interface Props {
   line: BudgetLine;
+  // Danh mục con của dòng này (số liệu của chúng đã được gộp vào `line`)
+  subLines?: BudgetLine[];
   month: string;
   clock: MonthClock;
   onEdit: (line: BudgetLine) => void;
 }
 
-export default function BudgetCard({ line, month, clock, onEdit }: Props) {
+const SOURCE_LABEL = (source: BudgetLine['source'], month: string) =>
+  source === 'MONTH' ? `Riêng ${formatMonthLabel(month)}` : source === 'DEFAULT' ? 'Mặc định hàng tháng' : source === 'CHILDREN' ? 'Tổng hạn mức các con' : null;
+
+export default function BudgetCard({ line, subLines = [], month, clock, onEdit }: Props) {
   const state = budgetState(line);
   const st = STATE_STYLE[state];
   const { from, to } = monthRange(month);
@@ -117,9 +122,10 @@ export default function BudgetCard({ line, month, clock, onEdit }: Props) {
                 {stateLabel(line)}
               </span>
               {line.source && (
-                <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-semibold">
-                  {line.source === 'MONTH' ? `Riêng ${formatMonthLabel(month)}` : 'Mặc định hàng tháng'}
-                </span>
+                <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-semibold">{SOURCE_LABEL(line.source, month)}</span>
+              )}
+              {subLines.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded bg-teal-50 text-teal-800 text-[11px] font-semibold fin-num">Gồm {subLines.length} danh mục con</span>
               )}
             </div>
             <p className="text-xs text-slate-500 mt-0.5 fin-num">
@@ -168,6 +174,50 @@ export default function BudgetCard({ line, month, clock, onEdit }: Props) {
           )}
         </div>
       </div>
+
+      {/* Danh mục con: phần chi tiết của số liệu đã gộp ở trên */}
+      {subLines.length > 0 && childrenOverCeiling(line, subLines) && (
+        <p className="flex items-center gap-1.5 text-xs text-rose-600 font-semibold fin-num" role="alert">
+          <OctagonAlert className="w-3.5 h-3.5 shrink-0" aria-hidden />
+          Tổng hạn mức các con {formatVND(childrenOverCeiling(line, subLines)!.sum)} vượt trần {formatVND(amount ?? 0)} của nhóm — hãy giảm hạn mức con hoặc tăng hạn mức cha.
+        </p>
+      )}
+      {subLines.length > 0 && (
+        <ul className="mt-1 rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+          {[...subLines]
+            .sort((a, b) => b.spent - a.spent)
+            .map((s) => {
+              const sst = STATE_STYLE[budgetState(s)];
+              const share = line.spent > 0 ? s.spent / line.spent : 0;
+              return (
+                <li key={s.categoryId} className="flex items-center gap-2.5 px-3 py-2 bg-slate-50/60 text-xs">
+                  <CategoryIcon icon={s.icon} color={s.color} size="sm" />
+                  <Link
+                    href={`/transactions${qs({ categoryId: s.categoryId, from, to, direction: 'OUT' })}`}
+                    className="font-semibold text-slate-800 truncate hover:underline min-w-0 flex-1"
+                  >
+                    {s.name}
+                  </Link>
+                  <span className="hidden sm:block w-24 h-1 rounded-full bg-slate-200 overflow-hidden" aria-hidden>
+                    <span className="block h-full rounded-full" style={{ width: `${Math.min(100, share * 100)}%`, backgroundColor: sst.fill }} />
+                  </span>
+                  <span className="fin-num text-slate-900 whitespace-nowrap">
+                    {formatCompactVND(s.spent)} ₫
+                    <span
+                      className={amount !== null && line.source !== 'CHILDREN' && (s.amount ?? 0) > amount ? 'text-rose-600 font-semibold' : 'text-slate-400'}
+                      title={amount !== null && line.source !== 'CHILDREN' && (s.amount ?? 0) > amount ? 'Hạn mức con vượt trần của nhóm cha' : undefined}
+                    >
+                      {' '}/ {s.amount !== null ? `${formatCompactVND(s.amount)} ₫` : '—'}
+                    </span>
+                  </span>
+                  <button type="button" className="p-1 rounded text-slate-400 hover:text-teal-700 hover:bg-white" onClick={() => onEdit(s)} aria-label={`Sửa hạn mức ${s.name}`}>
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              );
+            })}
+        </ul>
+      )}
     </div>
   );
 }

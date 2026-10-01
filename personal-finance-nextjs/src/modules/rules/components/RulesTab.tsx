@@ -87,7 +87,9 @@ export default function RulesTab({ categories, rules, pending, onGoToTree, onGoT
       const list = categories.filter((c) => c.kind === kind);
       return { total: list.length, covered: list.filter((c) => withRule.has(c.id)).length };
     };
-    return { expense: by('EXPENSE'), income: by('INCOME'), uncovered: categories.filter((c) => !withRule.has(c.id)).length };
+    // Chỉ tính danh mục lá: danh mục cha gom nhóm nên không cần quy tắc riêng
+    const uncovered = categories.filter((c) => !(c._count?.children ?? 0) && !withRule.has(c.id)).length;
+    return { expense: by('EXPENSE'), income: by('INCOME'), uncovered };
   }, [categories, rules]);
 
   const suggestion = pending.items[suggestIdx] ?? pending.items[0] ?? null;

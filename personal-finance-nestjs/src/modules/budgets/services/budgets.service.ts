@@ -8,14 +8,17 @@ export const DEFAULT_BUDGET_MONTH = '*';
 
 export interface BudgetLine {
   categoryId: number;
+  parentId: number | null; // danh mục 2 cấp: con trỏ về cha
   name: string;
   icon: string;
   color: string;
-  amount: number | null; // hạn mức hiệu lực của tháng (null = chưa đặt)
-  source: 'MONTH' | 'DEFAULT' | null; // đặt riêng cho tháng / dùng mặc định
+  // Hạn mức hiệu lực của tháng (null = chưa đặt). Với danh mục cha chưa đặt riêng: tổng hạn mức các con.
+  amount: number | null;
+  // MONTH: đặt riêng cho tháng; DEFAULT: dùng mặc định; CHILDREN: gộp từ hạn mức các con
+  source: 'MONTH' | 'DEFAULT' | 'CHILDREN' | null;
   defaultAmount: number | null;
-  spent: number;
-  count: number; // số giao dịch chi trong tháng
+  spent: number; // danh mục cha: cộng cả các con
+  count: number; // số giao dịch chi trong tháng (cha: cộng cả con)
   prevSpent: number; // đã chi tháng trước (để so sánh)
   percent: number | null;
 }
@@ -25,6 +28,15 @@ export interface BudgetMonthTotals {
   budget: number; // tổng hạn mức hiệu lực
   spentBudgeted: number; // đã chi ở các danh mục có hạn mức
   expense: number; // tổng chi cả tháng (mọi danh mục, kể cả chưa phân loại)
+}
+
+// Dòng cấp cao nhất: tổng của chúng đã bao gồm các con nên cộng lại không bị trùng
+export const topLevelLines = (lines: BudgetLine[]) => lines.filter((l) => l.parentId === null);
+
+// "Đơn vị hạn mức" để cảnh báo/cân đối: dòng có hạn mức tự đặt, bỏ con nếu cha đã có hạn mức riêng
+export function budgetUnits(lines: BudgetLine[]): BudgetLine[] {
+  const own = (l: BudgetLine | undefined) => !!l && (l.source === 'MONTH' || l.source === 'DEFAULT');
+  return lines.filter((l) => own(l) && (l.parentId === null || !own(lines.find((p) => p.categoryId === l.parentId))));
 }
 
 @Injectable()
@@ -40,7 +52,7 @@ export class BudgetsService {
     return new Map(rows.map((r) => [r.categoryId, r]));
   }
 
-  // Trạng thái ngân sách mọi danh mục chi trong một tháng.
+  // Trạng thái ngân sách mọi danh mục chi trong một tháng. Danh mục cha gộp số liệu của các con.
   async getBudgetStatus(month: string): Promise<BudgetLine[]> {
     const [categories, budgets, spent, prev] = await Promise.all([
       this.prisma.category.findMany({ where: { kind: 'EXPENSE' }, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }),
@@ -49,7 +61,7 @@ export class BudgetsService {
       this.expenseByCategory(addMonths(month, -1)),
     ]);
 
-    return categories.map((c) => {
+    const lines: BudgetLine[] = categories.map((c) => {
       const own = budgets.find((b) => b.categoryId === c.id && b.month === month);
       const def = budgets.find((b) => b.categoryId === c.id && b.month === DEFAULT_BUDGET_MONTH);
       const eff = own ?? def;
@@ -57,6 +69,7 @@ export class BudgetsService {
       const s = spent.get(c.id);
       return {
         categoryId: c.id,
+        parentId: c.parentId,
         name: c.name,
         icon: c.icon,
         color: c.color,
@@ -66,13 +79,33 @@ export class BudgetsService {
         spent: s?.total ?? 0,
         count: s?.count ?? 0,
         prevSpent: prev.get(c.id)?.total ?? 0,
-        percent: amount && amount > 0 ? (s?.total ?? 0) / amount : null,
+        percent: null,
       };
     });
+
+    // Gộp con vào cha
+    for (const parent of lines) {
+      if (parent.parentId !== null) continue;
+      const children = lines.filter((l) => l.parentId === parent.categoryId);
+      if (!children.length) continue;
+      parent.spent += children.reduce((s, l) => s + l.spent, 0);
+      parent.count += children.reduce((s, l) => s + l.count, 0);
+      parent.prevSpent += children.reduce((s, l) => s + l.prevSpent, 0);
+      if (parent.amount === null) {
+        const withAmount = children.filter((l) => l.amount !== null);
+        if (withAmount.length) {
+          parent.amount = withAmount.reduce((s, l) => s + (l.amount ?? 0), 0);
+          parent.source = 'CHILDREN';
+        }
+      }
+    }
+    for (const l of lines) l.percent = l.amount && l.amount > 0 ? l.spent / l.amount : null;
+    return lines;
   }
 
-  private totals(month: string, lines: BudgetLine[], expense: number): BudgetMonthTotals {
-    const budgeted = lines.filter((l) => l.amount !== null);
+  // Tổng hạn mức / đã chi của tháng — chỉ cộng dòng cấp cao nhất để không trùng con
+  totals(month: string, lines: BudgetLine[], expense: number): BudgetMonthTotals {
+    const budgeted = topLevelLines(lines).filter((l) => l.amount !== null);
     return {
       month,
       budget: budgeted.reduce((s, l) => s + (l.amount ?? 0), 0),
@@ -107,9 +140,10 @@ export class BudgetsService {
   // Lưu nhiều hạn mức trong một transaction; amount = null là xóa
   async save(items: BudgetItemDto[]) {
     const ids = [...new Set(items.map((i) => i.categoryId))];
-    const cats = await this.prisma.category.findMany({ where: { id: { in: ids } }, select: { id: true, kind: true } });
+    const cats = await this.prisma.category.findMany({ where: { id: { in: ids } }, select: { id: true, kind: true, parentId: true } });
     if (cats.length !== ids.length) throw new BadRequestException('Danh mục không tồn tại');
     if (cats.some((c) => c.kind !== 'EXPENSE')) throw new BadRequestException('Chỉ đặt ngân sách cho danh mục chi');
+    await this.assertWithinParentCeiling(items, cats);
 
     await this.prisma.$transaction(
       items.map(({ categoryId, month, amount }) =>
@@ -123,6 +157,49 @@ export class BudgetsService {
       ),
     );
     return { ok: true, saved: items.length };
+  }
+
+  // Trần của cha: tổng hạn mức hiệu lực các danh mục con không được vượt hạn mức của cha (nếu cha có đặt).
+  // Kiểm tra trên trạng thái SAU khi áp các thay đổi, theo từng tháng được đụng tới ("*" = mặc định).
+  private async assertWithinParentCeiling(items: BudgetItemDto[], cats: { id: number; parentId: number | null }[]) {
+    const familyHeads = new Set<number>(cats.map((c) => c.parentId ?? c.id));
+    const families = await this.prisma.category.findMany({
+      where: { id: { in: [...familyHeads] } },
+      select: { id: true, name: true, children: { select: { id: true, name: true } } },
+    });
+    const withChildren = families.filter((f) => f.children.length > 0);
+    if (!withChildren.length) return;
+
+    const famIds = withChildren.flatMap((f) => [f.id, ...f.children.map((c) => c.id)]);
+    const months = [...new Set(items.map((i) => i.month))];
+    const budgets = await this.prisma.budget.findMany({
+      where: { categoryId: { in: famIds }, month: { in: [...new Set([...months, DEFAULT_BUDGET_MONTH])] } },
+    });
+
+    // (categoryId|month) → hạn mức; null = đã xóa
+    const map = new Map<string, number | null>();
+    for (const b of budgets) map.set(`${b.categoryId}|${b.month}`, Number(b.amount));
+    for (const i of items) map.set(`${i.categoryId}|${i.month}`, i.amount);
+    const eff = (categoryId: number, month: string): number | null => {
+      if (month === DEFAULT_BUDGET_MONTH) return map.get(`${categoryId}|*`) ?? null;
+      const own = map.get(`${categoryId}|${month}`);
+      return own !== undefined && own !== null ? own : (map.get(`${categoryId}|*`) ?? null);
+    };
+    const fmt = (v: number) => new Intl.NumberFormat('vi-VN').format(v);
+
+    for (const f of withChildren) {
+      for (const m of months) {
+        const ceiling = eff(f.id, m);
+        if (ceiling === null) continue;
+        const sum = f.children.reduce((s, c) => s + (eff(c.id, m) ?? 0), 0);
+        if (sum > ceiling) {
+          const when = m === DEFAULT_BUDGET_MONTH ? 'mặc định' : `tháng ${m.slice(5)}/${m.slice(0, 4)}`;
+          throw new BadRequestException(
+            `Tổng hạn mức các danh mục con của "${f.name}" (${fmt(sum)} ₫) vượt trần ${fmt(ceiling)} ₫ (${when}). Giảm hạn mức con hoặc tăng hạn mức cha.`,
+          );
+        }
+      }
+    }
   }
 
   // Sao chép hạn mức đặt riêng của tháng trước sang tháng này (ghi đè nếu đã có)

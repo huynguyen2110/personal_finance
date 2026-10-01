@@ -11,6 +11,47 @@ export interface BudgetLineLike {
 
 export type BudgetState = 'over' | 'near' | 'ok' | 'unused' | 'none';
 
+// ─── Danh mục 2 cấp ───
+
+interface TreeLine {
+  categoryId: number;
+  parentId: number | null;
+  amount: number | null;
+  source: 'MONTH' | 'DEFAULT' | 'CHILDREN' | null;
+}
+
+// Dòng cấp cao nhất: số liệu đã gộp các con nên cộng lại không bị trùng
+export const topLevelLines = <T extends TreeLine>(lines: T[]): T[] => lines.filter((l) => l.parentId === null);
+
+export function childrenByParent<T extends TreeLine>(lines: T[]): Map<number, T[]> {
+  const m = new Map<number, T[]>();
+  for (const l of lines) {
+    if (l.parentId === null) continue;
+    if (!m.has(l.parentId)) m.set(l.parentId, []);
+    m.get(l.parentId)!.push(l);
+  }
+  return m;
+}
+
+// Thứ tự hiển thị dạng cây: cha rồi đến các con của nó
+export function orderByTree<T extends TreeLine>(lines: T[]): T[] {
+  const kids = childrenByParent(lines);
+  return topLevelLines(lines).flatMap((p) => [p, ...(kids.get(p.categoryId) ?? [])]);
+}
+
+// Trần của cha đang vi phạm: tổng hạn mức các con lớn hơn hạn mức cha tự đặt (MONTH/DEFAULT)
+export function childrenOverCeiling<T extends TreeLine>(parent: T, children: T[]): { ceiling: number; sum: number } | null {
+  if (parent.amount === null || parent.source === 'CHILDREN') return null;
+  const sum = children.reduce((s, c) => s + (c.amount ?? 0), 0);
+  return sum > parent.amount ? { ceiling: parent.amount, sum } : null;
+}
+
+// "Đơn vị hạn mức" để cảnh báo/cân đối: dòng có hạn mức tự đặt, bỏ con nếu cha đã có hạn mức riêng
+export function budgetUnits<T extends TreeLine>(lines: T[]): T[] {
+  const own = (l: T | undefined) => !!l && (l.source === 'MONTH' || l.source === 'DEFAULT');
+  return lines.filter((l) => own(l) && (l.parentId === null || !own(lines.find((p) => p.categoryId === l.parentId))));
+}
+
 export const NEAR_THRESHOLD = 0.8; // từ 80% hạn mức là "sắp chạm" (đồng bộ với cảnh báo ở Tổng quan)
 
 export function budgetState(l: BudgetLineLike): BudgetState {

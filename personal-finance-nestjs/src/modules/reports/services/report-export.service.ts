@@ -62,14 +62,17 @@ export class ReportExportService {
       styleHeader(ws.getRow(1));
       for (const r of rows) {
         ws.addRow({
-          name: r.name,
+          // Dòng con thụt vào dưới dòng cha (cha đã gộp số của con)
+          name: r.parentId !== null ? `    └ ${r.name}` : r.name,
           ...Object.fromEntries(r.values.map((v, i) => [`m${i}`, v])),
           total: r.total,
           avg: Math.round(r.average),
         });
       }
       styleBody(ws);
-      const colTotals = report.months.map((_, i) => rows.reduce((s, r) => s + r.values[i], 0));
+      // Tổng chỉ cộng dòng cấp cao nhất (dòng cha đã bao gồm con)
+      const tops = rows.filter((r) => r.parentId === null);
+      const colTotals = report.months.map((_, i) => tops.reduce((s, r) => s + r.values[i], 0));
       const grand = colTotals.reduce((s, v) => s + v, 0);
       styleTotal(
         ws.addRow({

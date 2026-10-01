@@ -22,7 +22,11 @@ export function buildTxnWhere(sp: URLSearchParams): Prisma.TransactionWhereInput
 
   const categoryId = sp.get('categoryId');
   if (categoryId === 'none') and.push({ categoryId: null });
-  else if (categoryId && Number(categoryId) > 0) and.push({ categoryId: Number(categoryId) });
+  else if (categoryId && Number(categoryId) > 0) {
+    // Lọc theo danh mục cha thì lấy luôn giao dịch của các danh mục con
+    const id = Number(categoryId);
+    and.push({ OR: [{ categoryId: id }, { category: { parentId: id } }] });
+  }
 
   const source = sp.get('source');
   if (source === 'EMAIL' || source === 'MANUAL' || source === 'IMPORT') and.push({ source });

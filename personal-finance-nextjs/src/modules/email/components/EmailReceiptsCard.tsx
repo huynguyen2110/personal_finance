@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { CircleAlert, CircleCheck, ClipboardPaste, Mail, RefreshCw } from 'lucide-react';
+import { CircleAlert, CircleCheck, ClipboardPaste, HelpCircle, MailCheck, ShieldCheck } from 'lucide-react';
 import { errorMessage } from '@/lib/api-client';
 import { formatVND } from '@/lib/money';
 import { formatVNDateTime } from '@/lib/dates';
+import { bankBrand } from '@/modules/accounts/lib/brand';
 import { EMAIL_QUERY_KEYS, importEmail, pollEmails, useEmailStatus } from '../lib';
 import type { EmailPreview } from '../types';
 
@@ -24,6 +25,7 @@ export default function EmailReceiptsCard({ onImported }: { onImported: () => vo
   const [text, setText] = useState('');
   const [preview, setPreview] = useState<EmailPreview | null>(null);
   const [busy, setBusy] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const loadStatus = () => qc.invalidateQueries({ queryKey: EMAIL_QUERY_KEYS.STATUS });
 
@@ -65,155 +67,190 @@ export default function EmailReceiptsCard({ onImported }: { onImported: () => vo
   }
 
   const last = status?.lastRun;
+  const canPoll = !polling && !!status?.configured;
 
   return (
-    <section className="glass-card p-4 md:p-5">
-      <h2 className="text-sm font-semibold text-text flex items-center gap-2 mb-1">
-        <Mail className="w-4 h-4 text-text-muted" /> Đọc email thông báo của ngân hàng
-      </h2>
-      <p className="text-xs text-text-muted mb-3">
-        Web đọc hộp thư của bạn để ghi nhận giao dịch, không qua bên thứ ba. Mỗi ngân hàng có mẫu email riêng:
-      </p>
+    <section className="fin-card p-4 md:p-6 flex flex-col gap-5">
+      {/* Tiêu đề + nút đọc */}
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+        <div className="flex flex-col gap-1 max-w-2xl">
+          <span className="inline-flex items-center gap-1.5 fin-label text-teal-700">
+            <ShieldCheck className="w-4 h-4" aria-hidden /> Không qua bên thứ ba
+          </span>
+          <h2 className="text-[16px] leading-6 font-semibold text-slate-900">Đọc email thông báo tự động từ ngân hàng</h2>
+          <p className="text-xs text-slate-600">
+            Web đọc thẳng hộp thư của bạn qua IMAP để bóc tách thông báo giao dịch. Không lưu thông tin đăng nhập ngân hàng, mỗi ngân
+            hàng có một mẫu email riêng bên dưới.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button type="button" className="fin-btn fin-btn-primary" disabled={!canPoll} onClick={() => poll()}>
+            <MailCheck className={`w-4 h-4 ${polling ? 'animate-pulse' : ''}`} aria-hidden /> Đọc email ngay
+          </button>
+          <button
+            type="button"
+            className="fin-btn fin-btn-outline"
+            disabled={!canPoll}
+            onClick={() => poll(90)}
+            title="Đọc lại toàn bộ thư 90 ngày gần nhất (giao dịch đã có sẽ tự bỏ qua)"
+          >
+            Đọc lại 90 ngày
+          </button>
+        </div>
+      </div>
 
+      {/* Dải trạng thái hộp thư */}
       {status && (
-        <ul className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
-          {status.providers.map((p) => (
-            <li key={p.id} className="rounded-xl border border-slate-200 px-3 py-2">
-              <p className="text-sm font-medium text-text">
-                {p.bankName}{' '}
-                <span className="text-xs font-normal text-text-muted">
-                  · {p.covers.in && p.covers.out ? 'tiền vào & ra' : p.covers.out ? 'chỉ tiền ra' : 'chỉ tiền vào'}
-                  {p.reportsBalance && ' · có số dư'}
-                </span>
-              </p>
-              <p className="text-xs text-text-secondary">{p.description}</p>
-              <p className="text-[11px] text-text-muted mt-0.5">
-                Lọc người gửi chứa “{p.from}”
-              </p>
-            </li>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+          {status.configured ? (
+            <span className="inline-flex items-center gap-1.5 text-slate-900">
+              <CircleCheck className="w-4 h-4 text-emerald-600" aria-hidden />
+              <span className="font-semibold">Hộp thư đã kết nối</span>
+              <span className="text-slate-500">
+                {status.pollMinutes > 0 ? `• tự đọc mỗi ${status.pollMinutes} phút` : '• đang tắt tự đọc (EMAIL_POLL_MINUTES=0)'}
+              </span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-amber-700 font-semibold">
+              <CircleAlert className="w-4 h-4" aria-hidden /> Chưa cấu hình IMAP_USER / IMAP_PASSWORD
+            </span>
+          )}
+          {last && (
+            <span className={`fin-num ${last.error ? 'text-rose-600' : 'text-slate-500'}`}>
+              Lần đọc gần nhất {formatVNDateTime(last.at)}:{' '}
+              {last.error ? last.error : `${last.scanned} thư, ${last.created} mới, ${last.merged} gộp, ${last.skipped} bỏ qua`}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Mẫu email từng ngân hàng */}
+      {status && status.providers.length > 0 && (
+        <ul className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {status.providers.map((p) => {
+            const b = bankBrand(p.bankName);
+            return (
+              <li
+                key={p.id}
+                className="p-4 rounded-xl bg-slate-50/60 border border-slate-200 hover:bg-slate-50 transition-colors flex flex-col justify-between gap-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: b.color }} aria-hidden />
+                    {p.bankName}
+                  </span>
+                  <span
+                    className={`text-[11px] font-semibold whitespace-nowrap ${
+                      p.reportsBalance ? 'text-emerald-700' : p.covers.in && p.covers.out ? 'text-teal-700' : 'text-slate-500'
+                    }`}
+                  >
+                    {p.reportsBalance ? 'Kèm số dư thực' : p.covers.in && p.covers.out ? 'Tiền vào & ra' : p.covers.out ? 'Chỉ tiền ra' : 'Chỉ tiền vào'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600">{p.description}</p>
+                <div className="pt-2 flex items-center justify-between gap-2 fin-label normal-case tracking-normal font-medium">
+                  <span className="shrink-0 whitespace-nowrap">Người gửi chứa:</span>
+                  <span className="font-mono text-slate-900 truncate min-w-0" title={p.from}>
+                    {p.from}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Tự động qua IMAP */}
-        <div className="space-y-3">
-          {status &&
-            (status.configured ? (
-              <p className="flex items-center gap-1.5 text-xs text-success">
-                <CircleCheck className="w-4 h-4" aria-hidden />
-                Đã cấu hình hộp thư
-                {status.pollMinutes > 0 ? ` · tự đọc mỗi ${status.pollMinutes} phút` : ' · đang tắt tự đọc (EMAIL_POLL_MINUTES=0)'}
-              </p>
-            ) : (
-              <p className="flex items-center gap-1.5 text-xs text-warning">
-                <CircleAlert className="w-4 h-4" aria-hidden /> Chưa cấu hình IMAP_USER / IMAP_PASSWORD
-              </p>
-            ))}
-
-          {last && (
-            <p className={`text-xs ${last.error ? 'text-danger' : 'text-text-secondary'}`}>
-              Lần đọc gần nhất {formatVNDateTime(last.at)}:{' '}
-              {last.error ? last.error : `${last.scanned} thư, ${last.created} mới, ${last.merged} gộp, ${last.skipped} bỏ qua`}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn-primary !py-2 text-sm flex items-center gap-2 disabled:opacity-60"
-              disabled={polling || !status?.configured}
-              onClick={() => poll()}
-            >
-              <RefreshCw className={`w-4 h-4 ${polling ? 'animate-spin' : ''}`} /> Đọc email ngay
-            </button>
-            <button
-              type="button"
-              className="btn-secondary !py-2 text-sm disabled:opacity-60"
-              disabled={polling || !status?.configured}
-              onClick={() => poll(90)}
-              title="Đọc lại toàn bộ thư 90 ngày gần nhất (giao dịch đã có sẽ tự bỏ qua)"
-            >
-              Đọc lại 90 ngày
-            </button>
-          </div>
-
-          <details className="text-xs text-text-secondary">
-            <summary className="cursor-pointer font-medium text-text">Cách cấu hình (Gmail)</summary>
-            <ol className="list-decimal pl-5 mt-2 space-y-1.5">
-              <li>Bật <b>Xác minh 2 bước</b> cho tài khoản Google nhận email ngân hàng.</li>
-              <li>
-                Tạo <b>Mật khẩu ứng dụng</b> tại <code className="bg-slate-100 px-1 rounded">myaccount.google.com/apppasswords</code> — không dùng mật khẩu Gmail thường.
-              </li>
-              <li>
-                Mở file <code className="bg-slate-100 px-1 rounded">.env</code>, điền <code className="bg-slate-100 px-1 rounded">IMAP_USER</code> (địa chỉ Gmail) và{' '}
-                <code className="bg-slate-100 px-1 rounded">IMAP_PASSWORD</code> (mật khẩu ứng dụng), rồi khởi động lại server.
-              </li>
-              <li>
-                Nếu địa chỉ gửi của ngân hàng không chứa chuỗi lọc ở trên, sửa{' '}
-                <code className="bg-slate-100 px-1 rounded">VCB_EMAIL_FROM</code> / <code className="bg-slate-100 px-1 rounded">CAKE_EMAIL_FROM</code> / <code className="bg-slate-100 px-1 rounded">ACB_EMAIL_FROM</code> cho khớp.
-              </li>
-              <li>Nên dùng hộp thư riêng (hoặc bộ lọc tự chuyển tiếp thư ngân hàng sang đó) để hạn chế quyền đọc thư khác.</li>
-            </ol>
-          </details>
+      {/* Dán tay một email */}
+      <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+            <ClipboardPaste className="w-5 h-5 text-slate-400" aria-hidden /> Thử nghiệm hoặc dán thủ công nội dung email
+          </span>
+          <span className="text-xs text-slate-500">Hỗ trợ Ctrl+A rồi dán toàn văn email thông báo, hoặc mã HTML gốc của thư</span>
         </div>
-
-        {/* Dán tay */}
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
-            <ClipboardPaste className="w-4 h-4" /> Hoặc dán nội dung một email
-          </p>
-          <textarea
-            className="input-field font-mono !text-xs"
-            rows={6}
-            value={text}
-            onChange={(e) => {
-              setText(e.target.value);
-              setPreview(null);
-            }}
-            placeholder="Mở email thông báo (Vietcombank / Cake / ACB), chọn toàn bộ nội dung (Ctrl+A) → Copy → dán vào đây. Hoặc dán mã HTML gốc của thư."
-            aria-label="Nội dung email"
-          />
-          {preview && (
-            <div className="rounded-xl bg-surface-light px-3 py-2 text-xs space-y-0.5">
-              <p className="text-text">
-                <span className="text-text-secondary">{preview.bankName} ••{preview.accountTail} · </span>
-                <b className={`tabular ${preview.direction === 'IN' ? 'text-[#1d4ed8]' : ''}`}>
-                  {preview.direction === 'IN' ? '+' : '−'}
-                  {formatVND(preview.amount)}
-                </b>
-                {preview.fee > 0 && <span className="text-text-muted"> (+ phí {formatVND(preview.fee)})</span>} ·{' '}
-                {formatVNDateTime(preview.transactionDate)}
-              </p>
-              <p className="text-text-secondary break-words">{preview.content}</p>
-              <p className="text-text-muted">
-                Mã {preview.referenceCode}
-                {preview.balanceAfter !== null && ` · số dư sau giao dịch ${formatVND(preview.balanceAfter)}`}
-              </p>
-              {preview.selfTransfer && (
-                <p className="text-text-secondary">↔ Bên kia trùng tên bạn → coi là chuyển nội bộ, không tính vào thu chi</p>
-              )}
-            </div>
-          )}
-          <div className="flex gap-2">
+        <textarea
+          className="input-field font-mono !text-xs !rounded-lg resize-y"
+          rows={4}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setPreview(null);
+          }}
+          placeholder="Mở email thông báo biến động (Vietcombank / Cake / ACB), chọn toàn bộ nội dung (Ctrl+A) → Copy → dán vào đây để kiểm tra trích xuất tức thì…"
+          aria-label="Nội dung email"
+        />
+        {preview && (
+          <div className="rounded-lg bg-white border border-slate-200 px-3 py-2.5 text-xs space-y-1">
+            <p className="text-slate-900">
+              <span className="text-slate-500">
+                {preview.bankName} ••{preview.accountTail} ·{' '}
+              </span>
+              <b className={`fin-num ${preview.direction === 'IN' ? 'text-income' : 'text-expense'}`}>
+                {preview.direction === 'IN' ? '+' : '−'}
+                {formatVND(preview.amount)}
+              </b>
+              {preview.fee > 0 && <span className="text-slate-500"> (+ phí {formatVND(preview.fee)})</span>} ·{' '}
+              <span className="fin-num">{formatVNDateTime(preview.transactionDate)}</span>
+            </p>
+            <p className="text-slate-600 break-words">{preview.content}</p>
+            <p className="text-slate-500 fin-num">
+              Mã {preview.referenceCode}
+              {preview.balanceAfter !== null && ` · số dư sau giao dịch ${formatVND(preview.balanceAfter)}`}
+            </p>
+            {preview.selfTransfer && (
+              <p className="text-slate-600">↔ Bên kia trùng tên bạn → coi là chuyển nội bộ, không tính vào thu chi</p>
+            )}
+          </div>
+        )}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-teal-700 self-start"
+            onClick={() => setGuideOpen((v) => !v)}
+            aria-expanded={guideOpen}
+          >
+            <HelpCircle className="w-4 h-4 text-teal-700" aria-hidden />
+            <span className="underline underline-offset-2">Xem hướng dẫn cấu hình hộp thư (Gmail)</span>
+          </button>
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              className="btn-secondary !py-2 text-sm disabled:opacity-60"
+              className="fin-btn fin-btn-outline"
               disabled={busy || text.trim().length < 20}
               onClick={() => importPasted(true)}
             >
-              Đọc thử
+              Đọc thử (Dry Run)
             </button>
-            <button
-              type="button"
-              className="btn-primary !py-2 text-sm disabled:opacity-60"
-              disabled={busy || !preview}
-              onClick={() => importPasted(false)}
-            >
-              Lưu giao dịch
+            <button type="button" className="fin-btn fin-btn-primary" disabled={busy || !preview} onClick={() => importPasted(false)}>
+              Lưu thành giao dịch
             </button>
           </div>
         </div>
+
+        {guideOpen && (
+          <ol className="list-decimal pl-5 mt-1 space-y-1.5 text-xs text-slate-600 border-t border-slate-200 pt-3">
+            <li>
+              Bật <b>Xác minh 2 bước</b> cho tài khoản Google nhận email ngân hàng.
+            </li>
+            <li>
+              Tạo <b>Mật khẩu ứng dụng</b> tại <code className="bg-white border border-slate-200 px-1 rounded">myaccount.google.com/apppasswords</code>{' '}
+              — không dùng mật khẩu Gmail thường.
+            </li>
+            <li>
+              Mở file <code className="bg-white border border-slate-200 px-1 rounded">.env</code>, điền{' '}
+              <code className="bg-white border border-slate-200 px-1 rounded">IMAP_USER</code> (địa chỉ Gmail) và{' '}
+              <code className="bg-white border border-slate-200 px-1 rounded">IMAP_PASSWORD</code> (mật khẩu ứng dụng), rồi khởi động lại
+              server.
+            </li>
+            <li>
+              Nếu địa chỉ gửi của ngân hàng không chứa chuỗi lọc ở trên, sửa{' '}
+              <code className="bg-white border border-slate-200 px-1 rounded">VCB_EMAIL_FROM</code> /{' '}
+              <code className="bg-white border border-slate-200 px-1 rounded">CAKE_EMAIL_FROM</code> /{' '}
+              <code className="bg-white border border-slate-200 px-1 rounded">ACB_EMAIL_FROM</code> cho khớp.
+            </li>
+            <li>Nên dùng hộp thư riêng (hoặc bộ lọc tự chuyển tiếp thư ngân hàng sang đó) để hạn chế quyền đọc thư khác.</li>
+          </ol>
+        )}
       </div>
     </section>
   );

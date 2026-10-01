@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Plus, Save, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { CornerDownRight, Plus, Save, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import CategoryIcon, { CATEGORY_COLORS, CATEGORY_ICONS } from '@/components/shared/CategoryIcon';
 import { errorMessage } from '@/lib/api-client';
 import { formatVND } from '@/lib/money';
@@ -12,11 +12,14 @@ import type { RuleDTO } from '@/modules/rules/types';
 import { ruleKeywords } from '@/modules/rules/utils/rule-match';
 import { createCategory, updateCategory } from '../lib';
 import type { CategoryDTO } from '../types';
+import { parentOptions } from '../utils/tree';
 
 interface Props {
-  // null = tạo danh mục mới thuộc `kind`
+  // null = tạo danh mục mới thuộc `kind` (và nằm dưới `initialParentId` nếu có)
   category: CategoryDTO | null;
   kind: CategoryKind;
+  initialParentId?: number | null;
+  categories: CategoryDTO[];
   rules: RuleDTO[];
   budgetLine?: BudgetLine;
   onClose: () => void;
@@ -25,30 +28,53 @@ interface Props {
   onAddRule: (categoryId: number) => void;
 }
 
-// Bảng chi tiết bên phải Cây danh mục: sửa tên/loại/icon/màu, xem từ khóa nhận diện
-export default function CategoryInspector({ category, kind: initialKind, rules, budgetLine, onClose, onSaved, onDelete, onAddRule }: Props) {
+// Bảng chi tiết bên phải Cây danh mục: sửa tên/loại/cha/icon/màu, xem từ khóa nhận diện
+export default function CategoryInspector({
+  category,
+  kind: initialKind,
+  initialParentId = null,
+  categories,
+  rules,
+  budgetLine,
+  onClose,
+  onSaved,
+  onDelete,
+  onAddRule,
+}: Props) {
   const [name, setName] = useState(category?.name ?? '');
   const [kind, setKind] = useState<CategoryKind>(category?.kind ?? initialKind);
+  const [parentId, setParentId] = useState<number | null>(category?.parentId ?? initialParentId);
   const [icon, setIcon] = useState(category?.icon ?? 'Tag');
   const [color, setColor] = useState(category?.color ?? CATEGORY_COLORS[0]);
   const [saving, setSaving] = useState(false);
+
   const txnCount = category?._count?.transactions ?? 0;
-  const kindLocked = !!category && txnCount > 0;
-  const dirty = !category || name !== category.name || kind !== category.kind || icon !== category.icon || color !== category.color;
+  const childCount = category?._count?.children ?? 0;
+  const kindLocked = !!category && (txnCount > 0 || childCount > 0);
+  const parentLocked = childCount > 0;
+  const parents = parentOptions(categories, kind, category?.id);
+  const effectiveParentId = parents.some((p) => p.id === parentId) ? parentId : null;
+  const dirty =
+    !category ||
+    name !== category.name ||
+    kind !== category.kind ||
+    effectiveParentId !== category.parentId ||
+    icon !== category.icon ||
+    color !== category.color;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return toast.error('Nhập tên danh mục');
     setSaving(true);
     try {
-      const payload = { name: name.trim(), icon, color, kind };
+      const payload = { name: name.trim(), icon, color, kind, parentId: effectiveParentId };
       if (category) {
         await updateCategory(category.id, payload);
         toast.success('Đã lưu danh mục');
         onSaved({ id: category.id });
       } else {
         const created = await createCategory(payload);
-        toast.success('Đã tạo danh mục');
+        toast.success(effectiveParentId ? 'Đã tạo danh mục con' : 'Đã tạo danh mục');
         onSaved(created?.id ? { id: created.id } : undefined);
       }
     } catch (err) {
@@ -58,15 +84,17 @@ export default function CategoryInspector({ category, kind: initialKind, rules, 
     }
   }
 
+  const title = category ? 'Chi tiết danh mục' : effectiveParentId ? 'Thêm danh mục con' : 'Thêm danh mục cha';
+
   return (
     <section className="fin-card p-4 md:p-5 flex flex-col gap-4">
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
         <h2 className="font-jakarta text-[15px] font-semibold text-slate-900 inline-flex items-center gap-2">
-          <SlidersHorizontal className="w-4 h-4 text-teal-700" aria-hidden /> Chi tiết danh mục
+          <SlidersHorizontal className="w-4 h-4 text-teal-700" aria-hidden /> {title}
         </h2>
         <div className="flex items-center gap-2">
           <span className={`fin-label px-2 py-0.5 rounded-full ${category ? 'bg-teal-50 !text-teal-700' : 'bg-amber-100 !text-amber-800'}`}>
-            {category ? 'Đang chọn' : 'Tạo mới'}
+            {category ? (category.parentId ? 'Danh mục con' : childCount ? `Cha (${childCount} con)` : 'Đang chọn') : 'Tạo mới'}
           </span>
           <button type="button" className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100" onClick={onClose} aria-label="Đóng bảng chi tiết">
             <X className="w-4 h-4" />
@@ -83,23 +111,37 @@ export default function CategoryInspector({ category, kind: initialKind, rules, 
         <div className="grid grid-cols-2 gap-2">
           <label className="flex flex-col gap-1">
             <span className="fin-label">Loại dòng tiền</span>
-            <select className="select-field !py-2 !rounded-lg !bg-slate-50 text-sm" value={kind} onChange={(e) => setKind(e.target.value as CategoryKind)} disabled={kindLocked}>
+            <select
+              className="select-field !py-2 !rounded-lg !bg-slate-50 text-sm"
+              value={kind}
+              onChange={(e) => {
+                setKind(e.target.value as CategoryKind);
+                setParentId(null);
+              }}
+              disabled={kindLocked}
+            >
               <option value="EXPENSE">Chi tiêu (tiền ra)</option>
               <option value="INCOME">Thu nhập (tiền vào)</option>
             </select>
-            {kindLocked && <span className="text-[11px] text-slate-500">Đã có giao dịch, không đổi được loại</span>}
+            {kindLocked && <span className="text-[11px] text-slate-500">{txnCount > 0 ? 'Đã có giao dịch' : 'Đang có danh mục con'}, không đổi được loại</span>}
           </label>
-          <div className="flex flex-col gap-1">
-            <span className="fin-label">Thống kê</span>
-            <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-600 flex flex-col gap-0.5">
-              <span>
-                <strong className="text-slate-900 fin-num">{txnCount}</strong> giao dịch
-              </span>
-              <span>
-                <strong className="text-slate-900 fin-num">{rules.length}</strong> quy tắc nhận diện
-              </span>
-            </div>
-          </div>
+          <label className="flex flex-col gap-1">
+            <span className="fin-label">Thuộc nhóm cha</span>
+            <select
+              className="select-field !py-2 !rounded-lg !bg-slate-50 text-sm"
+              value={effectiveParentId ?? ''}
+              onChange={(e) => setParentId(e.target.value ? Number(e.target.value) : null)}
+              disabled={parentLocked}
+            >
+              <option value="">— Danh mục cấp cao nhất —</option>
+              {parents.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            {parentLocked && <span className="text-[11px] text-slate-500">Đang có {childCount} danh mục con nên phải là cấp cao nhất</span>}
+          </label>
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -138,18 +180,32 @@ export default function CategoryInspector({ category, kind: initialKind, rules, 
           </div>
         </div>
 
-        {category && budgetLine && category.kind === 'EXPENSE' && (
-          <div className="flex items-center justify-between rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs">
-            <span className="text-slate-600">Hạn mức tháng này</span>
-            <span className="font-semibold text-slate-900 fin-num">
-              {budgetLine.amount !== null ? (
+        {category && (
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-slate-600 flex flex-col gap-0.5">
+              <span>
+                <strong className="text-slate-900 fin-num">{txnCount}</strong> giao dịch
+              </span>
+              <span>
+                <strong className="text-slate-900 fin-num">{rules.length}</strong> quy tắc nhận diện
+              </span>
+            </div>
+            <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-slate-600 flex flex-col gap-0.5">
+              {category.kind === 'EXPENSE' && budgetLine ? (
                 <>
-                  {formatVND(budgetLine.spent)} / {formatVND(budgetLine.amount)}
+                  <span className="fin-label !text-[10px]">Tháng này</span>
+                  <span className="font-semibold text-slate-900 fin-num">
+                    {formatVND(budgetLine.spent)}
+                    {budgetLine.amount !== null && <span className="text-slate-400 font-normal"> / {formatVND(budgetLine.amount)}</span>}
+                  </span>
+                  {budgetLine.amount === null && <span className="text-[11px] text-slate-500">Chưa đặt hạn mức</span>}
                 </>
               ) : (
-                <>Đã chi {formatVND(budgetLine.spent)} · chưa đặt hạn mức</>
+                <span className="inline-flex items-center gap-1">
+                  <CornerDownRight className="w-3.5 h-3.5" aria-hidden /> {childCount ? `${childCount} danh mục con` : category.parentId ? 'Danh mục con' : 'Cấp cao nhất'}
+                </span>
               )}
-            </span>
+            </div>
           </div>
         )}
 
