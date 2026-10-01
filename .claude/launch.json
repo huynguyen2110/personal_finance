@@ -2,22 +2,27 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "personal-finance",
+      "name": "pf-api",
       "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dev"
-      ],
-      "port": 3001,
-      "autoPort": true
+      "runtimeArgs": ["--prefix", "personal-finance-nestjs", "run", "start:dev"],
+      "port": 4000
     },
     {
-      "name": "personal-finance-prod",
+      "name": "pf-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "start"
-      ],
+      "runtimeArgs": ["--prefix", "personal-finance-nextjs", "run", "dev"],
+      "port": 3003
+    },
+    {
+      "name": "pf-api-prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "personal-finance-nestjs", "run", "start:prod"],
+      "port": 4000
+    },
+    {
+      "name": "pf-web-prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "personal-finance-nextjs", "run", "start"],
       "port": 3002
     }
   ]
