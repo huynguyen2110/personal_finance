@@ -42,13 +42,15 @@ export function ruleKeywords(rule: Pick<RuleDTO, 'pattern' | 'matchType'>): stri
   return rule.pattern.split(',').map((w) => w.trim()).filter(Boolean);
 }
 
-// Quy tắc đầu tiên khớp theo thứ tự ưu tiên (số nhỏ trước), hoặc null
-export function findMatchingRule(rules: RuleDTO[], content: string, direction: Direction): RuleDTO | null {
+// Quy tắc đầu tiên khớp theo thứ tự ưu tiên (số nhỏ trước), hoặc null.
+// `accountId`: quy tắc giới hạn theo tài khoản chỉ khớp đúng tài khoản đó (null = chỉ xét quy tắc chung).
+export function findMatchingRule(rules: RuleDTO[], content: string, direction: Direction, accountId: number | null = null): RuleDTO | null {
   const normalized = normalizeText(content);
   const kind = kindForDirection(direction);
   const sorted = [...rules].filter((r) => r.isActive).sort((a, b) => a.priority - b.priority || a.id - b.id);
   for (const r of sorted) {
     if (r.category.kind !== kind) continue;
+    if (r.accountId !== null && r.accountId !== accountId) continue;
     const re = compileRule(r.matchType, r.pattern);
     if (re && re.test(normalized)) return r;
   }

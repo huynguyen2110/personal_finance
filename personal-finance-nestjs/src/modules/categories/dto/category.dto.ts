@@ -32,6 +32,13 @@ export class CreateCategoryDto {
   @IsInt()
   @IsPositive()
   parentId?: number | null;
+
+  // Nhóm (tầng trên danh mục cha). Chỉ danh mục cấp cao nhất mới thuộc nhóm, phải cùng loại thu/chi.
+  @IsOptional()
+  @ValidateIf((o) => o.groupId !== null)
+  @IsInt()
+  @IsPositive()
+  groupId?: number | null;
 }
 
 export class UpdateCategoryDto extends PartialType(CreateCategoryDto) {}

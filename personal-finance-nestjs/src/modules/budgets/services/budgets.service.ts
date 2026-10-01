@@ -23,6 +23,32 @@ export interface BudgetLine {
   percent: number | null;
 }
 
+// Một nhóm chi tiêu trong khung của một tài khoản
+export interface GroupBudgetLine {
+  groupId: number;
+  name: string;
+  icon: string;
+  color: string;
+  categoryIds: number[]; // danh mục cha trong nhóm
+  budget: number | null; // tổng hạn mức hiệu lực của các danh mục cha (null = chưa đặt)
+  spent: number; // đã chi từ tài khoản này vào các danh mục của nhóm (kể cả con)
+  count: number;
+  sharedAccounts: number; // số tài khoản khác cũng gán nhóm này (hạn mức nhóm bị tính ở nhiều tài khoản)
+}
+
+// Ngân sách theo tài khoản: hạn mức các nhóm đã gán đang "phân bổ" cho tài khoản đó bao nhiêu, đã chi bao nhiêu
+export interface AccountBudgetLine {
+  accountId: number;
+  name: string;
+  type: 'BANK' | 'CASH';
+  bankName: string | null;
+  planned: number; // tổng hạn mức các nhóm đã gán
+  spent: number; // tổng chi thực tế từ tài khoản trong tháng (không tính giao dịch loại khỏi thống kê)
+  spentInGroups: number;
+  spentOutside: number; // chi vào danh mục không thuộc nhóm nào của tài khoản (hoặc chưa phân loại)
+  groups: GroupBudgetLine[];
+}
+
 export interface BudgetMonthTotals {
   month: string;
   budget: number; // tổng hạn mức hiệu lực
@@ -120,7 +146,7 @@ export class BudgetsService {
     return this.totals(month, lines, summary.expense);
   }
 
-  // Dữ liệu cho trang Ngân sách: từng danh mục + thu nhập tháng + lịch sử 3 tháng gần nhất.
+  // Dữ liệu cho trang Ngân sách: từng danh mục + thu nhập tháng + lịch sử 3 tháng gần nhất + ngân sách theo tài khoản.
   async getBudgetPage(month: string) {
     const { from, to } = monthRange(month);
     const [lines, summary, history] = await Promise.all([
@@ -128,13 +154,84 @@ export class BudgetsService {
       this.stats.getSummary({ from, to }),
       Promise.all([addMonths(month, -2), addMonths(month, -1)].map((m) => this.monthTotals(m))),
     ]);
+    const { accounts, unassignedGroups } = await this.getAccountBudgets(month, lines);
     return {
       month,
       lines,
       income: summary.income,
       expense: summary.expense,
       history: [...history, this.totals(month, lines, summary.expense)],
+      accounts,
+      unassignedGroups,
     };
+  }
+
+  // Ngân sách theo tài khoản: mỗi tài khoản đang hoạt động + các nhóm chi tiêu đã gán cho nó.
+  // Hạn mức nhóm = tổng hạn mức hiệu lực của các danh mục cha trong nhóm (lines đã gộp con vào cha).
+  async getAccountBudgets(month: string, lines: BudgetLine[]): Promise<{ accounts: AccountBudgetLine[]; unassignedGroups: GroupBudgetLine[] }> {
+    const { from, to } = monthRange(month);
+    const [accounts, groups, spentRows] = await Promise.all([
+      this.prisma.account.findMany({
+        where: { isActive: true },
+        orderBy: [{ type: 'asc' }, { id: 'asc' }],
+        include: { categoryGroups: { select: { groupId: true } } },
+      }),
+      this.prisma.categoryGroup.findMany({
+        where: { kind: 'EXPENSE' },
+        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+        include: { categories: { where: { parentId: null }, select: { id: true } }, accounts: { select: { accountId: true } } },
+      }),
+      this.stats.getExpenseByAccountCategory({ from, to }),
+    ]);
+
+    const lineById = new Map(lines.map((l) => [l.categoryId, l]));
+    // Danh mục (kể cả con) → danh mục cha đứng đầu
+    const topOf = (categoryId: number | null): number | null => {
+      if (categoryId === null) return null;
+      const l = lineById.get(categoryId);
+      return l ? (l.parentId ?? l.categoryId) : null;
+    };
+
+    const groupLineFor = (g: (typeof groups)[number], accountId: number | null): GroupBudgetLine => {
+      const categoryIds = g.categories.map((c) => c.id);
+      const parents = categoryIds.map((id) => lineById.get(id)).filter((l): l is BudgetLine => !!l);
+      const withBudget = parents.filter((l) => l.amount !== null);
+      const mine = spentRows.filter((r) => (accountId === null || r.accountId === accountId) && categoryIds.includes(topOf(r.categoryId) ?? -1));
+      return {
+        groupId: g.id,
+        name: g.name,
+        icon: g.icon,
+        color: g.color,
+        categoryIds,
+        budget: withBudget.length ? withBudget.reduce((s, l) => s + (l.amount ?? 0), 0) : null,
+        spent: mine.reduce((s, r) => s + r.total, 0),
+        count: mine.reduce((s, r) => s + r.count, 0),
+        sharedAccounts: Math.max(0, g.accounts.length - (accountId === null ? 0 : 1)),
+      };
+    };
+
+    const result: AccountBudgetLine[] = accounts.map((a) => {
+      const myGroupIds = new Set(a.categoryGroups.map((x) => x.groupId));
+      const myGroups = groups.filter((g) => myGroupIds.has(g.id)).map((g) => groupLineFor(g, a.id));
+      const covered = new Set(myGroups.flatMap((g) => g.categoryIds));
+      const rows = spentRows.filter((r) => r.accountId === a.id);
+      const spent = rows.reduce((s, r) => s + r.total, 0);
+      const spentInGroups = rows.filter((r) => covered.has(topOf(r.categoryId) ?? -1)).reduce((s, r) => s + r.total, 0);
+      return {
+        accountId: a.id,
+        name: a.name,
+        type: a.type,
+        bankName: a.bankName,
+        planned: myGroups.reduce((s, g) => s + (g.budget ?? 0), 0),
+        spent,
+        spentInGroups,
+        spentOutside: spent - spentInGroups,
+        groups: myGroups,
+      };
+    });
+
+    const unassignedGroups = groups.filter((g) => g.accounts.length === 0).map((g) => groupLineFor(g, null));
+    return { accounts: result, unassignedGroups };
   }
 
   // Lưu nhiều hạn mức trong một transaction; amount = null là xóa

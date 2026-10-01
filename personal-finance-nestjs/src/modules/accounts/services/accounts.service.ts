@@ -28,7 +28,10 @@ export class AccountsService {
   // - còn lại: số dư đầu kỳ + tổng thu − tổng chi
   async listWithBalances() {
     const [accounts, sums, after] = await Promise.all([
-      this.prisma.account.findMany({ orderBy: [{ type: 'asc' }, { id: 'asc' }] }),
+      this.prisma.account.findMany({
+        orderBy: [{ type: 'asc' }, { id: 'asc' }],
+        include: { categoryGroups: { select: { groupId: true } } },
+      }),
       this.prisma.$queryRaw<{ accountId: number; direction: 'IN' | 'OUT'; total: bigint; cnt: bigint }[]>`
         SELECT t.accountId, t.direction, CAST(SUM(t.amount) AS SIGNED) AS total, COUNT(*) AS cnt
         FROM \`Transaction\` t
@@ -43,7 +46,7 @@ export class AccountsService {
     const sumOf = (rows: { accountId: number; direction: 'IN' | 'OUT'; total: bigint }[], id: number, d: 'IN' | 'OUT') =>
       n(rows.find((s) => s.accountId === id && s.direction === d)?.total);
 
-    return accounts.map((a) => {
+    return accounts.map(({ categoryGroups, ...a }) => {
       const cnt = sums.filter((s) => s.accountId === a.id).reduce((acc, s) => acc + n(s.cnt), 0);
       const reported = a.bankBalance !== null && a.bankBalanceAt !== null;
       const balance = reported
@@ -57,11 +60,13 @@ export class AccountsService {
         balanceSource: reported ? ('BANK' as const) : ('COMPUTED' as const),
         tracking: trackingOf(a),
         transactionCount: cnt,
+        groupIds: categoryGroups.map((g) => g.groupId),
       };
     });
   }
 
-  create(dto: CreateAccountDto) {
+  async create(dto: CreateAccountDto) {
+    if (dto.groupIds?.length) await this.assertGroupsExist(dto.groupIds);
     return this.prisma.account.create({
       data: {
         type: dto.type ?? 'CASH',
@@ -70,11 +75,13 @@ export class AccountsService {
         accountNumber: dto.accountNumber || null,
         openingBalance: BigInt(dto.openingBalance ?? 0),
         isActive: dto.isActive ?? true,
+        categoryGroups: dto.groupIds?.length ? { create: dto.groupIds.map((groupId) => ({ groupId })) } : undefined,
       },
     });
   }
 
-  update(id: number, dto: UpdateAccountDto) {
+  async update(id: number, dto: UpdateAccountDto) {
+    if (dto.groupIds?.length) await this.assertGroupsExist(dto.groupIds);
     return this.prisma.account.update({
       where: { id },
       data: {
@@ -82,8 +89,17 @@ export class AccountsService {
         ...(dto.bankName !== undefined ? { bankName: dto.bankName || null } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
         ...(dto.openingBalance !== undefined ? { openingBalance: BigInt(dto.openingBalance) } : {}),
+        // Gửi groupIds = thay toàn bộ danh sách nhóm của tài khoản
+        ...(dto.groupIds !== undefined
+          ? { categoryGroups: { deleteMany: {}, create: dto.groupIds.map((groupId) => ({ groupId })) } }
+          : {}),
       },
     });
+  }
+
+  private async assertGroupsExist(ids: number[]) {
+    const found = await this.prisma.categoryGroup.count({ where: { id: { in: ids } } });
+    if (found !== new Set(ids).size) throw new BadRequestException('Có nhóm không tồn tại');
   }
 
   async remove(id: number) {

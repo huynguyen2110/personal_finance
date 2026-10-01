@@ -3,7 +3,20 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, ChevronRight, ChevronsDownUp, ChevronsUpDown, CornerDownRight, FolderPlus, Lightbulb, Pencil, Plus, Search, Trash2, TriangleAlert } from 'lucide-react';
+import {
+  CheckCircle2,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  CornerDownRight,
+  FolderPlus,
+  Lightbulb,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  TriangleAlert,
+} from 'lucide-react';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import CategoryIcon from '@/components/shared/CategoryIcon';
 import { errorMessage } from '@/lib/api-client';
@@ -12,13 +25,14 @@ import { normalizeText } from '@/lib/text';
 import { formatCompactVND, formatVND } from '@/lib/money';
 import { currentMonthVN, formatMonthLabel } from '@/lib/dates';
 import type { CategoryKind } from '@/types/common';
+import { useAccounts } from '@/modules/accounts/lib';
 import { useBudgetPage } from '@/modules/budgets/lib';
 import type { BudgetLine } from '@/modules/budgets/types';
 import RuleModal from '@/modules/rules/components/RuleModal';
 import { IconBtn } from '@/modules/rules/components/RulesTab';
 import type { RuleDTO } from '@/modules/rules/types';
-import { deleteCategory } from '../lib';
-import type { CategoryDTO } from '../types';
+import { deleteCategory, useCategoryGroups } from '../lib';
+import type { CategoryDTO, CategoryGroupDTO } from '../types';
 import { buildCategoryTree, type CategoryNode } from '../utils/tree';
 import CategoryInspector from './CategoryInspector';
 
@@ -43,6 +57,32 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
   const reload = () => invalidateFinanceData(qc);
   const month = currentMonthVN();
   const { data: budget } = useBudgetPage(month);
+  const { data: categoryGroups = [] } = useCategoryGroups();
+  const { data: accounts = [] } = useAccounts();
+  const accountById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
+  const groupById = useMemo(() => new Map(categoryGroups.map((g) => [g.id, g])), [categoryGroups]);
+
+  // Gom danh mục cha theo nhóm (thứ tự nhóm), phần chưa thuộc nhóm nào xếp cuối
+  const clustersOf = (
+    kind: CategoryKind,
+    nodes: CategoryNode[],
+  ): {
+    key: string;
+    group: CategoryGroupDTO | null;
+    nodes: CategoryNode[];
+  }[] => {
+    const byGroup = new Map<number | null, CategoryNode[]>();
+    for (const n of nodes) {
+      const gid = n.cat.groupId !== null && groupById.has(n.cat.groupId) ? n.cat.groupId : null;
+      if (!byGroup.has(gid)) byGroup.set(gid, []);
+      byGroup.get(gid)!.push(n);
+    }
+    const out: { key: string; group: CategoryGroupDTO | null; nodes: CategoryNode[] }[] = categoryGroups
+      .filter((g) => g.kind === kind && byGroup.has(g.id))
+      .map((g) => ({ key: `g${g.id}`, group: g, nodes: byGroup.get(g.id)! }));
+    if (byGroup.has(null)) out.push({ key: 'none', group: null, nodes: byGroup.get(null)! });
+    return out;
+  };
 
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
@@ -65,16 +105,28 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
   const hit = (c: CategoryDTO) => !q || normalizeText(c.name).includes(q) || (rulesByCat.get(c.id) ?? []).some((r) => normalizeText(r.pattern).includes(q));
   // Lọc: giữ cha nếu cha hoặc một con khớp; chỉ hiện con khớp (hoặc tất cả con khi cha khớp)
   const filterTree = (nodes: CategoryNode[]) =>
-    nodes
-      .map((n) => (hit(n.cat) ? n : { cat: n.cat, children: n.children.filter(hit) }))
-      .filter((n) => hit(n.cat) || n.children.length > 0);
+    nodes.map((n) => (hit(n.cat) ? n : { cat: n.cat, children: n.children.filter(hit) })).filter((n) => hit(n.cat) || n.children.length > 0);
 
   const groups = (
     [
-      { kind: 'EXPENSE', title: 'Nhóm chi tiêu', code: 'CHI', dot: 'bg-teal-700' },
-      { kind: 'INCOME', title: 'Nhóm thu nhập', code: 'THU', dot: 'bg-emerald-500' },
+      {
+        kind: 'EXPENSE',
+        title: 'Nhóm chi tiêu',
+        code: 'CHI',
+        dot: 'bg-teal-700',
+      },
+      {
+        kind: 'INCOME',
+        title: 'Nhóm thu nhập',
+        code: 'THU',
+        dot: 'bg-emerald-500',
+      },
     ] as const
-  ).map((g) => ({ ...g, nodes: filterTree(buildCategoryTree(categories, g.kind)), total: categories.filter((c) => c.kind === g.kind).length }));
+  ).map((g) => ({
+    ...g,
+    nodes: filterTree(buildCategoryTree(categories, g.kind)),
+    total: categories.filter((c) => c.kind === g.kind).length,
+  }));
 
   const rollup = (n: CategoryNode): Rollup => {
     const all = [n.cat, ...n.children];
@@ -94,7 +146,7 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
   const leaves = categories.filter((c) => !(c._count?.children ?? 0)).length;
   const coveredPct = leaves ? (leaves - uncovered.length) / leaves : 0;
   const selectedId = inspect?.mode === 'edit' ? inspect.id : null;
-  const selected = selectedId !== null ? categories.find((c) => c.id === selectedId) ?? null : null;
+  const selected = selectedId !== null ? (categories.find((c) => c.id === selectedId) ?? null) : null;
 
   const isOpen = (id: number) => (allOpen ? !expanded.has(id) : expanded.has(id));
   function toggleOpen(id: number) {
@@ -174,7 +226,8 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
                       </>
                     ) : (
                       <>
-                        Đã thu {formatMonthLabel(month)}: <strong className="text-slate-900 fin-num">{monthTotal !== undefined ? formatVND(monthTotal) : '—'}</strong>
+                        Đã thu {formatMonthLabel(month)}:{' '}
+                        <strong className="text-slate-900 fin-num">{monthTotal !== undefined ? formatVND(monthTotal) : '—'}</strong>
                       </>
                     )}
                   </span>
@@ -191,150 +244,219 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
                       )}
                     </p>
                   )}
-                  {g.nodes.map((node) => {
-                    const c = node.cat;
-                    const r = rollup(node);
-                    const open = isOpen(c.id) || (!!q && node.children.length > 0);
-                    const active = selectedId === c.id;
-                    const childActive = node.children.some((ch) => ch.id === selectedId);
-                    const over = r.amount !== null && r.spent > r.amount;
-                    return (
-                      <div key={c.id} className={`group/parent rounded-xl transition-colors ${active || childActive ? 'bg-slate-50 ring-1 ring-teal-700/20' : 'hover:bg-slate-50'}`}>
-                        {/* Dòng cha */}
-                        <div
-                          className="flex items-center justify-between gap-3 p-3 cursor-pointer"
-                          onClick={() => select(c)}
-                          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), select(c))}
-                          role="button"
-                          tabIndex={0}
-                          aria-pressed={active}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <button
-                              type="button"
-                              className="p-0.5 rounded text-slate-400 hover:text-slate-800 hover:bg-white transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleOpen(c.id);
-                              }}
-                              aria-label={open ? 'Thu gọn' : 'Mở rộng'}
-                              aria-expanded={open}
-                            >
-                              <ChevronRight className={`w-5 h-5 transition-transform ${open ? 'rotate-90' : ''}`} />
-                            </button>
-                            <CategoryIcon icon={c.icon} color={c.color} size="lg" />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className={`text-sm font-semibold truncate ${active ? 'text-teal-800' : 'text-slate-900'}`}>{c.name}</span>
-                                <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${node.children.length ? 'bg-teal-50 text-teal-800' : 'bg-slate-100 text-slate-600'}`}>
-                                  {node.children.length ? `Cha (${node.children.length} con)` : 'Chưa có con'}
+                  {clustersOf(g.kind, g.nodes).map((cl, ci, all) => (
+                    <div key={cl.key} className="flex flex-col gap-1.5">
+                      {/* Tiêu đề nhóm: chỉ hiện khi loại này có ít nhất một nhóm */}
+                      {(all.length > 1 || cl.group) && (
+                        <div className={`flex items-center justify-between gap-2 px-3 pt-2 pb-1 ${ci > 0 ? 'mt-2 border-t border-slate-100' : ''}`}>
+                          <div className="flex items-center gap-2 min-w-0">
+                            {cl.group ? (
+                              <>
+                                <CategoryIcon icon={cl.group.icon} color={cl.group.color} size="sm" />
+                                <span className="text-xs font-bold uppercase tracking-wide truncate" style={{ color: cl.group.color }}>
+                                  {cl.group.name}
                                 </span>
-                                {!node.children.length && !rulesByCat.has(c.id) && (
-                                  <span className="px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-amber-800 text-[11px] font-semibold inline-flex items-center gap-1 whitespace-nowrap">
-                                    <TriangleAlert className="w-3 h-3" aria-hidden /> Chưa có quy tắc
+                                {cl.group.accountIds.length > 0 && (
+                                  <span className="text-[11px] text-slate-500 truncate">
+                                    ·{' '}
+                                    {cl.group.accountIds
+                                      .map((id) => accountById.get(id)?.name)
+                                      .filter(Boolean)
+                                      .join(', ')}
                                   </span>
                                 )}
-                              </div>
-                              <p className="text-xs text-slate-500 truncate">
-                                {node.children.length ? node.children.map((ch) => ch.name).join(', ') : <><span className="fin-num">{r.txns}</span> giao dịch</>}
-                              </p>
-                            </div>
+                              </>
+                            ) : (
+                              <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Chưa thuộc nhóm nào</span>
+                            )}
                           </div>
-
-                          <div className="flex items-center gap-3 shrink-0">
-                            <div className="hidden sm:flex flex-col items-end gap-0.5">
-                              {c.kind === 'EXPENSE' ? (
-                                <>
-                                  <span className={`text-sm font-semibold fin-num ${over ? 'text-rose-600' : 'text-slate-900'}`}>
-                                    {r.amount !== null ? <>{formatVND(r.amount)}<span className="text-slate-400 font-normal text-xs">/tháng</span></> : <span className="text-slate-400 font-normal text-xs">Chưa đặt hạn mức</span>}
-                                  </span>
-                                  <span className="text-[11px] text-slate-500 fin-num">
-                                    Đã chi {formatCompactVND(r.spent)} ₫ · <span className={r.rules ? 'text-emerald-700' : 'text-slate-400'}>{r.rules} quy tắc khớp</span>
-                                  </span>
-                                </>
-                              ) : (
-                                <span className={`text-xs font-semibold fin-num ${r.rules ? 'text-emerald-700' : 'text-slate-400'}`}>{r.rules} quy tắc khớp</span>
-                              )}
-                            </div>
-                            <div className="flex items-center opacity-60 group-hover/parent:opacity-100 transition-opacity">
-                              <IconBtn label="Thêm danh mục con" onClick={() => createUnder(c.kind, c.id)}>
-                                <Plus className="w-4 h-4" />
-                              </IconBtn>
-                              <IconBtn label="Chỉnh sửa" onClick={() => select(c)}>
-                                <Pencil className="w-4 h-4" />
-                              </IconBtn>
-                              <IconBtn label="Xóa" danger onClick={() => setDeleting(c)}>
-                                <Trash2 className="w-4 h-4" />
-                              </IconBtn>
-                            </div>
-                          </div>
+                          <span className="fin-label fin-num">{cl.nodes.length} danh mục cha</span>
                         </div>
-
-                        {/* Các con */}
-                        {open && (
-                          <div className="relative pl-12 pr-3 pb-3 flex flex-col gap-1.5">
-                            <div className="absolute left-[27px] top-0 bottom-5 w-px bg-slate-200" aria-hidden />
-                            {node.children.map((ch) => {
-                              const chRules = rulesByCat.get(ch.id) ?? [];
-                              const line = budgetByCat.get(ch.id);
-                              const chActive = selectedId === ch.id;
-                              return (
-                                <div
-                                  key={ch.id}
-                                  className={`relative flex items-center justify-between gap-3 p-2.5 rounded-lg border shadow-sm cursor-pointer transition-colors ${
-                                    chActive ? 'bg-teal-50 border-teal-700/30' : 'bg-white border-slate-200 hover:bg-slate-50'
-                                  }`}
-                                  onClick={() => select(ch)}
-                                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), select(ch))}
-                                  role="button"
-                                  tabIndex={0}
-                                  aria-pressed={chActive}
+                      )}
+                      {cl.nodes.map((node) => {
+                        const c = node.cat;
+                        const r = rollup(node);
+                        const open = isOpen(c.id) || (!!q && node.children.length > 0);
+                        const active = selectedId === c.id;
+                        const childActive = node.children.some((ch) => ch.id === selectedId);
+                        const over = r.amount !== null && r.spent > r.amount;
+                        return (
+                          <div
+                            key={c.id}
+                            className={`group/parent rounded-xl transition-colors ${active || childActive ? 'bg-slate-50 ring-1 ring-teal-700/20' : 'hover:bg-slate-50'}`}
+                          >
+                            {/* Dòng cha */}
+                            <div
+                              className="flex items-center justify-between gap-3 p-3 cursor-pointer"
+                              onClick={() => select(c)}
+                              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), select(c))}
+                              role="button"
+                              tabIndex={0}
+                              aria-pressed={active}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <button
+                                  type="button"
+                                  className="p-0.5 rounded text-slate-400 hover:text-slate-800 hover:bg-white transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleOpen(c.id);
+                                  }}
+                                  aria-label={open ? 'Thu gọn' : 'Mở rộng'}
+                                  aria-expanded={open}
                                 >
-                                  <span className={`absolute -left-[21px] top-1/2 w-5 h-px ${chActive ? 'bg-teal-700' : 'bg-slate-200'}`} aria-hidden />
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <CategoryIcon icon={ch.icon} color={ch.color} size="sm" />
-                                    <span className={`text-sm font-semibold truncate ${chActive ? 'text-teal-800' : 'text-slate-900'}`}>{ch.name}</span>
-                                    {!chRules.length && (
+                                  <ChevronRight className={`w-5 h-5 transition-transform ${open ? 'rotate-90' : ''}`} />
+                                </button>
+                                <CategoryIcon icon={c.icon} color={c.color} size="lg" />
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className={`text-sm font-semibold truncate ${active ? 'text-teal-800' : 'text-slate-900'}`}>{c.name}</span>
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${node.children.length ? 'bg-teal-50 text-teal-800' : 'bg-slate-100 text-slate-600'}`}
+                                    >
+                                      {node.children.length ? `Cha (${node.children.length} con)` : 'Chưa có con'}
+                                    </span>
+                                    {!node.children.length && !rulesByCat.has(c.id) && (
                                       <span className="px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-amber-800 text-[11px] font-semibold inline-flex items-center gap-1 whitespace-nowrap">
                                         <TriangleAlert className="w-3 h-3" aria-hidden /> Chưa có quy tắc
                                       </span>
                                     )}
                                   </div>
-                                  <div className="flex items-center gap-3 shrink-0">
-                                    <span className="hidden sm:inline text-xs text-slate-600 fin-num">
-                                      {ch.kind === 'EXPENSE' ? (line?.amount !== null && line?.amount !== undefined ? formatVND(line.amount) : <span className="text-slate-400">Chưa đặt hạn mức</span>) : <>{ch._count?.transactions ?? 0} giao dịch</>}
-                                    </span>
-                                    {chRules.length ? (
-                                      <span className="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold whitespace-nowrap fin-num">{chRules.length} quy tắc</span>
+                                  <p className="text-xs text-slate-500 truncate">
+                                    {node.children.length ? (
+                                      node.children.map((ch) => ch.name).join(', ')
                                     ) : (
-                                      <button type="button" className="text-xs font-semibold text-teal-700 hover:underline whitespace-nowrap" onClick={(e) => { e.stopPropagation(); setRuleFor(ch.id); }}>
-                                        + Gán nhanh
-                                      </button>
+                                      <>
+                                        <span className="fin-num">{r.txns}</span> giao dịch
+                                      </>
                                     )}
-                                    {chActive ? (
-                                      <CheckCircle2 className="w-4 h-4 text-teal-700" aria-hidden />
-                                    ) : (
-                                      <IconBtn label="Xóa danh mục con" danger onClick={() => setDeleting(ch)}>
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </IconBtn>
-                                    )}
-                                  </div>
+                                  </p>
                                 </div>
-                              );
-                            })}
-                            <button
-                              type="button"
-                              className="relative flex items-center gap-2 p-2 rounded-lg border border-dashed border-slate-300 text-xs font-semibold text-slate-500 hover:text-teal-700 hover:border-teal-700/40 hover:bg-white transition-colors"
-                              onClick={() => createUnder(c.kind, c.id)}
-                            >
-                              <span className="absolute -left-[21px] top-1/2 w-5 h-px bg-slate-200" aria-hidden />
-                              <CornerDownRight className="w-3.5 h-3.5" aria-hidden /> Thêm danh mục con vào &ldquo;{c.name}&rdquo;
-                            </button>
+                              </div>
+
+                              <div className="flex items-center gap-3 shrink-0">
+                                <div className="hidden sm:flex flex-col items-end gap-0.5">
+                                  {c.kind === 'EXPENSE' ? (
+                                    <>
+                                      <span className={`text-sm font-semibold fin-num ${over ? 'text-rose-600' : 'text-slate-900'}`}>
+                                        {r.amount !== null ? (
+                                          <>
+                                            {formatVND(r.amount)}
+                                            <span className="text-slate-400 font-normal text-xs">/tháng</span>
+                                          </>
+                                        ) : (
+                                          <span className="text-slate-400 font-normal text-xs">Chưa đặt hạn mức</span>
+                                        )}
+                                      </span>
+                                      <span className="text-[11px] text-slate-500 fin-num">
+                                        Đã chi {formatCompactVND(r.spent)} ₫ ·{' '}
+                                        <span className={r.rules ? 'text-emerald-700' : 'text-slate-400'}>{r.rules} quy tắc khớp</span>
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className={`text-xs font-semibold fin-num ${r.rules ? 'text-emerald-700' : 'text-slate-400'}`}>
+                                      {r.rules} quy tắc khớp
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center opacity-60 group-hover/parent:opacity-100 transition-opacity">
+                                  <IconBtn label="Thêm danh mục con" onClick={() => createUnder(c.kind, c.id)}>
+                                    <Plus className="w-4 h-4" />
+                                  </IconBtn>
+                                  <IconBtn label="Chỉnh sửa" onClick={() => select(c)}>
+                                    <Pencil className="w-4 h-4" />
+                                  </IconBtn>
+                                  <IconBtn label="Xóa" danger onClick={() => setDeleting(c)}>
+                                    <Trash2 className="w-4 h-4" />
+                                  </IconBtn>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Các con */}
+                            {open && (
+                              <div className="relative pl-12 pr-3 pb-3 flex flex-col gap-1.5">
+                                <div className="absolute left-[27px] top-0 bottom-5 w-px bg-slate-200" aria-hidden />
+                                {node.children.map((ch) => {
+                                  const chRules = rulesByCat.get(ch.id) ?? [];
+                                  const line = budgetByCat.get(ch.id);
+                                  const chActive = selectedId === ch.id;
+                                  return (
+                                    <div
+                                      key={ch.id}
+                                      className={`relative flex items-center justify-between gap-3 p-2.5 rounded-lg border shadow-sm cursor-pointer transition-colors ${
+                                        chActive ? 'bg-teal-50 border-teal-700/30' : 'bg-white border-slate-200 hover:bg-slate-50'
+                                      }`}
+                                      onClick={() => select(ch)}
+                                      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), select(ch))}
+                                      role="button"
+                                      tabIndex={0}
+                                      aria-pressed={chActive}
+                                    >
+                                      <span className={`absolute -left-[21px] top-1/2 w-5 h-px ${chActive ? 'bg-teal-700' : 'bg-slate-200'}`} aria-hidden />
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <CategoryIcon icon={ch.icon} color={ch.color} size="sm" />
+                                        <span className={`text-sm font-semibold truncate ${chActive ? 'text-teal-800' : 'text-slate-900'}`}>{ch.name}</span>
+                                        {!chRules.length && (
+                                          <span className="px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-amber-800 text-[11px] font-semibold inline-flex items-center gap-1 whitespace-nowrap">
+                                            <TriangleAlert className="w-3 h-3" aria-hidden /> Chưa có quy tắc
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-3 shrink-0">
+                                        <span className="hidden sm:inline text-xs text-slate-600 fin-num">
+                                          {ch.kind === 'EXPENSE' ? (
+                                            line?.amount !== null && line?.amount !== undefined ? (
+                                              formatVND(line.amount)
+                                            ) : (
+                                              <span className="text-slate-400">Chưa đặt hạn mức</span>
+                                            )
+                                          ) : (
+                                            <>{ch._count?.transactions ?? 0} giao dịch</>
+                                          )}
+                                        </span>
+                                        {chRules.length ? (
+                                          <span className="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold whitespace-nowrap fin-num">
+                                            {chRules.length} quy tắc
+                                          </span>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            className="text-xs font-semibold text-teal-700 hover:underline whitespace-nowrap"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setRuleFor(ch.id);
+                                            }}
+                                          >
+                                            + Gán nhanh
+                                          </button>
+                                        )}
+                                        {chActive ? (
+                                          <CheckCircle2 className="w-4 h-4 text-teal-700" aria-hidden />
+                                        ) : (
+                                          <IconBtn label="Xóa danh mục con" danger onClick={() => setDeleting(ch)}>
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </IconBtn>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                <button
+                                  type="button"
+                                  className="relative flex items-center gap-2 p-2 rounded-lg border border-dashed border-slate-300 text-xs font-semibold text-slate-500 hover:text-teal-700 hover:border-teal-700/40 hover:bg-white transition-colors"
+                                  onClick={() => createUnder(c.kind, c.id)}
+                                >
+                                  <span className="absolute -left-[21px] top-1/2 w-5 h-px bg-slate-200" aria-hidden />
+                                  <CornerDownRight className="w-3.5 h-3.5" aria-hidden /> Thêm danh mục con vào &ldquo;{c.name}&rdquo;
+                                </button>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
               </div>
             );
@@ -353,14 +475,15 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
               kind={selected?.kind ?? (inspect.mode === 'create' ? inspect.kind : 'EXPENSE')}
               initialParentId={inspect.mode === 'create' ? inspect.parentId : null}
               categories={categories}
-              rules={selected ? rulesByCat.get(selected.id) ?? [] : []}
+              groups={categoryGroups}
+              rules={selected ? (rulesByCat.get(selected.id) ?? []) : []}
               budgetLine={selected ? budgetByCat.get(selected.id) : undefined}
               onClose={() => setInspect(null)}
               onSaved={(saved) => {
                 reload();
                 if (saved) {
                   setInspect({ mode: 'edit', id: saved.id });
-                  const parentId = inspect.mode === 'create' ? inspect.parentId : selected?.parentId ?? null;
+                  const parentId = inspect.mode === 'create' ? inspect.parentId : (selected?.parentId ?? null);
                   if (parentId !== null) setExpanded((prev) => new Set(prev).add(parentId));
                 } else setInspect(null);
               }}
@@ -374,7 +497,9 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
               </span>
               <div>
                 <h2 className="font-jakarta text-[15px] font-semibold text-slate-900">Chi tiết danh mục</h2>
-                <p className="text-xs text-slate-500 mt-1">Bấm vào một danh mục cha hoặc con bên trái để sửa tên, nhóm cha, biểu tượng, màu và xem từ khóa nhận diện.</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Bấm vào một danh mục cha hoặc con bên trái để sửa tên, nhóm cha, biểu tượng, màu và xem từ khóa nhận diện.
+                </p>
               </div>
               <div className="flex gap-2">
                 <button type="button" className="fin-btn fin-btn-outline fin-btn-sm" onClick={() => createUnder('INCOME', null)}>
@@ -394,13 +519,18 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
               <span className="fin-label">{leaves} danh mục lá</span>
             </div>
             <div className="flex flex-col gap-1.5">
-              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden flex" role="img" aria-label={`${Math.round(coveredPct * 100)}% danh mục có quy tắc`}>
+              <div
+                className="h-3 w-full bg-slate-100 rounded-full overflow-hidden flex"
+                role="img"
+                aria-label={`${Math.round(coveredPct * 100)}% danh mục có quy tắc`}
+              >
                 <div className="bg-teal-700 transition-[width] duration-500" style={{ width: `${coveredPct * 100}%` }} />
                 <div className="bg-amber-400 flex-1" />
               </div>
               <div className="flex items-center justify-between text-xs text-slate-600">
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-teal-700" aria-hidden /> Có quy tắc: <strong className="fin-num">{leaves - uncovered.length}</strong>
+                  <span className="w-2.5 h-2.5 rounded-sm bg-teal-700" aria-hidden /> Có quy tắc:{' '}
+                  <strong className="fin-num">{leaves - uncovered.length}</strong>
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-sm bg-amber-400" aria-hidden /> Chưa có: <strong className="fin-num">{uncovered.length}</strong>
@@ -410,7 +540,8 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
             {uncovered.length > 0 ? (
               <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex flex-col gap-2">
                 <p className="text-xs text-slate-700">
-                  <strong className="text-amber-800">{uncovered.length} danh mục</strong> chưa có từ khóa nhận diện từ nội dung chuyển khoản. Giao dịch của chúng sẽ phải gán tay.
+                  <strong className="text-amber-800">{uncovered.length} danh mục</strong> chưa có từ khóa nhận diện từ nội dung chuyển khoản. Giao dịch của
+                  chúng sẽ phải gán tay.
                 </p>
                 <ul className="flex flex-col gap-1">
                   {uncovered.slice(0, 4).map((c) => (

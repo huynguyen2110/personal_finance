@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowDownUp, BadgeCheck, PiggyBank, PlusCircle, ShoppingCart, Wallet } from 'lucide-react';
+import TreeSelect from '@/components/shared/TreeSelect';
 import Header from '@/components/layout/Header';
 import { errorMessage } from '@/lib/api-client';
 import { formatVND } from '@/lib/money';
@@ -160,17 +161,11 @@ export default function GoalsPage() {
               </button>
             ))}
           </div>
-          <label className="flex items-center gap-2 justify-end shrink-0 px-1 text-xs text-slate-500 whitespace-nowrap">
+          <div className="flex items-center gap-1 justify-end shrink-0 px-1 text-xs text-slate-500 whitespace-nowrap">
             <ArrowDownUp className="w-4 h-4 text-slate-400" aria-hidden />
             Sắp xếp:
-            <select className="select-field !py-1.5 !text-xs" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-              {SORTS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <TreeSelect<Sort> ariaLabel="Sắp xếp" variant="ghost" size="sm" options={SORTS} value={sort} onChange={(v) => v && setSort(v)} />
+          </div>
         </div>
 
         {/* Quỹ nào đã tiêu, quỹ nào chưa */}

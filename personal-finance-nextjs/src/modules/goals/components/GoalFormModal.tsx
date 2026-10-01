@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { CalendarDays, ChartSpline, Infinity as InfinityIcon, Landmark, PlusCircle, Save, Target, Trash2 } from 'lucide-react';
+import { ChartSpline, Infinity as InfinityIcon, Landmark, PlusCircle, Save, Target, Trash2 } from 'lucide-react';
 import Modal from '@/components/shared/Modal';
+import DatePicker from '@/components/shared/DatePicker';
+import TreeSelect from '@/components/shared/TreeSelect';
+import AccountSelect from '@/components/shared/AccountSelect';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import { errorMessage } from '@/lib/api-client';
 import { formatVND } from '@/lib/money';
@@ -300,20 +303,18 @@ export default function GoalFormModal({ goal, month, avgMonthlyExpense, onClose,
               <Label htmlFor="goal-deadline" hint={deadline ? <button type="button" className="text-teal-700 hover:underline" onClick={() => setDeadline('')}>Bỏ hạn</button> : 'Không bắt buộc'}>
                 Thời hạn hoàn thành
               </Label>
-              <div className="relative">
-                <input id="goal-deadline" type="month" min={month} className="input-field pr-9" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-                <CalendarDays className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden />
-              </div>
+              <DatePicker id="goal-deadline" mode="month" min={month} value={deadline} onChange={setDeadline} clearable placeholder="Không đặt hạn" className="w-full" />
             </div>
             <div>
               <Label htmlFor="goal-priority">Mức độ ưu tiên</Label>
-              <select id="goal-priority" className="select-field w-full" value={priority} onChange={(e) => setPriority(e.target.value as GoalPriority)}>
-                {(Object.keys(PRIORITIES) as GoalPriority[]).map((p) => (
-                  <option key={p} value={p}>
-                    {PRIORITIES[p].label}
-                  </option>
-                ))}
-              </select>
+              <TreeSelect<GoalPriority>
+                id="goal-priority"
+                ariaLabel="Mức độ ưu tiên"
+                options={(Object.keys(PRIORITIES) as GoalPriority[]).map((p) => ({ value: p, label: PRIORITIES[p].label }))}
+                value={priority}
+                onChange={(v) => v && setPriority(v)}
+                className="w-full"
+              />
             </div>
           </div>
           {target ? (
@@ -368,20 +369,7 @@ export default function GoalFormModal({ goal, month, avgMonthlyExpense, onClose,
             </div>
             <div>
               <label htmlFor="goal-source" className="block text-xs text-slate-500 mb-1">Tài khoản nguồn</label>
-              <select
-                id="goal-source"
-                className="select-field w-full"
-                value={sourceAccountId ?? ''}
-                disabled={!monthlyPlan}
-                onChange={(e) => setSourceAccountId(e.target.value ? Number(e.target.value) : null)}
-              >
-                <option value="">Không chọn</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
+              <AccountSelect id="goal-source" ariaLabel="Tài khoản nguồn" accounts={accounts} value={sourceAccountId} onChange={setSourceAccountId} allLabel="Không chọn" disabled={!monthlyPlan} className="w-full" />
             </div>
           </div>
           <p className="text-xs text-slate-500">Web nhắc khi tới ngày nạp mà tháng này chưa nạp đủ. Bạn tự chuyển tiền trong app ngân hàng rồi bấm ghi nhận.</p>
@@ -396,20 +384,16 @@ export default function GoalFormModal({ goal, month, avgMonthlyExpense, onClose,
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label htmlFor="goal-holding" className="block text-xs text-slate-500 mb-1">Tài khoản / sổ tiết kiệm</label>
-              <select
+              <AccountSelect
                 id="goal-holding"
-                className="select-field w-full"
-                value={holdingAccountId ?? ''}
-                onChange={(e) => setHoldingAccountId(e.target.value ? Number(e.target.value) : null)}
-              >
-                <option value="">Không ghi</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-                <option value={OTHER_HOLDING}>Khác (tự nhập)…</option>
-              </select>
+                ariaLabel="Tài khoản / sổ tiết kiệm"
+                accounts={accounts}
+                value={holdingAccountId}
+                onChange={setHoldingAccountId}
+                allLabel="Không ghi"
+                extra={[{ value: OTHER_HOLDING, label: 'Khác (tự nhập)…', icon: <span className="w-6 h-6 rounded-md inline-flex items-center justify-center bg-amber-50 text-amber-700" aria-hidden><Landmark className="w-3.5 h-3.5" /></span> }]}
+                className="w-full"
+              />
               {holdingAccountId === OTHER_HOLDING && (
                 <input
                   className="input-field mt-2"

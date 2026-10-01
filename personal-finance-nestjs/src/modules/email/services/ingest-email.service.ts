@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { isUniqueViolation } from '../../../common/utils/prisma-errors.util';
 import { CategorizeService } from '../../rules/services/categorize.service';
-import { findMatchingRule, type RuleWithKind } from '../../rules/utils/rule-engine';
+import type { CategorizeContext } from '../../rules/services/categorize.service';
 import { TransfersService } from '../../transfers/services/transfers.service';
 import { AccountsService } from '../../accounts/services/accounts.service';
 import { TransactionsService } from '../../transactions/services/transactions.service';
@@ -40,7 +40,7 @@ export class IngestEmailService {
   }
 
   // Lưu một giao dịch đọc từ email ngân hàng. Idempotent theo externalId (mã giao dịch của ngân hàng).
-  async ingest(p: ParsedBankEmail, meta: { messageId?: string | null } = {}, rules?: RuleWithKind[]): Promise<EmailIngestResult> {
+  async ingest(p: ParsedBankEmail, meta: { messageId?: string | null } = {}, ctx?: CategorizeContext): Promise<EmailIngestResult> {
     const existing = await this.prisma.transaction.findUnique({ where: { externalId: p.externalId }, select: { id: true } });
     if (existing) return { status: 'duplicate', id: existing.id, internal: false };
 
@@ -65,12 +65,17 @@ export class IngestEmailService {
     }
 
     const content = emailContent(p);
-    const rule = findMatchingRule(rules ?? (await this.categorize.loadActiveRules()), content, p.direction);
     // Tài khoản bên kia là một tài khoản đã có trong app → chắc chắn là chuyển nội bộ
     const toOwnAccount = p.counterpartyAccount
       ? !!(await this.prisma.account.findUnique({ where: { accountNumber: p.counterpartyAccount }, select: { id: true } }))
       : false;
     const internal = isSelfTransfer(p) || toOwnAccount;
+    const cat = this.categorize.resolve(ctx ?? (await this.categorize.loadContext()), {
+      content,
+      direction: p.direction,
+      accountId: account.id,
+      excludeFromStats: internal,
+    });
 
     let createdId: number;
     try {
@@ -84,8 +89,8 @@ export class IngestEmailService {
           content,
           referenceCode: p.referenceCode,
           transactionDate: p.transactionDate,
-          categoryId: rule?.categoryId ?? null,
-          categorizedBy: rule ? 'RULE' : 'NONE',
+          categoryId: cat.categoryId,
+          categorizedBy: cat.categorizedBy,
           excludeFromStats: internal,
           note: internal ? 'Chuyển giữa các tài khoản của chính bạn (tự nhận diện từ email)' : null,
           rawPayload: {

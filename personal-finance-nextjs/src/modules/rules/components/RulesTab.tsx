@@ -19,6 +19,7 @@ import {
   Tags,
   Trash2,
   WandSparkles,
+  Landmark,
 } from 'lucide-react';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import CategoryIcon from '@/components/shared/CategoryIcon';
@@ -75,7 +76,7 @@ export default function RulesTab({ categories, rules, pending, onGoToTree, onGoT
       if (flow !== 'ALL' && (r.category.kind === 'INCOME' ? 'IN' : 'OUT') !== flow) return false;
       if (status === 'ON' && !r.isActive) return false;
       if (status === 'OFF' && r.isActive) return false;
-      if (q && !normalizeText(`${r.pattern} ${r.category.name}`).includes(q)) return false;
+      if (q && !normalizeText(`${r.pattern} ${r.category.name} ${r.account?.name ?? ''}`).includes(q)) return false;
       return true;
     });
   }, [rules, search, flow, status]);
@@ -280,6 +281,14 @@ export default function RulesTab({ categories, rules, pending, onGoToTree, onGoT
                               )}
                               <span aria-hidden>•</span>
                               <span>{r.matchType === 'REGEX' ? 'Biểu thức chính quy' : `Khớp nguyên từ, ${kws.length} từ khóa`}</span>
+                              {r.account && (
+                                <>
+                                  <span aria-hidden>•</span>
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 font-semibold" title="Chỉ áp dụng cho tài khoản này">
+                                    <Landmark className="w-3 h-3" aria-hidden /> {r.account.name}
+                                  </span>
+                                </>
+                              )}
                               {cat?._count && (
                                 <>
                                   <span aria-hidden>•</span>

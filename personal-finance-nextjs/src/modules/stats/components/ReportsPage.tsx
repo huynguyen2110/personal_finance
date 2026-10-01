@@ -6,6 +6,9 @@ import { Download } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import StatTile from '@/components/shared/StatTile';
 import CategoryIcon from '@/components/shared/CategoryIcon';
+import TreeSelect from '@/components/shared/TreeSelect';
+import DatePicker from '@/components/shared/DatePicker';
+import AccountSelect from '@/components/shared/AccountSelect';
 import ChartCard, { DataTable } from '@/components/charts/ChartCard';
 import MonthlyBars, { MonthlyTable } from '@/components/charts/MonthlyBars';
 import TrendLines from '@/components/charts/TrendLines';
@@ -88,14 +91,10 @@ export default function ReportsPage() {
                 );
               })}
             </div>
-            <input type="month" className="input-field !w-auto !py-2" value={fromMonth} max={toMonth} onChange={(e) => e.target.value && setFromMonth(e.target.value)} aria-label="Từ tháng" />
-            <input type="month" className="input-field !w-auto !py-2" value={toMonth} min={fromMonth} onChange={(e) => e.target.value && setToMonth(e.target.value)} aria-label="Đến tháng" />
-            <select className="select-field !w-auto" value={accountId ?? ''} onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : null)} aria-label="Tài khoản">
-              <option value="">Tất cả tài khoản</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
+            <DatePicker mode="month" ariaLabel="Từ tháng" value={fromMonth} max={toMonth} onChange={(v) => v && setFromMonth(v)} />
+            <span className="text-text-muted text-sm" aria-hidden>→</span>
+            <DatePicker mode="month" ariaLabel="Đến tháng" value={toMonth} min={fromMonth} onChange={(v) => v && setToMonth(v)} />
+            <AccountSelect accounts={accounts} value={accountId} onChange={setAccountId} allLabel="Tất cả tài khoản" className="!w-auto min-w-[12rem]" />
             <button
               type="button"
               className="btn-secondary !py-2 text-sm flex items-center gap-1.5"
@@ -176,19 +175,20 @@ export default function ReportsPage() {
                 className="xl:col-span-2"
                 title="Xu hướng một danh mục chi"
                 actions={
-                  <select
-                    className="select-field !w-auto !py-1.5 !text-xs"
-                    value={trendRow ? String(trendRow.categoryId) : ''}
-                    onChange={(e) => setTrendCategory(e.target.value)}
-                    aria-label="Chọn danh mục"
-                  >
-                    {data.expenseRows.map((r) => (
-                      <option key={String(r.categoryId)} value={String(r.categoryId)}>
-                        {r.parentId !== null ? '   └ ' : ''}
-                        {r.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="w-56">
+                    <TreeSelect
+                      ariaLabel="Chọn danh mục"
+                      size="sm"
+                      options={data.expenseRows.map((r) => ({
+                        value: String(r.categoryId),
+                        label: r.name,
+                        depth: r.parentId !== null ? (1 as const) : (0 as const),
+                        icon: <CategoryIcon icon={r.icon} color={r.color} size="sm" />,
+                      }))}
+                      value={trendRow ? String(trendRow.categoryId) : null}
+                      onChange={(v) => v !== null && setTrendCategory(v)}
+                    />
+                  </div>
                 }
                 table={
                   trendRow && (

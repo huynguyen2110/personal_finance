@@ -18,6 +18,9 @@ export class CategoriesService {
     const max = await this.prisma.category.aggregate({ _max: { sortOrder: true } });
     const parentId = dto.parentId ?? null;
     if (parentId) await this.assertValidParent(parentId, dto.kind, null);
+    // Danh mục con đi theo nhóm của cha, không giữ nhóm riêng
+    const groupId = parentId ? null : (dto.groupId ?? null);
+    if (groupId) await this.assertValidGroup(groupId, dto.kind);
     return this.prisma.category.create({
       data: {
         name: dto.name,
@@ -26,6 +29,7 @@ export class CategoriesService {
         color: dto.color ?? '#64748B',
         sortOrder: dto.sortOrder ?? (max._max.sortOrder ?? 0) + 1,
         parentId,
+        groupId,
       },
     });
   }
@@ -44,7 +48,18 @@ export class CategoriesService {
       if (current._count.children > 0) throw new BadRequestException('Danh mục đang có danh mục con không thể trở thành danh mục con');
       await this.assertValidParent(dto.parentId, kind, id);
     }
-    return this.prisma.category.update({ where: { id }, data: dto });
+    const data: UpdateCategoryDto = { ...dto };
+    const nextParentId = dto.parentId !== undefined ? dto.parentId : current.parentId;
+    // Trở thành danh mục con → bỏ nhóm riêng (đi theo cha)
+    if (nextParentId !== null) data.groupId = null;
+    else if (dto.groupId !== undefined && dto.groupId !== null) await this.assertValidGroup(dto.groupId, kind);
+    return this.prisma.category.update({ where: { id }, data });
+  }
+
+  private async assertValidGroup(groupId: number, kind: CategoryKind) {
+    const group = await this.prisma.categoryGroup.findUnique({ where: { id: groupId }, select: { kind: true } });
+    if (!group) throw new BadRequestException('Nhóm không tồn tại');
+    if (group.kind !== kind) throw new BadRequestException('Nhóm phải cùng loại thu/chi với danh mục');
   }
 
   // Cha phải tồn tại, cùng loại thu/chi, không phải chính nó và bản thân cha phải là cấp cao nhất (tối đa 2 cấp)

@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { CircleCheck, CircleDashed, FlaskConical, X, Zap } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, CircleCheck, CircleDashed, FlaskConical, X, Zap } from 'lucide-react';
 import CategoryIcon from '@/components/shared/CategoryIcon';
+import TreeSelect from '@/components/shared/TreeSelect';
 import { errorMessage } from '@/lib/api-client';
 import type { Direction } from '@/types/common';
 import { testRule } from '../lib';
@@ -89,14 +90,16 @@ export default function RuleTester({ rules = [], initial }: Props) {
         <div className="grid grid-cols-2 gap-2">
           <label className="flex flex-col gap-1">
             <span className="fin-label">Loại giao dịch</span>
-            <select
-              className="select-field !py-2 !rounded-lg !bg-slate-50 text-sm"
+            <TreeSelect<Direction>
+              ariaLabel="Loại giao dịch"
+              className="!rounded-lg !bg-slate-50 hover:!bg-white"
+              options={[
+                { value: 'OUT', label: 'Tiền ra (Chi tiêu)', icon: <span className="w-6 h-6 rounded-md inline-flex items-center justify-center bg-orange-50 text-expense" aria-hidden><ArrowUpRight className="w-3.5 h-3.5" /></span> },
+                { value: 'IN', label: 'Tiền vào (Thu nhập)', icon: <span className="w-6 h-6 rounded-md inline-flex items-center justify-center bg-blue-50 text-income" aria-hidden><ArrowDownLeft className="w-3.5 h-3.5" /></span> },
+              ]}
               value={direction}
-              onChange={(e) => setDirection(e.target.value as Direction)}
-            >
-              <option value="OUT">Tiền ra (Chi tiêu)</option>
-              <option value="IN">Tiền vào (Thu nhập)</option>
-            </select>
+              onChange={(v) => v && setDirection(v)}
+            />
           </label>
           <div className="flex flex-col justify-end">
             <button type="submit" disabled={busy} className="fin-btn fin-btn-primary w-full justify-center">

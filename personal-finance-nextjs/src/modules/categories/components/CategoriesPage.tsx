@@ -1,20 +1,23 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { FolderTree, History, ListChecks, type LucideIcon } from 'lucide-react';
+import { FolderTree, History, Layers, ListChecks, type LucideIcon } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import MatchLogTab, { type LogStatus } from '@/modules/rules/components/MatchLogTab';
 import RulesTab from '@/modules/rules/components/RulesTab';
 import { useRules } from '@/modules/rules/lib';
 import { useTransactions } from '@/modules/transactions/lib';
-import { useCategories } from '../lib';
+import { useAccounts } from '@/modules/accounts/lib';
+import { useCategories, useCategoryGroups } from '../lib';
 import CategoryTreeTab from './CategoryTreeTab';
+import CategoryGroupsTab from './CategoryGroupsTab';
 
-type Tab = 'rules' | 'tree' | 'logs';
+type Tab = 'rules' | 'tree' | 'groups' | 'logs';
 
 const TABS: { key: Tab; label: string; Icon: LucideIcon }[] = [
   { key: 'rules', label: 'Quy tắc tự động', Icon: ListChecks },
   { key: 'tree', label: 'Cây danh mục', Icon: FolderTree },
+  { key: 'groups', label: 'Nhóm & Tài khoản', Icon: Layers },
   { key: 'logs', label: 'Nhật ký khớp', Icon: History },
 ];
 
@@ -23,6 +26,8 @@ export default function CategoriesPage() {
   const [logPreset, setLogPreset] = useState<{ status: LogStatus; key: number } | null>(null);
   const { data: categories = [] } = useCategories();
   const { data: rules = [] } = useRules();
+  const { data: groups = [] } = useCategoryGroups();
+  const { data: accounts = [] } = useAccounts();
   // Giao dịch chưa phân loại (mới nhất trước) — dùng cho số "chờ xử lý" và gợi ý quy tắc
   const { data: pendingData } = useTransactions({ categoryId: 'none', pageSize: 10, sort: 'date_desc' });
   const pending = { items: pendingData?.items ?? [], total: pendingData?.total ?? 0 };
@@ -33,7 +38,7 @@ export default function CategoriesPage() {
     setTab('logs');
   }, []);
 
-  const counts: Record<Tab, number> = { rules: rules.length, tree: categories.length, logs: pending.total };
+  const counts: Record<Tab, number> = { rules: rules.length, tree: categories.length, groups: groups.length, logs: pending.total };
 
   return (
     <div className="font-jakarta">
@@ -84,6 +89,7 @@ export default function CategoriesPage() {
 
         {tab === 'rules' && <RulesTab categories={categories} rules={rules} pending={pending} onGoToTree={() => setTab('tree')} onGoToPending={goToPending} />}
         {tab === 'tree' && <CategoryTreeTab categories={categories} rules={rules} />}
+        {tab === 'groups' && <CategoryGroupsTab categories={categories} groups={groups} accounts={accounts} />}
         {tab === 'logs' && <MatchLogTab key={logPreset?.key ?? 0} categories={categories} rules={rules} initialStatus={logPreset?.status} />}
       </div>
     </div>

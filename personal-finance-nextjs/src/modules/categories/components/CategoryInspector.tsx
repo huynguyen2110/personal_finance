@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { CornerDownRight, Plus, Save, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, CornerDownRight, Layers, LayoutGrid, Plus, Save, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import CategoryIcon, { CATEGORY_COLORS, CATEGORY_ICONS } from '@/components/shared/CategoryIcon';
+import TreeSelect from '@/components/shared/TreeSelect';
 import { errorMessage } from '@/lib/api-client';
 import { formatVND } from '@/lib/money';
 import type { CategoryKind } from '@/types/common';
@@ -11,7 +12,7 @@ import type { BudgetLine } from '@/modules/budgets/types';
 import type { RuleDTO } from '@/modules/rules/types';
 import { ruleKeywords } from '@/modules/rules/utils/rule-match';
 import { createCategory, updateCategory } from '../lib';
-import type { CategoryDTO } from '../types';
+import type { CategoryDTO, CategoryGroupDTO } from '../types';
 import { parentOptions } from '../utils/tree';
 
 interface Props {
@@ -20,6 +21,7 @@ interface Props {
   kind: CategoryKind;
   initialParentId?: number | null;
   categories: CategoryDTO[];
+  groups: CategoryGroupDTO[];
   rules: RuleDTO[];
   budgetLine?: BudgetLine;
   onClose: () => void;
@@ -28,12 +30,25 @@ interface Props {
   onAddRule: (categoryId: number) => void;
 }
 
+// Lớp cho các ô chọn trong bảng: bo góc nhỏ, nền xám nhạt như ô tên
+const FIELD = '!rounded-lg !bg-slate-50 hover:!bg-white';
+
+// Icon vuông nhỏ cho các lựa chọn không phải danh mục (cấp cao nhất, không nhóm, loại dòng tiền)
+function OptionIcon({ icon: Icon, tone }: { icon: typeof Layers; tone: string }) {
+  return (
+    <span className={`w-6 h-6 rounded-md inline-flex items-center justify-center ${tone}`} aria-hidden>
+      <Icon className="w-3.5 h-3.5" />
+    </span>
+  );
+}
+
 // Bảng chi tiết bên phải Cây danh mục: sửa tên/loại/cha/icon/màu, xem từ khóa nhận diện
 export default function CategoryInspector({
   category,
   kind: initialKind,
   initialParentId = null,
   categories,
+  groups,
   rules,
   budgetLine,
   onClose,
@@ -44,6 +59,7 @@ export default function CategoryInspector({
   const [name, setName] = useState(category?.name ?? '');
   const [kind, setKind] = useState<CategoryKind>(category?.kind ?? initialKind);
   const [parentId, setParentId] = useState<number | null>(category?.parentId ?? initialParentId);
+  const [groupId, setGroupId] = useState<number | null>(category?.groupId ?? null);
   const [icon, setIcon] = useState(category?.icon ?? 'Tag');
   const [color, setColor] = useState(category?.color ?? CATEGORY_COLORS[0]);
   const [saving, setSaving] = useState(false);
@@ -54,11 +70,15 @@ export default function CategoryInspector({
   const parentLocked = childCount > 0;
   const parents = parentOptions(categories, kind, category?.id);
   const effectiveParentId = parents.some((p) => p.id === parentId) ? parentId : null;
+  // Nhóm chỉ áp dụng cho danh mục cấp cao nhất và phải cùng loại
+  const groupOptions = groups.filter((g) => g.kind === kind);
+  const effectiveGroupId = effectiveParentId === null && groupOptions.some((g) => g.id === groupId) ? groupId : null;
   const dirty =
     !category ||
     name !== category.name ||
     kind !== category.kind ||
     effectiveParentId !== category.parentId ||
+    effectiveGroupId !== category.groupId ||
     icon !== category.icon ||
     color !== category.color;
 
@@ -67,7 +87,7 @@ export default function CategoryInspector({
     if (!name.trim()) return toast.error('Nhập tên danh mục');
     setSaving(true);
     try {
-      const payload = { name: name.trim(), icon, color, kind, parentId: effectiveParentId };
+      const payload = { name: name.trim(), icon, color, kind, parentId: effectiveParentId, groupId: effectiveGroupId };
       if (category) {
         await updateCategory(category.id, payload);
         toast.success('Đã lưu danh mục');
@@ -111,38 +131,60 @@ export default function CategoryInspector({
         <div className="grid grid-cols-2 gap-2">
           <label className="flex flex-col gap-1">
             <span className="fin-label">Loại dòng tiền</span>
-            <select
-              className="select-field !py-2 !rounded-lg !bg-slate-50 text-sm"
+            <TreeSelect<CategoryKind>
+              ariaLabel="Loại dòng tiền"
+              className={FIELD}
+              options={[
+                { value: 'EXPENSE', label: 'Chi tiêu (tiền ra)', icon: <OptionIcon icon={ArrowUpRight} tone="text-expense bg-orange-50" /> },
+                { value: 'INCOME', label: 'Thu nhập (tiền vào)', icon: <OptionIcon icon={ArrowDownLeft} tone="text-income bg-blue-50" /> },
+              ]}
               value={kind}
-              onChange={(e) => {
-                setKind(e.target.value as CategoryKind);
+              onChange={(v) => {
+                if (!v) return;
+                setKind(v);
                 setParentId(null);
               }}
               disabled={kindLocked}
-            >
-              <option value="EXPENSE">Chi tiêu (tiền ra)</option>
-              <option value="INCOME">Thu nhập (tiền vào)</option>
-            </select>
+            />
             {kindLocked && <span className="text-[11px] text-slate-500">{txnCount > 0 ? 'Đã có giao dịch' : 'Đang có danh mục con'}, không đổi được loại</span>}
           </label>
           <label className="flex flex-col gap-1">
             <span className="fin-label">Thuộc nhóm cha</span>
-            <select
-              className="select-field !py-2 !rounded-lg !bg-slate-50 text-sm"
-              value={effectiveParentId ?? ''}
-              onChange={(e) => setParentId(e.target.value ? Number(e.target.value) : null)}
+            <TreeSelect<number>
+              ariaLabel="Thuộc nhóm cha"
+              className={FIELD}
+              options={[
+                { value: 0, label: 'Danh mục cấp cao nhất', icon: <OptionIcon icon={Layers} tone="text-slate-500 bg-slate-100" /> },
+                ...parents.map((p) => ({ value: p.id, label: p.name, group: 'Nằm dưới danh mục', icon: <CategoryIcon icon={p.icon} color={p.color} size="sm" /> })),
+              ]}
+              value={effectiveParentId ?? 0}
+              onChange={(v) => setParentId(v ? v : null)}
               disabled={parentLocked}
-            >
-              <option value="">— Danh mục cấp cao nhất —</option>
-              {parents.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            />
             {parentLocked && <span className="text-[11px] text-slate-500">Đang có {childCount} danh mục con nên phải là cấp cao nhất</span>}
           </label>
         </div>
+
+        {effectiveParentId === null && (
+          <label className="flex flex-col gap-1">
+            <span className="fin-label">Thuộc nhóm {kind === 'EXPENSE' ? 'chi tiêu' : 'thu nhập'}</span>
+            <TreeSelect<number>
+              ariaLabel={`Thuộc nhóm ${kind === 'EXPENSE' ? 'chi tiêu' : 'thu nhập'}`}
+              className={FIELD}
+              options={[
+                { value: 0, label: 'Không thuộc nhóm nào', icon: <OptionIcon icon={LayoutGrid} tone="text-slate-500 bg-slate-100" /> },
+                ...groupOptions.map((g) => ({ value: g.id, label: g.name, group: 'Nhóm', icon: <CategoryIcon icon={g.icon} color={g.color} size="sm" /> })),
+              ]}
+              value={effectiveGroupId ?? 0}
+              onChange={(v) => setGroupId(v ? v : null)}
+            />
+            <span className="text-[11px] text-slate-500">
+              {groupOptions.length
+                ? 'Nhóm gán cho tài khoản ngân hàng để gợi ý và tự phân loại giao dịch. Danh mục con đi theo nhóm của cha.'
+                : 'Chưa có nhóm nào. Tạo nhóm ở tab "Nhóm & Tài khoản".'}
+            </span>
+          </label>
+        )}
 
         <div className="flex flex-col gap-1.5">
           <span className="fin-label">Biểu tượng &amp; màu đại diện</span>

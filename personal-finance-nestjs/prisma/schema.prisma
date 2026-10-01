@@ -53,9 +53,12 @@ model Account {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
-  transactions Transaction[]
-  goalsHeld    SavingsGoal[] @relation("GoalHolding")
-  goalsFunded  SavingsGoal[] @relation("GoalSource")
+  transactions   Transaction[]
+  goalsHeld      SavingsGoal[]          @relation("GoalHolding")
+  goalsFunded    SavingsGoal[]          @relation("GoalSource")
+  // Nhóm chi tiêu/thu nhập tài khoản này thường dùng (gợi ý & tự phân loại)
+  categoryGroups AccountCategoryGroup[]
+  rules          CategoryRule[]
 }
 
 enum CategoryKind {
@@ -73,16 +76,53 @@ model Category {
   sortOrder Int          @default(0)
   // Danh mục 2 cấp: danh mục con trỏ về danh mục cha cùng loại (cha luôn là cấp cao nhất)
   parentId  Int?
+  // Nhóm (tầng trên danh mục cha): chỉ danh mục cấp cao nhất mới thuộc nhóm, con đi theo cha
+  groupId   Int?
   createdAt DateTime     @default(now())
 
-  parent       Category?      @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children     Category[]     @relation("CategoryTree")
-  transactions Transaction[]
-  rules        CategoryRule[]
-  budgets      Budget[]
+  parent           Category?       @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children         Category[]      @relation("CategoryTree")
+  group            CategoryGroup?  @relation("GroupCategories", fields: [groupId], references: [id], onDelete: SetNull)
+  defaultForGroups CategoryGroup[] @relation("GroupDefault")
+  transactions     Transaction[]
+  rules            CategoryRule[]
+  budgets          Budget[]
 
   @@unique([name, kind])
   @@index([parentId])
+  @@index([groupId])
+}
+
+// Nhóm chi tiêu / thu nhập: gom nhiều danh mục cha, gán cho tài khoản ngân hàng thường chi cho nhóm đó.
+// Dùng để gợi ý danh mục khi chọn tay, giới hạn quy tắc theo tài khoản và tự phân loại khi không khớp quy tắc.
+model CategoryGroup {
+  id                Int          @id @default(autoincrement())
+  name              String
+  kind              CategoryKind
+  icon              String       @default("Layers")
+  color             String       @default("#64748B")
+  sortOrder         Int          @default(0)
+  // Danh mục nhận giao dịch khi tài khoản chỉ gán đúng một nhóm (loại này) và không quy tắc nào khớp
+  defaultCategoryId Int?
+  createdAt         DateTime     @default(now())
+
+  defaultCategory Category?              @relation("GroupDefault", fields: [defaultCategoryId], references: [id], onDelete: SetNull)
+  categories      Category[]             @relation("GroupCategories")
+  accounts        AccountCategoryGroup[]
+
+  @@unique([name, kind])
+}
+
+// Tài khoản ↔ nhóm (nhiều-nhiều)
+model AccountCategoryGroup {
+  accountId Int
+  groupId   Int
+
+  account Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  group   CategoryGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([accountId, groupId])
+  @@index([groupId])
 }
 
 enum MatchType {
@@ -100,9 +140,14 @@ model CategoryRule {
   categoryId Int
   priority   Int       @default(100) // số nhỏ chạy trước
   isActive   Boolean   @default(true)
+  // Chỉ áp dụng cho giao dịch của một tài khoản (null = mọi tài khoản)
+  accountId  Int?
   createdAt  DateTime  @default(now())
 
   category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  account  Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
 }
 
 enum TxnSource {
@@ -117,9 +162,10 @@ enum TxnDirection {
 }
 
 enum CategorizedBy {
-  RULE
-  MANUAL
-  NONE
+  RULE // khớp quy tắc từ khóa
+  MANUAL // người dùng tự chọn
+  NONE // chưa phân loại
+  ACCOUNT // không khớp quy tắc, gán theo nhóm duy nhất của tài khoản
 }
 
 model Transaction {

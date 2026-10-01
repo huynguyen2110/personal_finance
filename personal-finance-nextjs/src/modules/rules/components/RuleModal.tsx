@@ -4,8 +4,10 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import Modal from '@/components/shared/Modal';
 import CategorySelect from '@/components/shared/CategorySelect';
+import AccountSelect from '@/components/shared/AccountSelect';
 import { errorMessage } from '@/lib/api-client';
 import type { CategoryDTO } from '@/modules/categories/types';
+import { useAccounts } from '@/modules/accounts/lib';
 import { createRule, updateRule } from '../lib';
 import type { RuleDTO } from '../types';
 
@@ -13,6 +15,7 @@ export default function RuleModal({
   rule,
   categories,
   defaultCategoryId = null,
+  defaultAccountId = null,
   onClose,
   onSaved,
 }: {
@@ -20,6 +23,8 @@ export default function RuleModal({
   categories: CategoryDTO[];
   // Danh mục chọn sẵn khi tạo quy tắc từ Cây danh mục
   defaultCategoryId?: number | null;
+  // Tài khoản chọn sẵn (quy tắc chỉ áp dụng cho tài khoản này)
+  defaultAccountId?: number | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -27,14 +32,16 @@ export default function RuleModal({
   const [matchType, setMatchType] = useState<RuleDTO['matchType']>(rule?.matchType ?? 'CONTAINS');
   const [categoryId, setCategoryId] = useState<number | null>(rule?.categoryId ?? defaultCategoryId);
   const [priority, setPriority] = useState(String(rule?.priority ?? 100));
+  const [accountId, setAccountId] = useState<number | null>(rule?.accountId ?? defaultAccountId);
   const [saving, setSaving] = useState(false);
+  const { data: accounts = [] } = useAccounts();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!categoryId) return toast.error('Chọn danh mục');
     setSaving(true);
     try {
-      const payload = { pattern, matchType, categoryId, priority: Number(priority) || 100 };
+      const payload = { pattern, matchType, categoryId, priority: Number(priority) || 100, accountId };
       if (rule) await updateRule(rule.id, payload);
       else await createRule(payload);
       toast.success('Đã lưu quy tắc');
@@ -97,6 +104,13 @@ export default function RuleModal({
             <input type="number" min={0} className="input-field" value={priority} onChange={(e) => setPriority(e.target.value)} />
           </label>
         </div>
+        <label className="block">
+          <span className="block text-xs font-medium text-text-secondary mb-1">Áp dụng cho</span>
+          <AccountSelect ariaLabel="Áp dụng cho" accounts={accounts} value={accountId} onChange={setAccountId} allLabel="Mọi tài khoản" />
+          <span className="block text-xs text-text-muted mt-1">
+            Giới hạn theo tài khoản khi cùng một từ khóa nhưng mỗi ngân hàng chi cho mục đích khác nhau.
+          </span>
+        </label>
         <p className="text-xs text-text-muted">
           Quy tắc chỉ áp dụng cho giao dịch cùng loại với danh mục (danh mục chi → tiền ra, danh mục thu → tiền vào).
         </p>

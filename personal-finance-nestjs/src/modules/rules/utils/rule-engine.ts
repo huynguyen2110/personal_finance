@@ -3,7 +3,7 @@ import { normalizeText } from '../../../common/utils/text.util';
 
 // Bộ khớp quy tắc phân loại (thuần, không truy cập DB)
 
-export type RuleWithKind = Pick<CategoryRule, 'id' | 'pattern' | 'matchType' | 'categoryId' | 'priority'> & {
+export type RuleWithKind = Pick<CategoryRule, 'id' | 'pattern' | 'matchType' | 'categoryId' | 'priority' | 'accountId'> & {
   category: { kind: CategoryKind };
 };
 
@@ -41,17 +41,31 @@ export function kindForDirection(direction: 'IN' | 'OUT'): CategoryKind {
   return direction === 'IN' ? 'INCOME' : 'EXPENSE';
 }
 
-export function matchRule(rule: RuleWithKind, normalized: string, direction: 'IN' | 'OUT'): boolean {
-  if (rule.category.kind !== kindForDirection(direction)) return false;
+// Giao dịch cần khớp: nội dung đã chuẩn hóa, chiều tiền và tài khoản (null = chưa biết → chỉ khớp quy tắc chung)
+export interface MatchTarget {
+  normalized: string;
+  direction: 'IN' | 'OUT';
+  accountId: number | null;
+}
+
+export function matchRule(rule: RuleWithKind, t: MatchTarget): boolean {
+  if (rule.category.kind !== kindForDirection(t.direction)) return false;
+  // Quy tắc giới hạn theo tài khoản chỉ áp dụng cho đúng tài khoản đó
+  if (rule.accountId !== null && rule.accountId !== t.accountId) return false;
   const re = compileRule(rule.matchType, rule.pattern);
-  return !!re && re.test(normalized);
+  return !!re && re.test(t.normalized);
 }
 
 // Trả về rule đầu tiên khớp (theo priority tăng dần), hoặc null.
-export function findMatchingRule(rules: RuleWithKind[], content: string, direction: 'IN' | 'OUT'): RuleWithKind | null {
-  const normalized = normalizeText(content);
+export function findMatchingRule(
+  rules: RuleWithKind[],
+  content: string,
+  direction: 'IN' | 'OUT',
+  accountId: number | null = null,
+): RuleWithKind | null {
+  const t: MatchTarget = { normalized: normalizeText(content), direction, accountId };
   for (const r of rules) {
-    if (matchRule(r, normalized, direction)) return r;
+    if (matchRule(r, t)) return r;
   }
   return null;
 }

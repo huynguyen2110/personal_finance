@@ -14,7 +14,8 @@ export interface TransactionDTO {
   transactionDate: string;
   categoryId: number | null;
   category: CategoryRef | null;
-  categorizedBy: 'RULE' | 'MANUAL' | 'NONE';
+  // RULE: khớp quy tắc | MANUAL: tự chọn | NONE: chưa phân loại | ACCOUNT: theo nhóm duy nhất của tài khoản
+  categorizedBy: 'RULE' | 'MANUAL' | 'NONE' | 'ACCOUNT';
   note: string | null;
   excludeFromStats: boolean;
   // Chuyển khoản nội bộ: giao dịch đối ứng ở tài khoản kia
