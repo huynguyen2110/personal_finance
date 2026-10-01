@@ -2,6 +2,7 @@
 
 import type { Direction } from '@/types/common';
 import type { CategoryDTO } from '@/modules/categories/types';
+import { buildCategoryTree } from '@/modules/categories/utils/tree';
 
 interface Props {
   categories: CategoryDTO[];
@@ -15,6 +16,7 @@ interface Props {
   ariaLabel?: string;
 }
 
+// Chọn danh mục theo cây 2 cấp: danh mục cha rồi các con thụt vào bên dưới
 export default function CategorySelect({
   categories,
   value,
@@ -42,13 +44,17 @@ export default function CategorySelect({
       <option value="">{placeholder}</option>
       {groups.map((g) => (
         <optgroup key={g.kind} label={g.label}>
-          {categories
-            .filter((c) => c.kind === g.kind)
-            .map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
+          {buildCategoryTree(categories, g.kind).flatMap(({ cat, children }) => [
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
+            </option>,
+            ...children.map((child) => (
+              <option key={child.id} value={child.id}>
+                {'   └ '}
+                {child.name}
               </option>
-            ))}
+            )),
+          ])}
         </optgroup>
       ))}
     </select>

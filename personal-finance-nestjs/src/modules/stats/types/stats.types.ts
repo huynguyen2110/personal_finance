@@ -32,6 +32,9 @@ export interface CategoryTotal {
   icon: string;
   total: number;
   count: number;
+  // Danh mục 2 cấp: dòng cấp cao nhất gộp cả con; `children` là phần chi tiết của từng con
+  parentId?: number | null;
+  children?: CategoryTotal[];
 }
 
 export interface WeekdayPoint {

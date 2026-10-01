@@ -29,7 +29,7 @@ import { invalidateFinanceData } from '@/lib/query-client';
 import { copyBudgetsFromPrevMonth, useBudgetPage } from '../lib';
 import { formatCompactVND, formatVND } from '@/lib/money';
 import { addMonths, currentMonthVN, formatMonthLabel } from '@/lib/dates';
-import { budgetState, monthClock, sortByState, type BudgetState } from '../utils/budget-insights';
+import { budgetState, budgetUnits, childrenByParent, monthClock, sortByState, topLevelLines, type BudgetState } from '../utils/budget-insights';
 import type { BudgetLine } from '../types';
 
 
@@ -83,7 +83,9 @@ export default function BudgetsPage() {
   }, [error]);
 
   const clock = useMemo(() => monthClock(month), [month]);
-  const lines = useMemo(() => (data ? sortByState(data.lines) : []), [data]);
+  // Hiển thị theo dòng cấp cao nhất (danh mục cha đã gộp số liệu các con); con nằm trong thẻ của cha
+  const lines = useMemo(() => (data ? sortByState(topLevelLines(data.lines)) : []), [data]);
+  const subLines = useMemo(() => childrenByParent(data?.lines ?? []), [data]);
   const budgeted = lines.filter((l) => l.amount !== null);
   const totalBudget = budgeted.reduce((s, l) => s + (l.amount ?? 0), 0);
   const spentBudgeted = budgeted.reduce((s, l) => s + l.spent, 0);
@@ -393,12 +395,14 @@ export default function BudgetsPage() {
                 {visible.length === 0 ? (
                   <div className="fin-card p-8 text-center text-sm text-slate-500">Không có danh mục nào trong nhóm này</div>
                 ) : (
-                  visible.map((l) => <BudgetCard key={l.categoryId} line={l} month={month} clock={clock} onEdit={setEditing} />)
+                  visible.map((l) => (
+                    <BudgetCard key={l.categoryId} line={l} subLines={subLines.get(l.categoryId) ?? []} month={month} clock={clock} onEdit={setEditing} />
+                  ))
                 )}
               </div>
 
               <div className="lg:col-span-4 flex flex-col gap-4">
-                <RebalanceCard lines={lines} month={month} clock={clock} onApplied={reload} />
+                <RebalanceCard lines={budgetUnits(data.lines)} month={month} clock={clock} onApplied={reload} />
                 <HistoryCard history={data.history} month={month} />
                 <HowItWorksCard />
               </div>
@@ -408,7 +412,7 @@ export default function BudgetsPage() {
       </div>
 
       {editing && data && (
-        <BudgetEditModal lines={lines} month={month} line={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={reload} />
+        <BudgetEditModal lines={data.lines} month={month} line={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={reload} />
       )}
       {quickEdit && data && <QuickEditModal lines={data.lines} month={month} onClose={() => setQuickEdit(false)} onSaved={reload} />}
     </div>

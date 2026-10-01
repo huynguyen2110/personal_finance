@@ -71,13 +71,18 @@ model Category {
   color     String       @default("#64748B")
   isSystem  Boolean      @default(false)
   sortOrder Int          @default(0)
+  // Danh mục 2 cấp: danh mục con trỏ về danh mục cha cùng loại (cha luôn là cấp cao nhất)
+  parentId  Int?
   createdAt DateTime     @default(now())
 
+  parent       Category?      @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children     Category[]     @relation("CategoryTree")
   transactions Transaction[]
   rules        CategoryRule[]
   budgets      Budget[]
 
   @@unique([name, kind])
+  @@index([parentId])
 }
 
 enum MatchType {

@@ -1,13 +1,16 @@
 export interface BudgetLine {
   categoryId: number;
+  parentId: number | null; // danh mục 2 cấp: con trỏ về cha
   name: string;
   icon: string;
   color: string;
-  amount: number | null; // hạn mức hiệu lực của tháng (null = chưa đặt)
-  source: 'MONTH' | 'DEFAULT' | null; // đặt riêng cho tháng / dùng mặc định
+  // Hạn mức hiệu lực của tháng (null = chưa đặt). Danh mục cha chưa đặt riêng: tổng hạn mức các con.
+  amount: number | null;
+  // MONTH: đặt riêng cho tháng; DEFAULT: dùng mặc định; CHILDREN: gộp từ hạn mức các con
+  source: 'MONTH' | 'DEFAULT' | 'CHILDREN' | null;
   defaultAmount: number | null;
-  spent: number;
-  count: number; // số giao dịch chi trong tháng
+  spent: number; // danh mục cha: cộng cả các con
+  count: number; // số giao dịch chi trong tháng (cha: cộng cả con)
   prevSpent: number; // đã chi tháng trước (để so sánh)
   percent: number | null;
 }

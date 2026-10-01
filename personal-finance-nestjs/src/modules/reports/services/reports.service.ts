@@ -14,8 +14,9 @@ import {
 } from '../../../common/utils/dates.util';
 import { previousPeriod } from '../../../common/utils/period.util';
 import { StatsService } from '../../stats/services/stats.service';
-import type { StatsScope } from '../../stats/types/stats.types';
-import { BudgetsService } from '../../budgets/services/budgets.service';
+import type { CategoryMonthCell, StatsScope } from '../../stats/types/stats.types';
+import { foldCategoryTotals } from '../../stats/utils/category-rollup';
+import { BudgetsService, budgetUnits } from '../../budgets/services/budgets.service';
 import { AccountsService } from '../../accounts/services/accounts.service';
 import { txnSelect } from '../../transactions/utils/txn-query';
 import type { DashboardQueryDto, ReportQueryDto } from '../dto/report.dto';
@@ -25,6 +26,20 @@ export interface ReportScope {
   toMonth: string;
   accountId?: number | null;
 }
+
+// Một dòng ma trận danh mục × tháng. Dòng cha gộp cả con; dòng con có parentId.
+export interface ReportRow {
+  categoryId: number | null;
+  parentId: number | null;
+  name: string;
+  icon: string;
+  color: string;
+  values: number[];
+  total: number;
+  average: number;
+}
+
+const CATEGORY_META_SELECT = { id: true, parentId: true, name: true, icon: true, color: true, kind: true, sortOrder: true } as const;
 
 @Injectable()
 export class ReportsService {
@@ -72,8 +87,9 @@ export class ReportsService {
       monthlyRaw,
       dailyRaw,
       prevDailyRaw,
-      expenseByCategory,
-      incomeByCategory,
+      expenseRaw,
+      incomeRaw,
+      categories,
       weekday,
       topExpenses,
       recent,
@@ -88,6 +104,7 @@ export class ReportsService {
       this.stats.getDaily(prevScope),
       this.stats.getByCategory(scope, 'OUT'),
       this.stats.getByCategory(scope, 'IN'),
+      this.prisma.category.findMany({ select: CATEGORY_META_SELECT }),
       this.stats.getWeekday(scope),
       this.prisma.transaction.findMany({
         where: {
@@ -135,9 +152,8 @@ export class ReportsService {
       return { date, income: d?.income ?? 0, expense: d?.expense ?? 0, cumulativeExpense: cum, prevCumulativeExpense: prevCumulative };
     });
 
-    const budgeted = budgetLines.filter((l) => l.amount !== null);
-    const totalBudget = budgeted.reduce((s, l) => s + (l.amount ?? 0), 0);
-    const totalBudgetSpent = budgeted.reduce((s, l) => s + l.spent, 0);
+    // Ngân sách: tổng theo dòng cấp cao nhất (đã gộp con); cảnh báo theo từng đơn vị hạn mức
+    const { budget: totalBudget, spentBudgeted: totalBudgetSpent } = this.budgets.totals(budgetMonth, budgetLines, summary.expense);
     const periodIsBudgetMonth = scope.from === budgetMonthRange.from && scope.to <= budgetMonthRange.to;
     const visibleBalances = balances.filter((b) => b.isActive);
 
@@ -148,8 +164,9 @@ export class ReportsService {
       prevSummary,
       monthly,
       daily,
-      expenseByCategory,
-      incomeByCategory,
+      // Cơ cấu theo danh mục cha (con gộp vào cha, chi tiết nằm trong `children`)
+      expenseByCategory: foldCategoryTotals(expenseRaw, categories),
+      incomeByCategory: foldCategoryTotals(incomeRaw, categories),
       weekday,
       topExpenses,
       recent,
@@ -160,7 +177,9 @@ export class ReportsService {
         totalBudget,
         totalSpent: totalBudgetSpent,
         showOnDailyChart: periodIsBudgetMonth && totalBudget > 0,
-        alerts: budgeted.filter((l) => (l.percent ?? 0) >= 0.8).sort((a, b) => (b.percent ?? 0) - (a.percent ?? 0)),
+        alerts: budgetUnits(budgetLines)
+          .filter((l) => (l.percent ?? 0) >= 0.8)
+          .sort((a, b) => (b.percent ?? 0) - (a.percent ?? 0)),
       },
       uncategorizedCount,
     };
@@ -182,7 +201,7 @@ export class ReportsService {
       this.stats.getMonthly(prevYearScope),
       this.stats.getCategoryMonthMatrix(scope, 'OUT'),
       this.stats.getCategoryMonthMatrix(scope, 'IN'),
-      this.prisma.category.findMany({ orderBy: [{ kind: 'asc' }, { sortOrder: 'asc' }, { id: 'asc' }] }),
+      this.prisma.category.findMany({ select: CATEGORY_META_SELECT, orderBy: [{ kind: 'asc' }, { sortOrder: 'asc' }, { id: 'asc' }] }),
       this.stats.getSummary(scope),
     ]);
 
@@ -202,17 +221,34 @@ export class ReportsService {
       };
     });
 
-    const buildRows = (cells: typeof expenseCells, kind: 'EXPENSE' | 'INCOME') => {
+    // Ma trận 2 cấp: dòng cha (gộp cả con) rồi đến các dòng con; chỉ giữ dòng có phát sinh
+    const buildRows = (cells: CategoryMonthCell[], kind: 'EXPENSE' | 'INCOME'): ReportRow[] => {
       const cats = categories.filter((c) => c.kind === kind);
-      const rows = [
-        ...cats.map((c) => ({ categoryId: c.id as number | null, name: c.name, icon: c.icon, color: c.color })),
-        { categoryId: null, name: 'Chưa phân loại', icon: 'CircleHelp', color: '#94A3B8' },
-      ].map((c) => {
-        const values = months.map((m) => cells.find((x) => x.categoryId === c.categoryId && x.month === m)?.total ?? 0);
+      const valuesFor = (ids: (number | null)[]): number[] =>
+        months.map((m) => ids.reduce<number>((s, id) => s + (cells.find((x) => x.categoryId === id && x.month === m)?.total ?? 0), 0));
+      const row = (meta: { categoryId: number | null; parentId: number | null; name: string; icon: string; color: string }, values: number[]): ReportRow => {
         const total = values.reduce((s, v) => s + v, 0);
-        return { ...c, values, total, average: months.length ? total / months.length : 0 };
-      });
-      return rows.filter((row) => row.total > 0).sort((a, b) => b.total - a.total);
+        return { ...meta, values, total, average: months.length ? total / months.length : 0 };
+      };
+
+      const groups = cats
+        .filter((c) => c.parentId === null)
+        .map((parent) => {
+          const children = cats.filter((c) => c.parentId === parent.id);
+          const head = row({ categoryId: parent.id, parentId: null, name: parent.name, icon: parent.icon, color: parent.color }, valuesFor([parent.id, ...children.map((c) => c.id)]));
+          const subs = children
+            .map((c) => row({ categoryId: c.id, parentId: parent.id, name: c.name, icon: c.icon, color: c.color }, valuesFor([c.id])))
+            .filter((x) => x.total > 0)
+            .sort((a, b) => b.total - a.total);
+          return { head, subs };
+        })
+        .filter((g) => g.head.total > 0)
+        .sort((a, b) => b.head.total - a.head.total);
+
+      const rows = groups.flatMap((g) => [g.head, ...g.subs]);
+      const none = row({ categoryId: null, parentId: null, name: 'Chưa phân loại', icon: 'CircleHelp', color: '#94A3B8' }, valuesFor([null]));
+      if (none.total > 0) rows.push(none);
+      return rows;
     };
 
     return {

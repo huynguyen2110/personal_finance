@@ -18,6 +18,9 @@ export interface CategoryTotal {
   icon: string;
   total: number;
   count: number;
+  // Danh mục 2 cấp: dòng cấp cao nhất gộp cả con; `children` là chi tiết từng con
+  parentId?: number | null;
+  children?: CategoryTotal[];
 }
 
 export interface WeekdayPoint {
@@ -58,6 +61,7 @@ export interface DashboardData {
 
 export interface ReportRow {
   categoryId: number | null;
+  parentId: number | null; // dòng con thụt dưới dòng cha; dòng cha đã gộp số của con
   name: string;
   icon: string;
   color: string;

@@ -9,6 +9,7 @@ import { errorMessage } from '@/lib/api-client';
 import { saveBudgets } from '../lib';
 import { formatVND } from '@/lib/money';
 import { formatMonthLabel } from '@/lib/dates';
+import { orderByTree } from '../utils/budget-insights';
 import type { BudgetLine } from '../types';
 
 type Scope = 'DEFAULT' | 'MONTH';
@@ -42,6 +43,22 @@ export default function BudgetEditModal({ lines, month, line, onClose, onSaved }
   const amountNum = Number(value.replace(/[^\d]/g, ''));
   const existing = initial(current, scope);
 
+  // Trần của cha: hạn mức này + các con khác không được vượt hạn mức cha; cha không được hạ dưới tổng các con.
+  // Theo đúng phạm vi đang sửa: mặc định so với mặc định, riêng tháng so với hạn mức hiệu lực tháng đó.
+  const effFor = (l: BudgetLine) => (scope === 'DEFAULT' ? l.defaultAmount : l.amount);
+  const parent = current?.parentId !== null ? lines.find((l) => l.categoryId === current?.parentId) : undefined;
+  const children = current ? lines.filter((l) => l.parentId === current.categoryId) : [];
+  const ceiling = parent ? effFor(parent) : null;
+  const siblingsSum = parent ? children.length === 0 ? lines.filter((l) => l.parentId === parent.categoryId && l.categoryId !== current?.categoryId).reduce((s, l) => s + (effFor(l) ?? 0), 0) : 0 : 0;
+  const childrenSum = children.reduce((s, l) => s + (effFor(l) ?? 0), 0);
+  const maxAllowed = ceiling !== null ? Math.max(0, ceiling - siblingsSum) : null;
+  const ceilingError =
+    amountNum > 0 && maxAllowed !== null && amountNum > maxAllowed
+      ? `Vượt trần của "${parent!.name}": tối đa ${formatVND(maxAllowed)} (trần ${formatVND(ceiling!)}, các con khác đang dùng ${formatVND(siblingsSum)})`
+      : amountNum > 0 && children.length > 0 && amountNum < childrenSum
+        ? `Các danh mục con đang đặt tổng ${formatVND(childrenSum)}, hạn mức cha không được thấp hơn`
+        : null;
+
   // Gợi ý nhanh từ dữ liệu thật
   const chips = useMemo(() => {
     if (!current) return [];
@@ -74,6 +91,7 @@ export default function BudgetEditModal({ lines, month, line, onClose, onSaved }
         onSubmit={(e) => {
           e.preventDefault();
           if (!amountNum) return toast.error('Nhập số tiền hạn mức');
+          if (ceilingError) return toast.error(ceilingError);
           put(amountNum);
         }}
       >
@@ -91,10 +109,11 @@ export default function BudgetEditModal({ lines, month, line, onClose, onSaved }
                 setValue(v ? String(v) : '');
               }}
             >
-              {lines.map((l) => (
+              {orderByTree(lines).map((l) => (
                 <option key={l.categoryId} value={l.categoryId}>
+                  {l.parentId !== null ? '   └ ' : ''}
                   {l.name}
-                  {l.amount !== null ? ` — đang ${formatVND(l.amount)}` : ' — chưa đặt'}
+                  {l.source === 'CHILDREN' ? ` — tổng các con ${formatVND(l.amount ?? 0)}` : l.amount !== null ? ` — đang ${formatVND(l.amount)}` : ' — chưa đặt'}
                 </option>
               ))}
             </select>
@@ -109,6 +128,9 @@ export default function BudgetEditModal({ lines, month, line, onClose, onSaved }
                 Tháng này đã chi <b className="text-slate-900">{formatVND(current.spent)}</b> ({current.count} giao dịch)
               </p>
               <p>Tháng trước: {formatVND(current.prevSpent)}</p>
+              {lines.some((l) => l.parentId === current.categoryId) && (
+                <p className="text-teal-800 mt-0.5">Danh mục cha: số đã chi gồm cả các con; hạn mức đặt ở đây bao trùm toàn bộ nhóm.</p>
+              )}
             </div>
           </div>
         )}
@@ -155,7 +177,20 @@ export default function BudgetEditModal({ lines, month, line, onClose, onSaved }
             value={amountNum ? nf.format(amountNum) : value}
             onChange={(e) => setValue(e.target.value)}
             placeholder="VD: 3.000.000"
+            aria-invalid={!!ceilingError}
           />
+          {ceilingError ? (
+            <span className="block text-xs text-rose-600 mt-1.5 fin-num">{ceilingError}</span>
+          ) : maxAllowed !== null ? (
+            <span className="block text-xs text-slate-500 mt-1.5 fin-num">
+              Trần nhóm cha &ldquo;{parent!.name}&rdquo;: {formatVND(ceiling!)} · các con khác đang dùng {formatVND(siblingsSum)} · tối đa cho danh mục này{' '}
+              <b className="text-slate-800">{formatVND(maxAllowed)}</b>
+            </span>
+          ) : children.length > 0 && childrenSum > 0 ? (
+            <span className="block text-xs text-slate-500 mt-1.5 fin-num">
+              Các danh mục con đang đặt tổng <b className="text-slate-800">{formatVND(childrenSum)}</b> · hạn mức cha là trần của cả nhóm
+            </span>
+          ) : null}
         </label>
         {chips.length > 0 && (
           <div className="flex flex-wrap gap-2">
