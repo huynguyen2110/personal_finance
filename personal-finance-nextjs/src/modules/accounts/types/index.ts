@@ -14,6 +14,8 @@ export interface AccountDTO {
   tracking: { method: 'EMAIL' | 'MANUAL'; label: string; in: boolean; out: boolean };
   isActive: boolean;
   transactionCount: number;
+  // Nhóm chi tiêu / thu nhập tài khoản này thường dùng
+  groupIds: number[];
 }
 
 export interface AccountInput {
@@ -23,4 +25,5 @@ export interface AccountInput {
   accountNumber?: string | null;
   openingBalance?: number;
   isActive?: boolean;
+  groupIds?: number[];
 }

@@ -28,6 +28,13 @@ function scopeWhere(s: StatsScope): Prisma.Sql {
 
 const n = (v: unknown): number => (v === null || v === undefined ? 0 : Number(v));
 
+export interface AccountCategoryTotal {
+  accountId: number;
+  categoryId: number | null;
+  total: number;
+  count: number;
+}
+
 @Injectable()
 export class StatsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -82,6 +89,16 @@ export class StatsService {
       map.set(r.d, p);
     }
     return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  // Tổng chi theo (tài khoản, danh mục) — dùng cho ngân sách phân bổ theo tài khoản
+  async getExpenseByAccountCategory(s: StatsScope): Promise<AccountCategoryTotal[]> {
+    const rows = await this.prisma.$queryRaw<{ accountId: number; categoryId: number | null; total: bigint; cnt: bigint }[]>`
+      SELECT t.accountId, t.categoryId, CAST(SUM(t.amount) AS SIGNED) AS total, COUNT(*) AS cnt
+      FROM \`Transaction\` t
+      WHERE ${scopeWhere(s)} AND t.direction = 'OUT'
+      GROUP BY t.accountId, t.categoryId`;
+    return rows.map((r) => ({ accountId: r.accountId, categoryId: r.categoryId, total: n(r.total), count: n(r.cnt) }));
   }
 
   async getByCategory(s: StatsScope, direction: 'IN' | 'OUT'): Promise<CategoryTotal[]> {

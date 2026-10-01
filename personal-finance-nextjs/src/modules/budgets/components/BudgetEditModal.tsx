@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { Trash2 } from 'lucide-react';
 import Modal from '@/components/shared/Modal';
 import CategoryIcon from '@/components/shared/CategoryIcon';
+import TreeSelect from '@/components/shared/TreeSelect';
 import { errorMessage } from '@/lib/api-client';
 import { saveBudgets } from '../lib';
 import { formatVND } from '@/lib/money';
@@ -98,25 +99,24 @@ export default function BudgetEditModal({ lines, month, line, onClose, onSaved }
         {!line && (
           <label className="block">
             <span className="fin-label block mb-1.5">Danh mục chi</span>
-            <select
-              className="select-field"
+            <TreeSelect
+              ariaLabel="Danh mục chi"
+              options={orderByTree(lines).map((l) => ({
+                value: l.categoryId,
+                label: l.name,
+                depth: l.parentId !== null ? (1 as const) : (0 as const),
+                icon: <CategoryIcon icon={l.icon} color={l.color} size="sm" />,
+                meta: l.source === 'CHILDREN' ? `tổng con ${formatVND(l.amount ?? 0)}` : l.amount !== null ? `đang ${formatVND(l.amount)}` : 'chưa đặt',
+              }))}
               value={categoryId}
-              onChange={(e) => {
-                const id = Number(e.target.value);
+              onChange={(id) => {
+                if (id === null) return;
                 setCategoryId(id);
                 const l = lines.find((x) => x.categoryId === id) ?? null;
                 const v = initial(l, scope);
                 setValue(v ? String(v) : '');
               }}
-            >
-              {orderByTree(lines).map((l) => (
-                <option key={l.categoryId} value={l.categoryId}>
-                  {l.parentId !== null ? '   └ ' : ''}
-                  {l.name}
-                  {l.source === 'CHILDREN' ? ` — tổng các con ${formatVND(l.amount ?? 0)}` : l.amount !== null ? ` — đang ${formatVND(l.amount)}` : ' — chưa đặt'}
-                </option>
-              ))}
-            </select>
+            />
           </label>
         )}
 

@@ -117,7 +117,7 @@ export class ImapService {
 
         let maxUid = cursor?.uidValidity === uidValidity ? cursor.lastUid : 0;
         if (uids.length) {
-          const rules = await this.categorize.loadActiveRules();
+          const ctx = await this.categorize.loadContext();
           for await (const msg of client.fetch(uids, { uid: true, source: true }, { uid: true })) {
             summary.scanned++;
             maxUid = Math.max(maxUid, msg.uid);
@@ -133,7 +133,7 @@ export class ImapService {
               summary.skipped++;
               continue;
             }
-            const r = await this.ingestEmail.ingest(parsed.data, { messageId: mail.messageId ?? null }, rules);
+            const r = await this.ingestEmail.ingest(parsed.data, { messageId: mail.messageId ?? null }, ctx);
             if (r.status === 'created') summary.created++;
             else if (r.status === 'merged') summary.merged++;
             else summary.duplicates++;

@@ -17,12 +17,16 @@ import {
   RefreshCw,
   Trash2,
   Wallet,
+  Layers,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Modal from '@/components/shared/Modal';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import EmailReceiptsCard from '@/modules/email/components/EmailReceiptsCard';
 import { useEmailStatus } from '@/modules/email/lib';
+import { useCategoryGroups } from '@/modules/categories/lib';
+import type { CategoryGroupDTO } from '@/modules/categories/types';
+import { groupsOfAccount } from '@/modules/categories/utils/groups';
 import { errorMessage } from '@/lib/api-client';
 import { invalidateFinanceData } from '@/lib/query-client';
 import { scanTransfers, useTransferStatus } from '@/modules/transactions/lib';
@@ -118,6 +122,7 @@ export default function AccountsPage() {
   const { data: accounts, isLoading } = useAccounts();
   const { data: transfers } = useTransferStatus();
   const { data: email } = useEmailStatus();
+  const { data: groups = [] } = useCategoryGroups();
   const [editing, setEditing] = useState<AccountDTO | 'new' | null>(null);
   const [deleting, setDeleting] = useState<AccountDTO | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -317,6 +322,16 @@ export default function AccountsPage() {
                       <span>{a.type === 'CASH' ? 'Tiền mặt' : a.bankName || 'Tài khoản ngân hàng'}</span>
                       <span aria-hidden>•</span>
                       <span>{a.transactionCount} giao dịch</span>
+                      {groupsOfAccount(a.groupIds, groups).map((g) => (
+                        <span
+                          key={g.id}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold"
+                          style={{ backgroundColor: `${g.color}14`, color: g.color }}
+                          title={`Nhóm ${g.kind === 'EXPENSE' ? 'chi tiêu' : 'thu nhập'} thường dùng`}
+                        >
+                          <Layers className="w-3 h-3" aria-hidden /> {g.name}
+                        </span>
+                      ))}
                       {a.balanceSource === 'BANK' && (
                         <>
                           <span aria-hidden>•</span>
@@ -420,7 +435,7 @@ export default function AccountsPage() {
         </section>
       </div>
 
-      {editing && <AccountModal account={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={reload} />}
+      {editing && <AccountModal account={editing === 'new' ? null : editing} groups={groups} onClose={() => setEditing(null)} onSaved={reload} />}
       <ConfirmModal
         isOpen={!!deleting}
         onClose={() => setDeleting(null)}
@@ -433,20 +448,33 @@ export default function AccountsPage() {
   );
 }
 
-function AccountModal({ account, onClose, onSaved }: { account: AccountDTO | null; onClose: () => void; onSaved: () => void }) {
+function AccountModal({
+  account,
+  groups,
+  onClose,
+  onSaved,
+}: {
+  account: AccountDTO | null;
+  groups: CategoryGroupDTO[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [type, setType] = useState<'CASH' | 'BANK'>(account?.type ?? 'CASH');
   const [name, setName] = useState(account?.name ?? 'Tiền mặt');
   const [bankName, setBankName] = useState(account?.bankName ?? '');
   const [accountNumber, setAccountNumber] = useState(account?.accountNumber ?? '');
   const [opening, setOpening] = useState(String(account?.openingBalance ?? 0));
   const [isActive, setIsActive] = useState(account?.isActive ?? true);
+  const [groupIds, setGroupIds] = useState<number[]>(account?.groupIds ?? []);
   const [saving, setSaving] = useState(false);
+
+  const toggleGroup = (id: number) => setGroupIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      const base = { name, openingBalance: Number(opening.replace(/[^\d-]/g, '')) || 0, isActive };
+      const base = { name, openingBalance: Number(opening.replace(/[^\d-]/g, '')) || 0, isActive, groupIds };
       if (account) {
         await updateAccount(account.id, { ...base, ...(account.type === 'BANK' ? { bankName: bankName || null } : {}) });
       } else {
@@ -531,6 +559,34 @@ function AccountModal({ account, onClose, onSaved }: { account: AccountDTO | nul
           <input inputMode="numeric" className="input-field fin-num" value={opening} onChange={(e) => setOpening(e.target.value)} />
           <span className="block text-xs text-slate-500 mt-1">Số dư hiện tại = số dư đầu kỳ + tổng thu − tổng chi của tài khoản.</span>
         </label>
+        {groups.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <span className="block text-xs font-medium text-slate-600">Nhóm chi tiêu / thu nhập thường dùng</span>
+            <div className="flex flex-wrap gap-1.5">
+              {groups.map((g) => {
+                const on = groupIds.includes(g.id);
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => toggleGroup(g.id)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${
+                      on ? 'border-transparent text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                    style={on ? { backgroundColor: g.color } : undefined}
+                  >
+                    <Layers className="w-3 h-3" aria-hidden /> {g.name}
+                    <span className={`text-[10px] font-bold ${on ? 'opacity-80' : 'text-slate-400'}`}>{g.kind === 'EXPENSE' ? 'CHI' : 'THU'}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <span className="block text-xs text-slate-500">
+              Danh mục trong nhóm được gợi ý lên đầu khi chọn tay. Tài khoản chỉ có một nhóm chi (hoặc thu) thì giao dịch không khớp quy tắc được gán vào danh mục mặc định của nhóm.
+            </span>
+          </div>
+        )}
         {account && (
           <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />

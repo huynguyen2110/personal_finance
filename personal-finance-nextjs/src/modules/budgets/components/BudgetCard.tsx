@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { Circle, CircleCheck, CircleDashed, OctagonAlert, Pencil, Plus, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { ChevronDown, Circle, CircleCheck, CircleDashed, OctagonAlert, Pencil, Plus, TriangleAlert, type LucideIcon } from 'lucide-react';
 import CategoryIcon from '@/components/shared/CategoryIcon';
 import { qs } from '@/lib/url';
 import { formatCompactVND, formatVND } from '@/lib/money';
@@ -73,18 +74,22 @@ interface Props {
   month: string;
   clock: MonthClock;
   onEdit: (line: BudgetLine) => void;
+  // Mặc định thu gọn: chỉ hiện tên, trạng thái, đã chi / hạn mức và thanh tiến độ
+  defaultExpanded?: boolean;
 }
 
 const SOURCE_LABEL = (source: BudgetLine['source'], month: string) =>
   source === 'MONTH' ? `Riêng ${formatMonthLabel(month)}` : source === 'DEFAULT' ? 'Mặc định hàng tháng' : source === 'CHILDREN' ? 'Tổng hạn mức các con' : null;
 
-export default function BudgetCard({ line, subLines = [], month, clock, onEdit }: Props) {
+export default function BudgetCard({ line, subLines = [], month, clock, onEdit, defaultExpanded = false }: Props) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const state = budgetState(line);
   const st = STATE_STYLE[state];
   const { from, to } = monthRange(month);
   const amount = line.amount;
   const remaining = amount !== null ? amount - line.spent : null;
   const showMarker = clock.phase === 'current' ? clock.timePct : null;
+  const detailId = `budget-detail-${line.categoryId}`;
 
   // Dòng giải thích dưới thanh tiến độ
   let pace: string;
@@ -102,18 +107,34 @@ export default function BudgetCard({ line, subLines = [], month, clock, onEdit }
         : `Trong nhịp an toàn · dự kiến cuối tháng ~${formatCompactVND(projected)}`;
   }
 
+  const editButton =
+    amount === null ? (
+      <button type="button" className="fin-btn fin-btn-outline fin-btn-sm text-teal-700" onClick={() => onEdit(line)}>
+        <Plus className="w-3.5 h-3.5" /> Đặt hạn mức
+      </button>
+    ) : state === 'over' ? (
+      <button type="button" className="fin-btn fin-btn-outline fin-btn-sm text-teal-700" onClick={() => onEdit(line)}>
+        <Plus className="w-3.5 h-3.5" /> Tăng hạn mức
+      </button>
+    ) : (
+      <button type="button" className="fin-btn fin-btn-ghost fin-btn-sm" onClick={() => onEdit(line)} aria-label={`Sửa hạn mức ${line.name}`}>
+        <Pencil className="w-3.5 h-3.5" /> Sửa
+      </button>
+    );
+
   return (
-    <div className="fin-card fin-card-hover relative overflow-hidden p-4 pl-5 flex flex-col gap-3">
+    <div className={`fin-card fin-card-hover relative overflow-hidden pl-4 sm:pl-5 flex flex-col ${expanded ? 'p-4 gap-3' : 'px-3 py-2.5 gap-2'}`}>
       <span className={`absolute left-0 inset-y-0 w-1.5 ${st.stripe}`} aria-hidden />
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <CategoryIcon icon={line.icon} color={line.color} size="lg" />
+      {/* Hàng tóm tắt: luôn hiện */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <CategoryIcon icon={line.icon} color={line.color} size={expanded ? 'lg' : 'md'} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
               <Link
                 href={`/transactions${qs({ categoryId: line.categoryId, from, to, direction: 'OUT' })}`}
-                className="text-[16px] leading-6 font-semibold tracking-[-0.01em] text-slate-900 hover:underline"
+                className="text-[15px] sm:text-[16px] leading-6 font-semibold tracking-[-0.01em] text-slate-900 hover:underline truncate"
               >
                 {line.name}
               </Link>
@@ -121,102 +142,111 @@ export default function BudgetCard({ line, subLines = [], month, clock, onEdit }
                 <st.Icon className="w-3 h-3" aria-hidden />
                 {stateLabel(line)}
               </span>
-              {line.source && (
+              {expanded && line.source && (
                 <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-semibold">{SOURCE_LABEL(line.source, month)}</span>
               )}
               {subLines.length > 0 && (
-                <span className="px-1.5 py-0.5 rounded bg-teal-50 text-teal-800 text-[11px] font-semibold fin-num">Gồm {subLines.length} danh mục con</span>
+                <span className="px-1.5 py-0.5 rounded bg-teal-50 text-teal-800 text-[11px] font-semibold fin-num">
+                  {expanded ? `Gồm ${subLines.length} danh mục con` : `${subLines.length} danh mục con`}
+                </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 mt-0.5 fin-num">
-              {line.count} giao dịch tháng này · tháng trước {formatVND(line.prevSpent)}
-            </p>
+            {expanded && (
+              <p className="text-xs text-slate-500 mt-0.5 fin-num">
+                {line.count} giao dịch tháng này · tháng trước {formatVND(line.prevSpent)}
+              </p>
+            )}
           </div>
         </div>
 
-        <div className="text-right shrink-0 fin-num">
-          <p className="text-slate-900">
-            <span className={`text-[20px] leading-7 font-semibold tracking-[-0.015em] ${state === 'over' ? 'text-rose-600' : ''}`}>
-              {new Intl.NumberFormat('vi-VN').format(line.spent)}
-            </span>
-            <span className="text-xs text-slate-500"> / {amount !== null ? formatVND(amount) : '—'}</span>
-          </p>
-          {remaining !== null && (
-            <p className={`text-xs font-semibold mt-0.5 ${remaining < 0 ? 'text-rose-600' : st.text}`}>
-              {remaining < 0
-                ? `Đã vượt: −${formatVND(-remaining)}`
-                : clock.phase === 'current' && clock.daysLeft > 0
-                  ? `Còn lại ${formatVND(remaining)} (~${formatCompactVND(remaining / clock.daysLeft)}/ngày)`
-                  : `Còn lại ${formatVND(remaining)}`}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className="text-right fin-num">
+            <p className="text-slate-900 whitespace-nowrap">
+              <span className={`text-[18px] sm:text-[20px] leading-7 font-semibold tracking-[-0.015em] ${state === 'over' ? 'text-rose-600' : ''}`}>
+                {new Intl.NumberFormat('vi-VN').format(line.spent)}
+              </span>
+              <span className="text-xs text-slate-500"> / {amount !== null ? (expanded ? formatVND(amount) : formatCompactVND(amount)) : '—'}</span>
+            </p>
+            {expanded && remaining !== null && (
+              <p className={`text-xs font-semibold mt-0.5 ${remaining < 0 ? 'text-rose-600' : st.text}`}>
+                {remaining < 0
+                  ? `Đã vượt: −${formatVND(-remaining)}`
+                  : clock.phase === 'current' && clock.daysLeft > 0
+                    ? `Còn lại ${formatVND(remaining)} (~${formatCompactVND(remaining / clock.daysLeft)}/ngày)`
+                    : `Còn lại ${formatVND(remaining)}`}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-teal-700 hover:bg-slate-100 transition-colors"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            aria-controls={detailId}
+            aria-label={expanded ? `Thu gọn ${line.name}` : `Xem chi tiết ${line.name}`}
+            title={expanded ? 'Thu gọn' : 'Xem chi tiết'}
+          >
+            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} aria-hidden />
+          </button>
+        </div>
+      </div>
+
+      {amount !== null && (
+        <ProgressTrack percent={line.percent ?? 0} fill={st.fill} timePct={showMarker} label={`${line.name}: đã dùng hạn mức`} />
+      )}
+
+      {/* Phần chi tiết: chỉ hiện khi mở rộng */}
+      {expanded && (
+        <div id={detailId} className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className={`text-xs fin-num ${state === 'over' ? 'text-rose-600 font-semibold' : 'text-slate-500'}`}>{pace}</span>
+            {editButton}
+          </div>
+
+          {/* Danh mục con: phần chi tiết của số liệu đã gộp ở trên */}
+          {subLines.length > 0 && childrenOverCeiling(line, subLines) && (
+            <p className="flex items-center gap-1.5 text-xs text-rose-600 font-semibold fin-num" role="alert">
+              <OctagonAlert className="w-3.5 h-3.5 shrink-0" aria-hidden />
+              Tổng hạn mức các con {formatVND(childrenOverCeiling(line, subLines)!.sum)} vượt trần {formatVND(amount ?? 0)} của nhóm — hãy giảm hạn mức con hoặc tăng hạn mức cha.
             </p>
           )}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        {amount !== null && (
-          <ProgressTrack percent={line.percent ?? 0} fill={st.fill} timePct={showMarker} label={`${line.name}: đã dùng hạn mức`} />
-        )}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className={`text-xs fin-num ${state === 'over' ? 'text-rose-600 font-semibold' : 'text-slate-500'}`}>{pace}</span>
-          {amount === null ? (
-            <button type="button" className="fin-btn fin-btn-outline fin-btn-sm text-teal-700" onClick={() => onEdit(line)}>
-              <Plus className="w-3.5 h-3.5" /> Đặt hạn mức
-            </button>
-          ) : state === 'over' ? (
-            <button type="button" className="fin-btn fin-btn-outline fin-btn-sm text-teal-700" onClick={() => onEdit(line)}>
-              <Plus className="w-3.5 h-3.5" /> Tăng hạn mức
-            </button>
-          ) : (
-            <button type="button" className="fin-btn fin-btn-ghost fin-btn-sm" onClick={() => onEdit(line)} aria-label={`Sửa hạn mức ${line.name}`}>
-              <Pencil className="w-3.5 h-3.5" /> Sửa
-            </button>
+          {subLines.length > 0 && (
+            <ul className="rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+              {[...subLines]
+                .sort((a, b) => b.spent - a.spent)
+                .map((s) => {
+                  const sst = STATE_STYLE[budgetState(s)];
+                  const share = line.spent > 0 ? s.spent / line.spent : 0;
+                  return (
+                    <li key={s.categoryId} className="flex items-center gap-2.5 px-3 py-2 bg-slate-50/60 text-xs">
+                      <CategoryIcon icon={s.icon} color={s.color} size="sm" />
+                      <Link
+                        href={`/transactions${qs({ categoryId: s.categoryId, from, to, direction: 'OUT' })}`}
+                        className="font-semibold text-slate-800 truncate hover:underline min-w-0 flex-1"
+                      >
+                        {s.name}
+                      </Link>
+                      <span className="hidden sm:block w-24 h-1 rounded-full bg-slate-200 overflow-hidden" aria-hidden>
+                        <span className="block h-full rounded-full" style={{ width: `${Math.min(100, share * 100)}%`, backgroundColor: sst.fill }} />
+                      </span>
+                      <span className="fin-num text-slate-900 whitespace-nowrap">
+                        {formatCompactVND(s.spent)} ₫
+                        <span
+                          className={amount !== null && line.source !== 'CHILDREN' && (s.amount ?? 0) > amount ? 'text-rose-600 font-semibold' : 'text-slate-400'}
+                          title={amount !== null && line.source !== 'CHILDREN' && (s.amount ?? 0) > amount ? 'Hạn mức con vượt trần của nhóm cha' : undefined}
+                        >
+                          {' '}/ {s.amount !== null ? `${formatCompactVND(s.amount)} ₫` : '—'}
+                        </span>
+                      </span>
+                      <button type="button" className="p-1 rounded text-slate-400 hover:text-teal-700 hover:bg-white" onClick={() => onEdit(s)} aria-label={`Sửa hạn mức ${s.name}`}>
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    </li>
+                  );
+                })}
+            </ul>
           )}
         </div>
-      </div>
-
-      {/* Danh mục con: phần chi tiết của số liệu đã gộp ở trên */}
-      {subLines.length > 0 && childrenOverCeiling(line, subLines) && (
-        <p className="flex items-center gap-1.5 text-xs text-rose-600 font-semibold fin-num" role="alert">
-          <OctagonAlert className="w-3.5 h-3.5 shrink-0" aria-hidden />
-          Tổng hạn mức các con {formatVND(childrenOverCeiling(line, subLines)!.sum)} vượt trần {formatVND(amount ?? 0)} của nhóm — hãy giảm hạn mức con hoặc tăng hạn mức cha.
-        </p>
-      )}
-      {subLines.length > 0 && (
-        <ul className="mt-1 rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-hidden">
-          {[...subLines]
-            .sort((a, b) => b.spent - a.spent)
-            .map((s) => {
-              const sst = STATE_STYLE[budgetState(s)];
-              const share = line.spent > 0 ? s.spent / line.spent : 0;
-              return (
-                <li key={s.categoryId} className="flex items-center gap-2.5 px-3 py-2 bg-slate-50/60 text-xs">
-                  <CategoryIcon icon={s.icon} color={s.color} size="sm" />
-                  <Link
-                    href={`/transactions${qs({ categoryId: s.categoryId, from, to, direction: 'OUT' })}`}
-                    className="font-semibold text-slate-800 truncate hover:underline min-w-0 flex-1"
-                  >
-                    {s.name}
-                  </Link>
-                  <span className="hidden sm:block w-24 h-1 rounded-full bg-slate-200 overflow-hidden" aria-hidden>
-                    <span className="block h-full rounded-full" style={{ width: `${Math.min(100, share * 100)}%`, backgroundColor: sst.fill }} />
-                  </span>
-                  <span className="fin-num text-slate-900 whitespace-nowrap">
-                    {formatCompactVND(s.spent)} ₫
-                    <span
-                      className={amount !== null && line.source !== 'CHILDREN' && (s.amount ?? 0) > amount ? 'text-rose-600 font-semibold' : 'text-slate-400'}
-                      title={amount !== null && line.source !== 'CHILDREN' && (s.amount ?? 0) > amount ? 'Hạn mức con vượt trần của nhóm cha' : undefined}
-                    >
-                      {' '}/ {s.amount !== null ? `${formatCompactVND(s.amount)} ₫` : '—'}
-                    </span>
-                  </span>
-                  <button type="button" className="p-1 rounded text-slate-400 hover:text-teal-700 hover:bg-white" onClick={() => onEdit(s)} aria-label={`Sửa hạn mức ${s.name}`}>
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                </li>
-              );
-            })}
-        </ul>
       )}
     </div>
   );

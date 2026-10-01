@@ -31,8 +31,10 @@ import {
   Zap,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
-import CategoryIcon from '@/components/shared/CategoryIcon';
-import CategorySelect from '@/components/shared/CategorySelect';
+import CategorySelect, { categoryOptions } from '@/components/shared/CategorySelect';
+import TreeSelect, { type TreeOption } from '@/components/shared/TreeSelect';
+import DatePicker from '@/components/shared/DatePicker';
+import AccountSelect from '@/components/shared/AccountSelect';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import { useQueryClient } from '@tanstack/react-query';
 import TransactionFormModal from './TransactionFormModal';
@@ -40,6 +42,7 @@ import RuleFromTxnModal from '@/modules/rules/components/RuleFromTxnModal';
 import { useAccounts } from '@/modules/accounts/lib';
 import { bankBrand } from '@/modules/accounts/lib/brand';
 import { useCategories } from '@/modules/categories/lib';
+import { suggestionFor } from '@/modules/categories/utils/groups';
 import { errorMessage } from '@/lib/api-client';
 import { invalidateFinanceData } from '@/lib/query-client';
 import { bulkUpdateTransactions, deleteTransaction, exportTransactions, updateTransaction, useTransactions } from '../lib';
@@ -66,6 +69,26 @@ const pct = (v: number) => `${(v * 100).toFixed(1).replace('.', ',')}%`;
 
 // ───────── Kỳ xem nhanh (từ/đến ngày) ─────────
 type Period = 'all' | 'this_month' | 'last_month' | 'last_3_months' | 'this_year' | 'custom';
+
+const PERIOD_CHOICES: { value: Period; label: string }[] = [
+  { value: 'all', label: 'Toàn bộ thời gian' },
+  { value: 'this_month', label: 'Tháng này' },
+  { value: 'last_month', label: 'Tháng trước' },
+  { value: 'last_3_months', label: '3 tháng gần đây' },
+  { value: 'this_year', label: 'Năm nay' },
+  { value: 'custom', label: 'Tùy chỉnh ngày…' },
+];
+const DIRECTION_CHOICES = [
+  { value: '', label: 'Tất cả dòng tiền' },
+  { value: 'OUT', label: 'Tiền ra (Chi tiêu)' },
+  { value: 'IN', label: 'Tiền vào (Thu nhập)' },
+];
+const SORT_CHOICES = [
+  { value: 'date_desc', label: 'Mới nhất trước' },
+  { value: 'date_asc', label: 'Cũ nhất trước' },
+  { value: 'amount_desc', label: 'Số tiền lớn nhất' },
+  { value: 'amount_asc', label: 'Số tiền nhỏ nhất' },
+];
 const PRESET_PERIODS: Period[] = ['this_month', 'last_month', 'last_3_months', 'this_year'];
 
 function periodRange(p: Period): { from?: string; to?: string } {
@@ -222,23 +245,6 @@ function Chip({
   );
 }
 
-// Ô lọc có icon bên trái
-function FilterSelect({
-  icon: Icon,
-  className = '',
-  children,
-  ...rest
-}: React.SelectHTMLAttributes<HTMLSelectElement> & { icon: typeof Wallet }) {
-  return (
-    <div className={`relative ${className}`}>
-      <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" aria-hidden />
-      <select {...rest} className="select-field !py-2 !pl-9 !text-[13px] !rounded-lg !bg-slate-50 hover:!bg-white">
-        {children}
-      </select>
-    </div>
-  );
-}
-
 // Cột "Phân loại": giao dịch được gán danh mục bằng cách nào
 function CategorizedBadge({ t, onCreateRule }: { t: TransactionDTO; onCreateRule: () => void }) {
   if (t.transferPair) {
@@ -268,6 +274,16 @@ function CategorizedBadge({ t, onCreateRule }: { t: TransactionDTO; onCreateRule
         title="Bạn đã chọn danh mục này"
       >
         <Hand className="w-3 h-3" aria-hidden /> Chọn tay
+      </span>
+    );
+  }
+  if (t.categorizedBy === 'ACCOUNT') {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 text-[11px] font-semibold"
+        title={`Không khớp quy tắc nào, gán theo nhóm chi tiêu duy nhất của ${t.account.name}. Nên kiểm tra lại.`}
+      >
+        <Landmark className="w-3 h-3" aria-hidden /> Theo tài khoản
       </span>
     );
   }
@@ -434,6 +450,25 @@ export default function TransactionsPage() {
   const hasFilters = FILTER_KEYS.some((k) => k !== 'sort' && filters[k]);
 
   const chipNone = filters.categoryId === 'none';
+  // Lựa chọn bộ lọc danh mục: "Chưa phân loại" đứng đầu, rồi cây Chi/Thu (giá trị là chuỗi để khớp URL param)
+  const categoryFilterOptions = useMemo<TreeOption<string>[]>(
+    () => [
+      {
+        value: 'none',
+        label: 'Chưa phân loại',
+        icon: (
+          <span className="w-6 h-6 rounded-md inline-flex items-center justify-center bg-amber-100 text-amber-700" aria-hidden>
+            <TriangleAlert className="w-3.5 h-3.5" />
+          </span>
+        ),
+      },
+      ...categoryOptions(categories, [
+        { kind: 'EXPENSE', label: 'Chi' },
+        { kind: 'INCOME', label: 'Thu' },
+      ]).map((o) => ({ ...o, value: String(o.value) })),
+    ],
+    [categories],
+  );
   const anyChip = chipNone || CHIP_KEYS.some((k) => !!filters[k]);
   const toggleChip = (patch: ParamPatch, active: boolean) =>
     setParams(active ? Object.fromEntries(Object.keys(patch).map((k) => [k, undefined])) : patch);
@@ -443,6 +478,10 @@ export default function TransactionsPage() {
   const net = sumIn - sumOut;
   const savingRate = sumIn > 0 ? net / sumIn : 0;
   const outShare = sumIn > 0 ? sumOut / sumIn : 0;
+
+  // Gợi ý danh mục theo nhóm đã gán cho từng tài khoản
+  const suggestionByAccount = useMemo(() => new Map(accounts.map((a) => [a.id, suggestionFor(a, categories)])), [accounts, categories]);
+  const bulkSuggestion = filters.accountId ? suggestionByAccount.get(Number(filters.accountId)) : undefined;
 
   const baseTotal = allData?.total ?? 0;
   const noneCount = noneData?.total ?? 0;
@@ -577,107 +616,68 @@ export default function TransactionsPage() {
               )}
             </div>
 
-            <FilterSelect
-              icon={CalendarDays}
-              className="lg:col-span-2"
-              aria-label="Kỳ"
-              value={showCustomDates ? 'custom' : period}
-              onChange={(e) => {
-                const p = e.target.value as Period;
-                if (p === 'custom') {
-                  setCustomPeriod(true);
-                  return;
-                }
-                setCustomPeriod(false);
-                const r = periodRange(p);
-                setParams({ from: r.from, to: r.to });
-              }}
-            >
-              <option value="all">Toàn bộ thời gian</option>
-              <option value="this_month">Tháng này</option>
-              <option value="last_month">Tháng trước</option>
-              <option value="last_3_months">3 tháng gần đây</option>
-              <option value="this_year">Năm nay</option>
-              <option value="custom">Tùy chỉnh ngày…</option>
-            </FilterSelect>
+            <div className="lg:col-span-2">
+              <TreeSelect<Period>
+                ariaLabel="Kỳ"
+                options={PERIOD_CHOICES}
+                value={showCustomDates ? 'custom' : period}
+                onChange={(p) => {
+                  if (!p) return;
+                  if (p === 'custom') {
+                    setCustomPeriod(true);
+                    return;
+                  }
+                  setCustomPeriod(false);
+                  const r = periodRange(p);
+                  setParams({ from: r.from, to: r.to });
+                }}
+                triggerIcon={<CalendarDays className="w-4 h-4 text-slate-400" aria-hidden />}
+                className="!min-h-0 !py-2 !text-[13px] !rounded-lg !bg-slate-50 hover:!bg-white"
+              />
+            </div>
 
-            <FilterSelect
-              icon={ArrowUpDown}
-              className="lg:col-span-2"
-              aria-label="Thu/chi"
-              value={filters.direction ?? ''}
-              onChange={(e) => setParams({ direction: e.target.value || undefined })}
-            >
-              <option value="">Tất cả dòng tiền</option>
-              <option value="OUT">Tiền ra (Chi tiêu)</option>
-              <option value="IN">Tiền vào (Thu nhập)</option>
-            </FilterSelect>
+            <div className="lg:col-span-2">
+              <TreeSelect<string>
+                ariaLabel="Thu/chi"
+                options={DIRECTION_CHOICES}
+                value={filters.direction ?? ''}
+                onChange={(v) => setParams({ direction: v || undefined })}
+                triggerIcon={<ArrowUpDown className="w-4 h-4 text-slate-400" aria-hidden />}
+                className="!min-h-0 !py-2 !text-[13px] !rounded-lg !bg-slate-50 hover:!bg-white"
+              />
+            </div>
 
-            <FilterSelect
-              icon={Landmark}
-              className="lg:col-span-2"
-              aria-label="Tài khoản"
-              value={filters.accountId ?? ''}
-              onChange={(e) => setParams({ accountId: e.target.value || undefined })}
-            >
-              <option value="">Tất cả tài khoản ({accounts.length})</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </FilterSelect>
+            <div className="lg:col-span-2">
+              <AccountSelect
+                ariaLabel="Tài khoản"
+                accounts={accounts}
+                value={filters.accountId ? Number(filters.accountId) : null}
+                onChange={(id) => setParams({ accountId: id ? String(id) : undefined })}
+                allLabel={`Tất cả tài khoản (${accounts.length})`}
+                className="!min-h-0 !py-2 !text-[13px] !rounded-lg !bg-slate-50 hover:!bg-white"
+              />
+            </div>
 
-            <FilterSelect
-              icon={Tag}
-              className="lg:col-span-2"
-              aria-label="Danh mục"
-              value={filters.categoryId ?? ''}
-              onChange={(e) => setParams({ categoryId: e.target.value || undefined })}
-            >
-              <option value="">Tất cả danh mục</option>
-              <option value="none">⚠ Chưa phân loại</option>
-              <optgroup label="Chi">
-                {categories
-                  .filter((c) => c.kind === 'EXPENSE')
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.parentId ? `   └ ${c.name}` : c.name}
-                    </option>
-                  ))}
-              </optgroup>
-              <optgroup label="Thu">
-                {categories
-                  .filter((c) => c.kind === 'INCOME')
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.parentId ? `   └ ${c.name}` : c.name}
-                    </option>
-                  ))}
-              </optgroup>
-            </FilterSelect>
+            <div className="lg:col-span-2">
+              <TreeSelect
+                ariaLabel="Danh mục"
+                options={categoryFilterOptions}
+                value={filters.categoryId ?? ''}
+                onChange={(v) => setParams({ categoryId: v || undefined })}
+                placeholder="Tất cả danh mục"
+                placeholderIcon={<Tag className="w-4 h-4 text-slate-400" aria-hidden />}
+                showParentInTrigger={false}
+                className="!min-h-0 !py-2 !text-[13px] !rounded-lg !bg-slate-50 hover:!bg-white"
+              />
+            </div>
           </div>
 
           {showCustomDates && (
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 animate-fadeIn">
               <span className="font-semibold">Khoảng ngày:</span>
-              <input
-                type="date"
-                aria-label="Từ ngày"
-                className="input-field !w-auto !py-1.5 !text-[13px] !rounded-lg"
-                value={filters.from ?? ''}
-                max={filters.to}
-                onChange={(e) => setParams({ from: e.target.value || undefined })}
-              />
+              <DatePicker size="sm" clearable ariaLabel="Từ ngày" value={filters.from ?? ''} max={filters.to} onChange={(v) => setParams({ from: v || undefined })} />
               <span aria-hidden>→</span>
-              <input
-                type="date"
-                aria-label="Đến ngày"
-                className="input-field !w-auto !py-1.5 !text-[13px] !rounded-lg"
-                value={filters.to ?? ''}
-                min={filters.from}
-                onChange={(e) => setParams({ to: e.target.value || undefined })}
-              />
+              <DatePicker size="sm" clearable ariaLabel="Đến ngày" value={filters.to ?? ''} min={filters.from} onChange={(v) => setParams({ to: v || undefined })} />
               <button
                 type="button"
                 className="fin-btn fin-btn-ghost fin-btn-sm"
@@ -738,17 +738,14 @@ export default function TransactionsPage() {
             <div className="flex items-center gap-2 text-xs">
               <label className="flex items-center gap-1.5 text-slate-500">
                 <span className="font-semibold text-slate-700">Sắp xếp</span>
-                <select
-                  aria-label="Sắp xếp"
-                  className="select-field !w-auto !py-1.5 !pl-2.5 !pr-8 !text-xs !rounded-lg !border-transparent !bg-transparent font-semibold !text-teal-700 hover:!bg-slate-50"
+                <TreeSelect<string>
+                  ariaLabel="Sắp xếp"
+                  variant="ghost"
+                  size="sm"
+                  options={SORT_CHOICES}
                   value={filters.sort ?? 'date_desc'}
-                  onChange={(e) => setParams({ sort: e.target.value === 'date_desc' ? undefined : e.target.value })}
-                >
-                  <option value="date_desc">Mới nhất trước</option>
-                  <option value="date_asc">Cũ nhất trước</option>
-                  <option value="amount_desc">Số tiền lớn nhất</option>
-                  <option value="amount_asc">Số tiền nhỏ nhất</option>
-                </select>
+                  onChange={(v) => setParams({ sort: !v || v === 'date_desc' ? undefined : v })}
+                />
               </label>
               {hasFilters && (
                 <>
@@ -783,13 +780,7 @@ export default function TransactionsPage() {
               {selected.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2 pl-3 border-l border-slate-200 animate-fadeIn">
                   <div className="w-52">
-                    <CategorySelect
-                      categories={categories}
-                      value={bulkCategory}
-                      onChange={setBulkCategory}
-                      placeholder="Chọn danh mục…"
-                      className="select-field !py-1.5 !text-xs !rounded-lg"
-                    />
+                    <CategorySelect categories={categories} value={bulkCategory} onChange={setBulkCategory} suggested={bulkSuggestion} placeholder="Chọn danh mục…" size="sm" />
                   </div>
                   <button
                     type="button"
@@ -965,22 +956,19 @@ export default function TransactionsPage() {
                             <ArrowLeftRight className="w-3.5 h-3.5" aria-hidden /> Chuyển nội bộ
                           </span>
                         ) : (
-                          <div className="relative">
-                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                              <CategoryIcon icon={t.category?.icon} color={t.category?.color} size="sm" />
-                            </span>
-                            <CategorySelect
-                              categories={categories}
-                              value={t.categoryId}
-                              direction={t.direction}
-                              onChange={(id) => changeCategory(t, id)}
-                              placeholder="Chọn danh mục…"
-                              className={`select-field !py-1.5 !pl-10 !pr-8 !text-xs !rounded-lg font-medium ${
-                                uncategorized ? '!border-dashed !border-amber-400 !text-amber-700 !bg-white' : '!bg-slate-50 !border-slate-200 hover:!bg-white'
-                              }`}
-                              ariaLabel={`Danh mục của giao dịch ${t.id}`}
-                            />
-                          </div>
+                          <CategorySelect
+                            categories={categories}
+                            value={t.categoryId}
+                            direction={t.direction}
+                            suggested={suggestionByAccount.get(t.accountId)}
+                            onChange={(id) => changeCategory(t, id)}
+                            placeholder="Chọn danh mục…"
+                            size="sm"
+                            className={`${
+                              uncategorized ? '!border-dashed !border-amber-400 [&_.tsel-trigger-label]:!text-amber-700' : '!bg-slate-50 hover:!bg-white'
+                            }`}
+                            ariaLabel={`Danh mục của giao dịch ${t.id}`}
+                          />
                         )}
                       </td>
 
@@ -1047,18 +1035,15 @@ export default function TransactionsPage() {
             <div className="px-4 py-3 bg-slate-50/60 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
               <label className="flex items-center gap-2">
                 <span>Hiển thị</span>
-                <select
-                  aria-label="Số dòng mỗi trang"
-                  className="select-field !w-auto !py-1 !pl-2.5 !pr-7 !text-xs !rounded-md fin-num"
+                <TreeSelect<number>
+                  ariaLabel="Số dòng mỗi trang"
+                  variant="ghost"
+                  size="sm"
+                  className="fin-num"
+                  options={PAGE_SIZES.map((n) => ({ value: n, label: String(n) }))}
                   value={pageSize}
-                  onChange={(e) => setParams({ pageSize: e.target.value === String(DEFAULT_PAGE_SIZE) ? undefined : e.target.value })}
-                >
-                  {PAGE_SIZES.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => v && setParams({ pageSize: v === DEFAULT_PAGE_SIZE ? undefined : String(v) })}
+                />
                 <span>dòng mỗi trang</span>
               </label>
 

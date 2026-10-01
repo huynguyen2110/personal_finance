@@ -3,7 +3,7 @@ import {
   GraduationCap, Gift, Ellipsis, Briefcase, Award, HandCoins, RotateCcw, TrendingUp,
   CircleHelp, Tag, Coffee, Plane, Baby, PawPrint, Dumbbell, Shirt, Smartphone, Wifi, Zap,
   Fuel, Bus, Wallet, PiggyBank, Landmark, Receipt, Banknote, Building2, Sparkles, Wrench,
-  BookOpen, Music, Gamepad2, Stethoscope, Pill, Users, ArrowLeftRight, CreditCard,
+  BookOpen, Music, Gamepad2, Stethoscope, Pill, Users, ArrowLeftRight, CreditCard, Layers,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -13,7 +13,7 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   Receipt, ShoppingBag, Shirt, Smartphone, Clapperboard, Music, Gamepad2, HeartPulse, Stethoscope,
   Pill, Dumbbell, GraduationCap, BookOpen, Gift, Baby, PawPrint, Users, Wrench, Sparkles,
   Briefcase, Award, HandCoins, RotateCcw, TrendingUp, PiggyBank, Wallet, Banknote, Landmark,
-  CreditCard, ArrowLeftRight, Tag, Ellipsis, CircleHelp,
+  CreditCard, ArrowLeftRight, Layers, Tag, Ellipsis, CircleHelp,
 };
 
 export const CATEGORY_COLORS = [

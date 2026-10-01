@@ -5,12 +5,15 @@ import toast from 'react-hot-toast';
 import { ArrowLeftRight } from 'lucide-react';
 import Modal from '@/components/shared/Modal';
 import CategorySelect from '@/components/shared/CategorySelect';
+import DatePicker from '@/components/shared/DatePicker';
+import AccountSelect from '@/components/shared/AccountSelect';
 import { errorMessage } from '@/lib/api-client';
 import { formatVND } from '@/lib/money';
 import { formatVNDateTime, toVNDateString, vnParts } from '@/lib/dates';
 import type { Direction } from '@/types/common';
 import type { AccountDTO } from '@/modules/accounts/types';
 import type { CategoryDTO } from '@/modules/categories/types';
+import { suggestionFor } from '@/modules/categories/utils/groups';
 import { createTransaction, unpairTransaction, updateTransaction } from '../lib';
 import type { TransactionDTO, TransactionInput } from '../types';
 
@@ -53,6 +56,8 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
   const [saving, setSaving] = useState(false);
 
   const amountNum = Number(amount.replace(/[^\d]/g, ''));
+  // Danh mục thuộc nhóm của tài khoản đang chọn được đưa lên đầu ô chọn
+  const suggested = suggestionFor(accounts.find((a) => a.id === accountId), categories);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -172,13 +177,7 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
               </label>
               <label className="block">
                 <span className="block text-xs font-medium text-text-secondary mb-1">Tài khoản</span>
-                <select className="select-field" value={accountId ?? ''} onChange={(e) => setAccountId(Number(e.target.value))}>
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
+                <AccountSelect accounts={accounts} value={accountId ?? null} onChange={(id) => id !== null && setAccountId(id)} />
               </label>
             </div>
             <label className="block">
@@ -188,7 +187,7 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="block text-xs font-medium text-text-secondary mb-1">Ngày</span>
-                <input type="date" className="input-field" value={date} onChange={(e) => setDate(e.target.value)} />
+                <DatePicker value={date} onChange={(v) => v && setDate(v)} className="w-full" />
               </label>
               <label className="block">
                 <span className="block text-xs font-medium text-text-secondary mb-1">Giờ</span>
@@ -221,7 +220,7 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
 
         <label className="block">
           <span className="block text-xs font-medium text-text-secondary mb-1">Danh mục</span>
-          <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} direction={direction} />
+          <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} direction={direction} suggested={suggested} />
         </label>
         <label className="block">
           <span className="block text-xs font-medium text-text-secondary mb-1">Ghi chú</span>

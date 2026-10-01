@@ -8,7 +8,8 @@ import { errorMessage } from '@/lib/api-client';
 import type { CategoryDTO } from '@/modules/categories/types';
 import { updateTransaction } from '@/modules/transactions/lib';
 import type { TransactionDTO } from '@/modules/transactions/types';
-import { createRule, reapplyRules } from '../lib';
+import { normalizeText } from '@/lib/text';
+import { createRule, reapplyRules, updateRule, useRules } from '../lib';
 import { suggestKeyword } from '../utils/suggest-keyword';
 
 interface Props {
@@ -27,7 +28,15 @@ function Inner({ transaction, categories, onClose, onDone }: Props & { transacti
   const [pattern, setPattern] = useState(suggestKeyword(transaction.content));
   const [categoryId, setCategoryId] = useState<number | null>(transaction.categoryId);
   const [applyExisting, setApplyExisting] = useState(true);
+  const [onlyThisAccount, setOnlyThisAccount] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { data: rules = [] } = useRules();
+
+  // Quy tắc có sẵn cùng từ khóa + cùng phạm vi tài khoản → lưu sẽ cập nhật danh mục của nó thay vì tạo bản trùng
+  const scopeAccountId = onlyThisAccount ? transaction.accountId : null;
+  const existing = rules.find(
+    (r) => r.matchType === 'CONTAINS' && normalizeText(r.pattern) === normalizeText(pattern.trim()) && (r.accountId ?? null) === scopeAccountId,
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,14 +44,18 @@ function Inner({ transaction, categories, onClose, onDone }: Props & { transacti
     if (!categoryId) return toast.error('Chọn danh mục');
     setSaving(true);
     try {
-      await createRule({ pattern: pattern.trim(), matchType: 'CONTAINS', categoryId, priority: 50 });
+      if (existing) {
+        await updateRule(existing.id, { categoryId, isActive: true });
+      } else {
+        await createRule({ pattern: pattern.trim(), matchType: 'CONTAINS', categoryId, priority: 50, accountId: scopeAccountId });
+      }
       // Giao dịch hiện tại được gán luôn (kể cả khi nó đã được phân loại trước đó)
       await updateTransaction(transaction.id, { categoryId });
       if (applyExisting) {
         const r = await reapplyRules(false);
-        toast.success(`Đã tạo quy tắc và phân loại thêm ${r.changed} giao dịch`);
+        toast.success(`${existing ? 'Đã cập nhật quy tắc' : 'Đã tạo quy tắc'} và phân loại thêm ${r.changed} giao dịch`);
       } else {
-        toast.success('Đã tạo quy tắc');
+        toast.success(existing ? 'Đã cập nhật quy tắc có sẵn' : 'Đã tạo quy tắc');
       }
       onDone();
       onClose();
@@ -65,6 +78,11 @@ function Inner({ transaction, categories, onClose, onDone }: Props & { transacti
           <span className="block text-xs text-text-muted mt-1">
             Khớp nguyên cụm từ, không phân biệt hoa thường và dấu tiếng Việt.
           </span>
+          {existing && (
+            <span className="block text-xs text-amber-700 mt-1">
+              Từ khóa này đã có quy tắc (→ {existing.category.name}). Lưu sẽ cập nhật danh mục của quy tắc đó, không tạo thêm bản trùng.
+            </span>
+          )}
         </label>
         <label className="block">
           <span className="block text-xs font-medium text-text-secondary mb-1">Gán vào danh mục</span>
@@ -77,6 +95,12 @@ function Inner({ transaction, categories, onClose, onDone }: Props & { transacti
           />
         </label>
         <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
+          <input type="checkbox" checked={onlyThisAccount} onChange={(e) => setOnlyThisAccount(e.target.checked)} />
+          <span>
+            Chỉ áp dụng cho giao dịch của <b className="text-text">{transaction.account.name}</b>
+          </span>
+        </label>
+        <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
           <input type="checkbox" checked={applyExisting} onChange={(e) => setApplyExisting(e.target.checked)} />
           Áp dụng cho các giao dịch cũ chưa phân loại
         </label>
@@ -85,7 +109,7 @@ function Inner({ transaction, categories, onClose, onDone }: Props & { transacti
             Hủy
           </button>
           <button type="submit" disabled={saving} className="btn-primary flex-1 disabled:opacity-60">
-            {saving ? 'Đang lưu…' : 'Tạo quy tắc'}
+            {saving ? 'Đang lưu…' : existing ? 'Cập nhật quy tắc' : 'Tạo quy tắc'}
           </button>
         </div>
       </form>

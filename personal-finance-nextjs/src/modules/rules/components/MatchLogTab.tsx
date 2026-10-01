@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight,
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -23,8 +22,11 @@ import {
   TriangleAlert,
   WandSparkles,
   X,
+  Landmark,
 } from 'lucide-react';
 import CategoryIcon from '@/components/shared/CategoryIcon';
+import DatePicker from '@/components/shared/DatePicker';
+import TreeSelect from '@/components/shared/TreeSelect';
 import { errorMessage } from '@/lib/api-client';
 import { invalidateFinanceData } from '@/lib/query-client';
 import { normalizeText } from '@/lib/text';
@@ -39,7 +41,7 @@ import { findMatchingRule, matchSpan } from '../utils/rule-match';
 import RuleFromTxnModal from './RuleFromTxnModal';
 import { IconBtn, Segmented } from './RulesTab';
 
-export type LogStatus = 'ALL' | 'RULE' | 'MANUAL' | 'NONE';
+export type LogStatus = 'ALL' | 'RULE' | 'ACCOUNT' | 'MANUAL' | 'NONE';
 type Source = 'ALL' | 'EMAIL' | 'MANUAL' | 'IMPORT';
 
 const SOURCE_LABEL: Record<TransactionDTO['source'], string> = { EMAIL: 'Email NH', MANUAL: 'Nhập tay', IMPORT: 'Nhập file' };
@@ -65,7 +67,6 @@ export default function MatchLogTab({ categories, rules, initialStatus = 'ALL' }
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [ruleFromTxn, setRuleFromTxn] = useState<TransactionDTO | null>(null);
   const [applying, setApplying] = useState(false);
-  const monthInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setQ(qInput.trim()), 300);
@@ -96,6 +97,7 @@ export default function MatchLogTab({ categories, rules, initialStatus = 'ALL' }
   });
   // Đếm theo cách phân loại (chỉ cần `total`, pageSize nhỏ nhất server cho phép là 10)
   const ruleCount = useCategorizedCount(from, to, 'RULE');
+  const accountCount = useCategorizedCount(from, to, 'ACCOUNT');
   const manualCount = useCategorizedCount(from, to, 'MANUAL');
   const noneCount = useCategorizedCount(from, to, 'NONE');
   const totalMonth = ruleCount !== undefined && manualCount !== undefined && noneCount !== undefined ? ruleCount + manualCount + noneCount : undefined;
@@ -105,7 +107,7 @@ export default function MatchLogTab({ categories, rules, initialStatus = 'ALL' }
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const focus = items.find((t) => t.id === selectedId) ?? items[0] ?? null;
-  const focusRule = focus ? findMatchingRule(rules, focus.content, focus.direction) : null;
+  const focusRule = focus ? findMatchingRule(rules, focus.content, focus.direction, focus.accountId) : null;
   const isCurrent = month === currentMonthVN();
 
   async function reapply() {
@@ -188,16 +190,7 @@ export default function MatchLogTab({ categories, rules, initialStatus = 'ALL' }
               <button type="button" className="p-1.5 rounded-md text-slate-600 hover:bg-white" onClick={() => setMonth((m) => addMonths(m, -1))} aria-label="Tháng trước">
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button
-                type="button"
-                className="relative flex items-center gap-1.5 px-2 py-1 text-xs font-semibold text-slate-900 fin-num rounded-md hover:bg-white"
-                onClick={() => monthInput.current?.showPicker?.()}
-                aria-label="Chọn tháng"
-              >
-                <CalendarDays className="w-4 h-4 text-teal-700" aria-hidden />
-                {formatMonthLabel(month).replace('T', 'Tháng ')}
-                <input ref={monthInput} type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} className="absolute inset-0 opacity-0 pointer-events-none" tabIndex={-1} aria-hidden />
-              </button>
+              <DatePicker mode="month" variant="ghost" ariaLabel="Chọn tháng" value={month} onChange={(v) => v && setMonth(v)} className="text-xs hover:!bg-white" />
               <button type="button" className="p-1.5 rounded-md text-slate-600 hover:bg-white" onClick={() => setMonth((m) => addMonths(m, 1))} aria-label="Tháng sau">
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -230,6 +223,9 @@ export default function MatchLogTab({ categories, rules, initialStatus = 'ALL' }
           </Pill>
           <Pill active={status === 'RULE'} onClick={() => setStatus('RULE')} count={ruleCount} dot="bg-emerald-600">
             Khớp tự động
+          </Pill>
+          <Pill active={status === 'ACCOUNT'} onClick={() => setStatus('ACCOUNT')} count={accountCount} dot="bg-violet-500">
+            Theo tài khoản
           </Pill>
           <Pill active={status === 'NONE'} onClick={() => setStatus('NONE')} count={noneCount} dot="bg-amber-500" warn={!!noneCount}>
             Chưa phân loại
@@ -270,7 +266,7 @@ export default function MatchLogTab({ categories, rules, initialStatus = 'ALL' }
                 </tr>
               )}
               {items.map((t) => {
-                const matched = findMatchingRule(rules, t.content, t.direction);
+                const matched = findMatchingRule(rules, t.content, t.direction, t.accountId);
                 const span = matched ? matchSpan(matched, t.content) : null;
                 const pendingRow = t.categorizedBy === 'NONE';
                 const isFocus = focus?.id === t.id;
@@ -381,16 +377,18 @@ export default function MatchLogTab({ categories, rules, initialStatus = 'ALL' }
               <strong className="text-slate-800 fin-num">{total}</strong> kết quả
             </span>
             <span className="text-slate-300">|</span>
-            <label className="inline-flex items-center gap-1">
+            <span className="inline-flex items-center gap-1">
               Dòng mỗi trang:
-              <select className="bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-xs text-slate-800 fin-num" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
-                {PAGE_SIZES.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <TreeSelect<number>
+                ariaLabel="Dòng mỗi trang"
+                variant="ghost"
+                size="sm"
+                className="fin-num"
+                options={PAGE_SIZES.map((n) => ({ value: n, label: String(n) }))}
+                value={pageSize}
+                onChange={(v) => v && setPageSize(v)}
+              />
+            </span>
           </div>
           <div className="flex items-center gap-1">
             <PageBtn label="Trang đầu" disabled={page === 1} onClick={() => setPage(1)}>
@@ -568,6 +566,15 @@ function StatusBadge({ status }: { status: TransactionDTO['categorizedBy'] }) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold">
         <Hand className="w-3.5 h-3.5" aria-hidden /> Gán tay
+      </span>
+    );
+  if (status === 'ACCOUNT')
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-50 border border-violet-200 text-violet-700 text-xs font-semibold"
+        title="Không khớp quy tắc nào, gán theo nhóm chi tiêu duy nhất của tài khoản"
+      >
+        <Landmark className="w-3.5 h-3.5" aria-hidden /> Theo tài khoản
       </span>
     );
   return (

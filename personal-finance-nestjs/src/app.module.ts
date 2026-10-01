@@ -9,6 +9,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { CategoriesModule } from './modules/categories/categories.module';
+import { CategoryGroupsModule } from './modules/category-groups/category-groups.module';
 import { RulesModule } from './modules/rules/rules.module';
 import { TransfersModule } from './modules/transfers/transfers.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
@@ -35,6 +36,7 @@ import { EmailModule } from './modules/email/email.module';
     AuthModule,
     AccountsModule,
     CategoriesModule,
+    CategoryGroupsModule,
     RulesModule,
     TransfersModule,
     TransactionsModule,

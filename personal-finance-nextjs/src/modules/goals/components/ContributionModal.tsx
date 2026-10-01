@@ -4,6 +4,9 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Info, Link2 } from 'lucide-react';
 import Modal from '@/components/shared/Modal';
+import DatePicker from '@/components/shared/DatePicker';
+import TreeSelect from '@/components/shared/TreeSelect';
+import { AccountIcon } from '@/components/shared/AccountSelect';
 import { errorMessage } from '@/lib/api-client';
 import { formatVND } from '@/lib/money';
 import { formatVNDate, todayVN, toVNDateString } from '@/lib/dates';
@@ -187,7 +190,7 @@ export default function ContributionModal({ goal, preset, initialKind = 'DEPOSIT
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label htmlFor="contrib-date" className="block text-xs text-slate-500 mb-1">Ngày</label>
-            <input id="contrib-date" type="date" max={today} className="input-field" value={date} disabled={!!txn} onChange={(e) => setDate(e.target.value)} />
+            <DatePicker id="contrib-date" max={today} value={date} disabled={!!txn} onChange={setDate} className="w-full" />
           </div>
           <div>
             <label htmlFor="contrib-note" className="block text-xs text-slate-500 mb-1">Ghi chú</label>
@@ -204,19 +207,22 @@ export default function ContributionModal({ goal, preset, initialKind = 'DEPOSIT
           </label>
           {linking && (
             <>
-              <select
-                className="select-field w-full"
-                value={txnId ?? ''}
-                onChange={(e) => pickTxn(e.target.value ? Number(e.target.value) : null)}
-                aria-label="Chọn giao dịch"
-              >
-                <option value="">{isLoading ? 'Đang tải…' : txns.length ? 'Chọn giao dịch (90 ngày gần nhất)…' : 'Không có giao dịch phù hợp'}</option>
-                {txns.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {formatVNDate(t.transactionDate)} · {formatVND(t.amount)} · {t.account.name} · {t.content.slice(0, 50)}
-                  </option>
-                ))}
-              </select>
+              <TreeSelect<number>
+                ariaLabel="Chọn giao dịch"
+                options={txns.map((t) => ({
+                  value: t.id,
+                  label: `${formatVNDate(t.transactionDate)} · ${t.content.slice(0, 50)}`,
+                  meta: formatVND(t.amount),
+                  keywords: `${t.account.name} ${t.content}`,
+                  icon: <AccountIcon type="BANK" />,
+                }))}
+                value={txnId}
+                onChange={pickTxn}
+                clearable
+                placeholder={isLoading ? 'Đang tải…' : txns.length ? 'Chọn giao dịch (90 ngày gần nhất)…' : 'Không có giao dịch phù hợp'}
+                disabled={!isLoading && !txns.length}
+                className="w-full"
+              />
               {txn &&
                 (txn.excludeFromStats ? (
                   <p className="text-xs text-slate-500">Giao dịch này đã được loại khỏi thống kê (VD chuyển khoản nội bộ).</p>

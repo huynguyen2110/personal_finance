@@ -1,6 +1,6 @@
 import { OmitType, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
@@ -38,6 +38,13 @@ export class CreateAccountDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  // Nhóm chi tiêu / thu nhập tài khoản này thường dùng (thay toàn bộ danh sách khi gửi lên)
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsInt({ each: true })
+  groupIds?: number[];
 }
 
 // Số tài khoản dùng để khớp email ngân hàng nên không cho sửa sau khi tạo

@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -19,7 +18,9 @@ import {
   Wallet,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import DatePicker from '@/components/shared/DatePicker';
 import { useQueryClient } from '@tanstack/react-query';
+import AccountBudgetsSection from './AccountBudgetsSection';
 import BudgetCard, { ProgressTrack } from './BudgetCard';
 import BudgetEditModal from './BudgetEditModal';
 import QuickEditModal from './QuickEditModal';
@@ -72,7 +73,6 @@ export default function BudgetsPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [editing, setEditing] = useState<BudgetLine | 'new' | null>(null);
   const [quickEdit, setQuickEdit] = useState(false);
-  const monthInput = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
   const reload = useCallback(() => invalidateFinanceData(qc), [qc]);
   const { data, error } = useBudgetPage(month);
@@ -132,24 +132,7 @@ export default function BudgetsPage() {
               <button type="button" className="p-1.5 rounded-md text-slate-600 hover:bg-slate-100" onClick={() => setMonth((m) => addMonths(m, -1))} aria-label="Tháng trước">
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button
-                type="button"
-                className="relative flex items-center gap-1.5 px-2.5 py-1 text-sm font-semibold text-slate-900 fin-num rounded-md hover:bg-slate-100"
-                onClick={() => monthInput.current?.showPicker?.()}
-                aria-label="Chọn tháng"
-              >
-                <CalendarDays className="w-4 h-4 text-teal-700" aria-hidden />
-                {formatMonthLabel(month).replace('T', 'Tháng ')}
-                <input
-                  ref={monthInput}
-                  type="month"
-                  value={month}
-                  onChange={(e) => e.target.value && setMonth(e.target.value)}
-                  className="absolute inset-0 opacity-0 pointer-events-none"
-                  tabIndex={-1}
-                  aria-hidden
-                />
-              </button>
+              <DatePicker mode="month" variant="ghost" ariaLabel="Chọn tháng" value={month} onChange={(v) => v && setMonth(v)} className="text-sm" />
               <button type="button" className="p-1.5 rounded-md text-slate-600 hover:bg-slate-100" onClick={() => setMonth((m) => addMonths(m, 1))} aria-label="Tháng sau">
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -289,6 +272,16 @@ export default function BudgetsPage() {
                 </div>
               </section>
             )}
+
+            {/* Phân bổ đầu tháng theo tài khoản → nhóm chi tiêu */}
+            <AccountBudgetsSection
+              accounts={data.accounts ?? []}
+              unassignedGroups={data.unassignedGroups ?? []}
+              clock={clock}
+              lines={data.lines}
+              onEditCategory={(l) => setEditing(l)}
+              onQuickEdit={() => setQuickEdit(true)}
+            />
 
             {/* Nhịp chi so với thời gian */}
             {budgeted.length > 0 && clock.phase !== 'future' && (
