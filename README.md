@@ -101,6 +101,13 @@ Kiểm tra bộ đọc email: `npm test -- providers` trong `personal-finance-ne
   - Ma trận danh mục × tháng, xu hướng từng danh mục.
   - Xuất Excel (3 sheet).
 - **Ngân sách**: hạn mức mặc định hàng tháng hoặc riêng từng tháng, tiến độ chi so với tiến độ thời gian, sao chép từ tháng trước.
+- **Mục tiêu tiết kiệm**
+  - Mỗi mục tiêu là một "hũ": số tiền cần đạt, thời hạn, mức ưu tiên, nơi giữ tiền và lãi suất. Web chỉ ghi lại các lần nạp/rút/nhận lãi, không chuyển tiền thật.
+  - Tự tính số cần nạp mỗi tháng để kịp hạn, dự kiến tháng đạt (có tính lãi nhập gốc hàng tháng), trạng thái đúng lộ trình / chậm / quá hạn.
+  - Kế hoạch nạp định kỳ (số tiền + ngày trong tháng): nhắc khi tới ngày mà tháng đó chưa nạp đủ; huy hiệu "kỷ luật tài chính" so thực nạp với kế hoạch 3 tháng gần nhất.
+  - Quỹ khẩn cấp: gợi ý số tiền bằng 6 tháng chi tiêu thực tế, vạch mốc an toàn 3 tháng, hiển thị số tháng chi tiêu đã đủ.
+  - Gợi ý trích thặng dư tháng này (thu − chi − đã nạp) để về đích mục tiêu ưu tiên nhất.
+  - Lần nạp/rút có thể gắn với giao dịch chuyển tiền đã ghi nhận và loại giao dịch đó khỏi thống kê chi tiêu; xóa lần nạp thì giao dịch được tính lại.
 - **Danh mục & Quy tắc**
   - Quy tắc theo từ khóa (khớp nguyên từ, không phân biệt dấu) hoặc regex, có độ ưu tiên.
   - Ô thử quy tắc, nút áp dụng lại cho giao dịch cũ. Giao dịch bạn đã tự phân loại không bao giờ bị ghi đè.

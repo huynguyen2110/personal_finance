@@ -10,6 +10,7 @@ import {
   Tags,
   Landmark,
   Wallet,
+  PiggyBank,
   ChevronLeft,
   ChevronRight,
   X,
@@ -21,6 +22,7 @@ const navItems = [
   { href: '/transactions', icon: ListOrdered, label: 'Giao dịch' },
   { href: '/reports', icon: ChartColumn, label: 'Thống kê' },
   { href: '/budgets', icon: Target, label: 'Ngân sách' },
+  { href: '/goals', icon: PiggyBank, label: 'Mục tiêu tiết kiệm' },
   { href: '/categories', icon: Tags, label: 'Danh mục & Quy tắc' },
   { href: '/accounts', icon: Landmark, label: 'Tài khoản' },
 ];

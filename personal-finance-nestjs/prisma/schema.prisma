@@ -54,6 +54,8 @@ model Account {
   updatedAt      DateTime    @updatedAt
 
   transactions Transaction[]
+  goalsHeld    SavingsGoal[] @relation("GoalHolding")
+  goalsFunded  SavingsGoal[] @relation("GoalSource")
 }
 
 enum CategoryKind {
@@ -139,10 +141,11 @@ model Transaction {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  account  Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  transferPair   Transaction? @relation("TransferPair", fields: [transferPairId], references: [id], onDelete: SetNull)
-  transferPairOf Transaction? @relation("TransferPair")
+  account          Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category         Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  transferPair     Transaction?      @relation("TransferPair", fields: [transferPairId], references: [id], onDelete: SetNull)
+  transferPairOf   Transaction?      @relation("TransferPair")
+  goalContribution GoalContribution?
 
   @@index([transactionDate])
   @@index([amount, transactionDate])
@@ -151,15 +154,89 @@ model Transaction {
 }
 
 model Budget {
-  id         Int     @id @default(autoincrement())
+  id         Int    @id @default(autoincrement())
   categoryId Int
   // "YYYY-MM", hoặc "*" = ngân sách mặc định áp dụng cho tháng chưa đặt riêng
-  month      String   @db.VarChar(7)
+  month      String @db.VarChar(7)
   amount     BigInt
 
   category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([categoryId, month])
+}
+
+// ─── Mục tiêu tiết kiệm ───
+// Mục tiêu là "hũ" ảo: web không chuyển tiền thật, chỉ ghi lại các lần bạn nạp/rút
+// (có thể gắn với giao dịch chuyển tiền thật để không bị tính là khoản chi).
+
+enum GoalJar {
+  SAFETY // An toàn tài chính (quỹ khẩn cấp)
+  PURCHASE // Mua sắm lớn
+  EXPERIENCE // Trải nghiệm & du lịch
+  INVESTMENT // Đầu tư / hưu trí
+  SELF // Nâng tầm bản thân
+  OTHER
+}
+
+enum GoalPriority {
+  HIGH // Ưu tiên cao nhất
+  NORMAL // Bình thường
+  FLEXIBLE // Linh hoạt, tùy dòng tiền dư
+}
+
+model SavingsGoal {
+  id               Int          @id @default(autoincrement())
+  name             String
+  icon             String       @default("PiggyBank")
+  jar              GoalJar      @default(OTHER)
+  priority         GoalPriority @default(NORMAL)
+  targetAmount     BigInt
+  // Tháng cần đạt "YYYY-MM" (null = không đặt hạn)
+  deadline         String?      @db.VarChar(7)
+  // Kế hoạch nạp định kỳ: số tiền/tháng + ngày trong tháng (để nhắc, web không tự chuyển tiền)
+  monthlyPlan      BigInt?
+  planDay          Int?
+  sourceAccountId  Int?
+  // Nơi giữ tiền: một tài khoản trong web, hoặc tên tự nhập (VD "Cake - Hũ tiết kiệm")
+  holdingAccountId Int?
+  holdingName      String?
+  // Lãi suất %/năm × 100 (550 = 5,50%/năm)
+  interestRateBp   Int?
+  note             String?      @db.Text
+  completedAt      DateTime?
+  archivedAt       DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  sourceAccount  Account?           @relation("GoalSource", fields: [sourceAccountId], references: [id], onDelete: SetNull)
+  holdingAccount Account?           @relation("GoalHolding", fields: [holdingAccountId], references: [id], onDelete: SetNull)
+  contributions  GoalContribution[]
+}
+
+enum ContributionKind {
+  OPENING // số tiền đã có khi tạo mục tiêu
+  DEPOSIT // nạp thêm
+  WITHDRAW // rút ra
+  INTEREST // tiền lãi nhận được
+}
+
+model GoalContribution {
+  id            Int              @id @default(autoincrement())
+  goalId        Int
+  kind          ContributionKind
+  amount        BigInt // luôn dương; chiều do kind quyết định
+  date          DateTime
+  note          String?          @db.Text
+  // Gắn với giao dịch chuyển tiền thật (mỗi giao dịch gắn tối đa một lần)
+  transactionId Int?             @unique
+  // Web đã tự loại giao dịch gắn kèm khỏi thống kê → bỏ gắn thì trả lại như cũ
+  excludedTxn   Boolean          @default(false)
+  createdAt     DateTime         @default(now())
+
+  goal        SavingsGoal  @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([goalId, date])
 }
 
 // Trạng thái nội bộ dạng key–value (VD: UID email đã đọc tới đâu, kết quả lần đọc email gần nhất)

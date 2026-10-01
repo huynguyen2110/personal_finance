@@ -1,0 +1,415 @@
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import type { ContributionKind, GoalContribution, Prisma } from '@prisma/client';
+import { PrismaService } from '../../../database/prisma.service';
+import {
+  addMonths,
+  currentMonthVN,
+  monthRange,
+  todayVN,
+  toVNMonthString,
+  VN_OFFSET,
+} from '../../../common/utils/dates.util';
+import { StatsService } from '../../stats/services/stats.service';
+import type { CreateContributionDto, CreateGoalDto, UpdateGoalDto } from '../dto/goal.dto';
+import {
+  disciplineGrade,
+  disciplineMonths,
+  goalHorizon,
+  goalStatus,
+  monthDiff,
+  monthsLeftUntil,
+  projectMonth,
+  simulateGoal,
+} from '../utils/goal-insights';
+
+// Mỗi mục tiêu là một "hũ" ảo: số đã tích lũy = tổng các lần nạp/rút/lãi đã ghi.
+// Web không tự chuyển tiền; kế hoạch nạp định kỳ chỉ để nhắc và dự báo.
+
+const SIGN: Record<ContributionKind, 1 | -1> = { OPENING: 1, DEPOSIT: 1, INTEREST: 1, WITHDRAW: -1 };
+// Tốc độ nạp thực tế tính trên 3 tháng gần nhất (kể cả tháng hiện tại)
+const PACE_MONTHS = 3;
+// Mốc an toàn của quỹ khẩn cấp: 3 tháng chi tiêu
+const SAFETY_MILESTONE_MONTHS = 3;
+
+type ContributionRow = Pick<GoalContribution, 'kind' | 'amount' | 'date' | 'transactionId'> & {
+  transaction: { excludeFromStats: boolean } | null;
+};
+
+const goalInclude = {
+  sourceAccount: { select: { id: true, name: true } },
+  holdingAccount: { select: { id: true, name: true } },
+  contributions: {
+    select: { kind: true, amount: true, date: true, transactionId: true, transaction: { select: { excludeFromStats: true } } },
+  },
+} satisfies Prisma.SavingsGoalInclude;
+
+type GoalWithRelations = Prisma.SavingsGoalGetPayload<{ include: typeof goalInclude }>;
+
+// Nạp/rút ròng (bỏ số dư ban đầu và tiền lãi) — dùng để đo tốc độ và kỷ luật nạp
+const netDeposit = (c: ContributionRow) => (c.kind === 'DEPOSIT' ? Number(c.amount) : c.kind === 'WITHDRAW' ? -Number(c.amount) : 0);
+const savedOf = (cs: ContributionRow[]) => cs.reduce((s, c) => s + SIGN[c.kind] * Number(c.amount), 0);
+
+function daysInMonth(month: string): number {
+  return Number(monthRange(month).to.slice(8));
+}
+
+@Injectable()
+export class GoalsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly stats: StatsService,
+  ) {}
+
+  // ─── Trang mục tiêu ───
+
+  async getPage() {
+    const month = currentMonthVN();
+    const today = todayVN();
+    const [goals, avgMonthlyExpense, summary] = await Promise.all([
+      this.prisma.savingsGoal.findMany({ include: goalInclude, orderBy: { id: 'asc' } }),
+      this.avgMonthlyExpense(month),
+      this.stats.getSummary(monthRange(month)),
+    ]);
+
+    const views = goals.map((g) => this.toView(g, month, today, avgMonthlyExpense));
+
+    // Thặng dư tháng này còn chưa phân bổ vào mục tiêu nào.
+    // Khoản nạp gắn với giao dịch vẫn đang tính là chi thì đã bị trừ trong "chi", không trừ lần nữa.
+    const deposited = goals
+      .flatMap((g) => g.contributions)
+      .filter((c) => toVNMonthString(c.date) === month && (!c.transactionId || c.transaction?.excludeFromStats))
+      .reduce((s, c) => s + netDeposit(c), 0);
+    const available = summary.income - summary.expense - deposited;
+
+    // Gợi ý: mục tiêu ưu tiên cao nhất có thể về đích ngay bằng phần thặng dư còn lại
+    const rank = { HIGH: 0, NORMAL: 1, FLEXIBLE: 2 } as const;
+    const candidate = views
+      .filter((v) => !v.archivedAt && v.status !== 'done' && v.remaining > 0 && v.remaining <= available)
+      .sort((a, b) => rank[a.priority] - rank[b.priority] || a.remaining - b.remaining)[0];
+
+    return {
+      month,
+      today,
+      goals: views,
+      avgMonthlyExpense,
+      surplus: {
+        income: summary.income,
+        expense: summary.expense,
+        deposited,
+        available,
+        suggestion: candidate ? { goalId: candidate.id, amount: candidate.remaining } : null,
+      },
+      discipline: this.discipline(goals, month, today),
+    };
+  }
+
+  private toView(g: GoalWithRelations, month: string, today: string, avgMonthlyExpense: number | null) {
+    const target = Number(g.targetAmount);
+    const saved = savedOf(g.contributions);
+    const remaining = Math.max(0, target - saved);
+    const interestRate = g.interestRateBp !== null ? g.interestRateBp / 100 : null;
+    const monthlyPlan = g.monthlyPlan !== null ? Number(g.monthlyPlan) : null;
+
+    // Tốc độ nạp thực tế: trung bình các tháng gần nhất kể từ khi tạo mục tiêu
+    const createdMonth = toVNMonthString(g.createdAt);
+    const paceFrom = createdMonth > addMonths(month, -(PACE_MONTHS - 1)) ? createdMonth : addMonths(month, -(PACE_MONTHS - 1));
+    const paceMonths = Math.max(1, monthDiff(paceFrom, month) + 1);
+    const paceNet = g.contributions.filter((c) => toVNMonthString(c.date) >= paceFrom).reduce((s, c) => s + netDeposit(c), 0);
+    const pace = Math.max(0, Math.round(paceNet / paceMonths));
+
+    // Dự báo theo kế hoạch nạp nếu có, không thì theo tốc độ thực tế
+    const monthlyRate = monthlyPlan && monthlyPlan > 0 ? monthlyPlan : pace;
+    const sim = simulateGoal(saved, target, monthlyRate, interestRate);
+    const projectedMonth = remaining === 0 ? null : projectMonth(month, sim.months);
+    const status = goalStatus({ saved, target, deadline: g.deadline, currentMonth: month, projectedMonth, monthlyRate });
+    const monthsLeft = g.deadline && g.deadline >= month ? monthsLeftUntil(month, g.deadline) : null;
+
+    // Kế hoạch tháng này: đã nạp bao nhiêu, còn thiếu bao nhiêu, đã tới ngày nạp chưa
+    const depositedThisMonth = g.contributions.filter((c) => toVNMonthString(c.date) === month).reduce((s, c) => s + netDeposit(c), 0);
+    const planDay = g.planDay ? Math.min(g.planDay, daysInMonth(month)) : null;
+    const due = monthlyPlan && status !== 'done' ? Math.max(0, Math.min(monthlyPlan, remaining) - Math.max(0, depositedThisMonth)) : 0;
+
+    // Quỹ khẩn cấp: mốc an toàn 3 tháng chi tiêu, và số tháng chi tiêu đã đủ
+    const isSafety = g.jar === 'SAFETY' && avgMonthlyExpense !== null && avgMonthlyExpense > 0;
+    const milestoneAmount = isSafety ? Math.round(avgMonthlyExpense * SAFETY_MILESTONE_MONTHS) : null;
+
+    const dates = g.contributions.map((c) => c.date.getTime());
+
+    return {
+      id: g.id,
+      name: g.name,
+      icon: g.icon,
+      jar: g.jar,
+      priority: g.priority,
+      targetAmount: target,
+      deadline: g.deadline,
+      monthlyPlan,
+      planDay: g.planDay,
+      sourceAccount: g.sourceAccount,
+      holdingAccount: g.holdingAccount,
+      holdingName: g.holdingName,
+      interestRate,
+      note: g.note,
+      completedAt: g.completedAt,
+      archivedAt: g.archivedAt,
+      createdAt: g.createdAt,
+
+      saved,
+      remaining,
+      progress: target > 0 ? saved / target : 0,
+      contributionCount: g.contributions.length,
+      lastContributionAt: dates.length ? new Date(Math.max(...dates)) : null,
+
+      pace,
+      monthlyRate,
+      projectedMonth,
+      projectedMonths: remaining === 0 ? 0 : sim.months,
+      monthsLeft,
+      // Cần nạp mỗi tháng (không tính lãi) để kịp hạn
+      requiredMonthly: monthsLeft ? Math.ceil(remaining / monthsLeft) : null,
+      status,
+      horizon: status === 'done' ? null : goalHorizon(month, g.deadline, sim.months),
+
+      monthlyInterest: interestRate ? Math.round((saved * interestRate) / 100 / 12) : 0,
+      interestToFinish: remaining > 0 && sim.months !== null ? sim.interest : 0,
+
+      thisMonth: {
+        deposited: depositedThisMonth,
+        due,
+        dueNow: due > 0 && (planDay === null || Number(today.slice(8)) >= planDay),
+      },
+      milestone:
+        milestoneAmount !== null && milestoneAmount < target
+          ? { amount: milestoneAmount, label: `Mốc an toàn ${SAFETY_MILESTONE_MONTHS} tháng chi tiêu`, reached: saved >= milestoneAmount }
+          : null,
+      coverMonths: isSafety ? saved / avgMonthlyExpense : null,
+    };
+  }
+
+  // Chi tiêu trung bình/tháng của 6 tháng đã qua (chỉ tính tháng có phát sinh chi)
+  private async avgMonthlyExpense(month: string): Promise<number | null> {
+    const points = await this.stats.getMonthly({
+      from: monthRange(addMonths(month, -6)).from,
+      to: monthRange(addMonths(month, -1)).to,
+    });
+    const withExpense = points.filter((p) => p.expense > 0);
+    if (!withExpense.length) return null;
+    return Math.round(withExpense.reduce((s, p) => s + p.expense, 0) / withExpense.length);
+  }
+
+  // Kỷ luật nạp: thực nạp / kế hoạch, trên các mục tiêu có kế hoạch nạp định kỳ, tối đa 3 tháng gần nhất
+  private discipline(goals: GoalWithRelations[], month: string, today: string) {
+    let planned = 0;
+    let actual = 0;
+    let goalCount = 0;
+    for (const g of goals) {
+      if (!g.monthlyPlan || g.monthlyPlan <= 0n || g.archivedAt) continue;
+      // Đã đạt trước kỳ chấm thì không cần nạp nữa
+      if (g.completedAt && toVNMonthString(g.completedAt) < addMonths(month, -3)) continue;
+      const planDay = g.planDay ? Math.min(g.planDay, daysInMonth(month)) : daysInMonth(month);
+      const months = disciplineMonths(toVNMonthString(g.createdAt), month, Number(today.slice(8)) >= planDay);
+      if (!months.length) continue;
+      goalCount++;
+      planned += Number(g.monthlyPlan) * months.length;
+      actual += g.contributions.filter((c) => months.includes(toVNMonthString(c.date))).reduce((s, c) => s + netDeposit(c), 0);
+    }
+    if (planned <= 0) return null;
+    const ratio = Math.max(0, actual / planned);
+    return { grade: disciplineGrade(ratio), ratio, planned, actual, goals: goalCount };
+  }
+
+  // ─── CRUD mục tiêu ───
+
+  private toData(dto: UpdateGoalDto): Prisma.SavingsGoalUncheckedUpdateInput {
+    const data: Prisma.SavingsGoalUncheckedUpdateInput = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.icon !== undefined) data.icon = dto.icon;
+    if (dto.jar !== undefined) data.jar = dto.jar;
+    if (dto.priority !== undefined) data.priority = dto.priority;
+    if (dto.targetAmount !== undefined) data.targetAmount = BigInt(dto.targetAmount);
+    if (dto.deadline !== undefined) data.deadline = dto.deadline || null;
+    if (dto.monthlyPlan !== undefined) data.monthlyPlan = dto.monthlyPlan ? BigInt(dto.monthlyPlan) : null;
+    if (dto.planDay !== undefined) data.planDay = dto.planDay ?? null;
+    if (dto.sourceAccountId !== undefined) data.sourceAccountId = dto.sourceAccountId ?? null;
+    if (dto.holdingAccountId !== undefined) data.holdingAccountId = dto.holdingAccountId ?? null;
+    if (dto.holdingName !== undefined) data.holdingName = dto.holdingName || null;
+    if (dto.interestRate !== undefined) data.interestRateBp = dto.interestRate !== null ? Math.round(dto.interestRate * 100) : null;
+    if (dto.note !== undefined) data.note = dto.note || null;
+    return data;
+  }
+
+  private async assertAccounts(dto: UpdateGoalDto) {
+    const ids = [dto.sourceAccountId, dto.holdingAccountId].filter((x): x is number => typeof x === 'number');
+    if (!ids.length) return;
+    const found = await this.prisma.account.count({ where: { id: { in: ids } } });
+    if (found !== new Set(ids).size) throw new BadRequestException('Tài khoản không tồn tại');
+  }
+
+  async create(dto: CreateGoalDto) {
+    await this.assertAccounts(dto);
+    const { initialAmount, ...rest } = dto;
+    const goal = await this.prisma.savingsGoal.create({
+      data: {
+        name: dto.name,
+        targetAmount: BigInt(dto.targetAmount),
+        icon: 'PiggyBank',
+        jar: 'OTHER',
+        priority: 'NORMAL',
+        ...(this.toData(rest) as unknown as Partial<Prisma.SavingsGoalUncheckedCreateInput>),
+        contributions: initialAmount
+          ? { create: { kind: 'OPENING', amount: BigInt(initialAmount), date: new Date(), note: 'Số tiền đã có khi tạo mục tiêu' } }
+          : undefined,
+      },
+    });
+    await this.syncCompletion(goal.id);
+    return { id: goal.id };
+  }
+
+  async update(id: number, dto: UpdateGoalDto) {
+    await this.assertAccounts(dto);
+    await this.prisma.savingsGoal.update({ where: { id }, data: this.toData(dto) });
+    await this.syncCompletion(id);
+    return { ok: true };
+  }
+
+  async archive(id: number, archived: boolean) {
+    await this.prisma.savingsGoal.update({ where: { id }, data: { archivedAt: archived ? new Date() : null } });
+    return { ok: true };
+  }
+
+  // Xóa mục tiêu: trả các giao dịch đã bị web loại khỏi thống kê về như cũ
+  async remove(id: number) {
+    const linked = await this.prisma.goalContribution.findMany({
+      where: { goalId: id, excludedTxn: true, transactionId: { not: null } },
+      select: { transactionId: true },
+    });
+    await this.prisma.$transaction([
+      this.prisma.transaction.updateMany({
+        where: { id: { in: linked.map((l) => l.transactionId!) }, transferPairId: null },
+        data: { excludeFromStats: false },
+      }),
+      this.prisma.savingsGoal.delete({ where: { id } }),
+    ]);
+    return { ok: true };
+  }
+
+  // Đánh dấu hoàn thành khi số đã tích lũy chạm mục tiêu; tụt xuống dưới (rút tiền, tăng mục tiêu) thì bỏ đánh dấu
+  private async syncCompletion(goalId: number) {
+    const goal = await this.prisma.savingsGoal.findUnique({
+      where: { id: goalId },
+      select: { targetAmount: true, completedAt: true, contributions: { select: { kind: true, amount: true } } },
+    });
+    if (!goal) return;
+    const saved = goal.contributions.reduce((s, c) => s + SIGN[c.kind] * Number(c.amount), 0);
+    const reached = saved >= Number(goal.targetAmount);
+    if (reached && !goal.completedAt) {
+      await this.prisma.savingsGoal.update({ where: { id: goalId }, data: { completedAt: new Date() } });
+    } else if (!reached && goal.completedAt) {
+      await this.prisma.savingsGoal.update({ where: { id: goalId }, data: { completedAt: null } });
+    }
+  }
+
+  // ─── Nạp / rút ───
+
+  async listContributions(goalId: number) {
+    await this.prisma.savingsGoal.findUniqueOrThrow({ where: { id: goalId }, select: { id: true } });
+    const rows = await this.prisma.goalContribution.findMany({
+      where: { goalId },
+      orderBy: [{ date: 'desc' }, { id: 'desc' }],
+      include: {
+        transaction: {
+          select: { id: true, content: true, transactionDate: true, direction: true, account: { select: { id: true, name: true } } },
+        },
+      },
+    });
+    return rows.map((r) => ({ ...r, amount: Number(r.amount) }));
+  }
+
+  async addContribution(goalId: number, dto: CreateContributionDto) {
+    const goal = await this.prisma.savingsGoal.findUnique({
+      where: { id: goalId },
+      select: { id: true, contributions: { select: { kind: true, amount: true } } },
+    });
+    if (!goal) throw new NotFoundException('Không tìm thấy mục tiêu');
+
+    let txn: { id: number; amount: bigint; transactionDate: Date; excludeFromStats: boolean } | null = null;
+    if (dto.transactionId) {
+      txn = await this.prisma.transaction.findUnique({
+        where: { id: dto.transactionId },
+        select: { id: true, amount: true, transactionDate: true, excludeFromStats: true, goalContribution: { select: { id: true } } },
+      }).then((t) => {
+        if (!t) throw new BadRequestException('Giao dịch không tồn tại');
+        if (t.goalContribution) throw new BadRequestException('Giao dịch này đã được gắn với một lần nạp/rút khác');
+        return t;
+      });
+    }
+
+    const amount = dto.amount ?? (txn ? Number(txn.amount) : 0);
+    if (amount <= 0) throw new BadRequestException('Nhập số tiền');
+    if (dto.kind === 'WITHDRAW') {
+      const saved = goal.contributions.reduce((s, c) => s + SIGN[c.kind] * Number(c.amount), 0);
+      if (amount > saved) throw new BadRequestException('Số tiền rút lớn hơn số đã tích lũy');
+    }
+
+    // Ngày: theo giao dịch gắn kèm; hôm nay → thời điểm hiện tại; ngày khác → 12:00 ngày đó
+    const date = dto.date
+      ? dto.date === todayVN()
+        ? new Date()
+        : new Date(`${dto.date}T12:00:00${VN_OFFSET}`)
+      : (txn?.transactionDate ?? new Date());
+    if (date.getTime() > Date.now() + 60_000) throw new BadRequestException('Không ghi nạp/rút cho ngày trong tương lai');
+
+    const excludeTxn = !!txn && !!dto.excludeFromStats && !txn.excludeFromStats;
+    await this.prisma.$transaction([
+      ...(excludeTxn ? [this.prisma.transaction.update({ where: { id: txn!.id }, data: { excludeFromStats: true } })] : []),
+      this.prisma.goalContribution.create({
+        data: {
+          goalId,
+          kind: dto.kind,
+          amount: BigInt(amount),
+          date,
+          note: dto.note || null,
+          transactionId: txn?.id ?? null,
+          excludedTxn: excludeTxn,
+        },
+      }),
+    ]);
+    await this.syncCompletion(goalId);
+    return { ok: true };
+  }
+
+  async removeContribution(id: number) {
+    const c = await this.prisma.goalContribution.findUniqueOrThrow({
+      where: { id },
+      select: { goalId: true, transactionId: true, excludedTxn: true },
+    });
+    await this.prisma.$transaction([
+      ...(c.excludedTxn && c.transactionId
+        ? [this.prisma.transaction.updateMany({ where: { id: c.transactionId, transferPairId: null }, data: { excludeFromStats: false } })]
+        : []),
+      this.prisma.goalContribution.delete({ where: { id } }),
+    ]);
+    await this.syncCompletion(c.goalId);
+    return { ok: true };
+  }
+
+  // Giao dịch 90 ngày gần nhất chưa gắn với lần nạp/rút nào (để chọn khi ghi nạp/rút)
+  async linkableTransactions(direction?: 'IN' | 'OUT') {
+    const since = new Date(Date.now() - 90 * 86400000);
+    const rows = await this.prisma.transaction.findMany({
+      where: { transactionDate: { gte: since }, goalContribution: null, ...(direction ? { direction } : {}) },
+      orderBy: { transactionDate: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        direction: true,
+        amount: true,
+        content: true,
+        transactionDate: true,
+        excludeFromStats: true,
+        account: { select: { id: true, name: true } },
+      },
+    });
+    return rows.map((r) => ({ ...r, amount: Number(r.amount) }));
+  }
+}

@@ -14,6 +14,7 @@ import { TransfersModule } from './modules/transfers/transfers.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { StatsModule } from './modules/stats/stats.module';
 import { BudgetsModule } from './modules/budgets/budgets.module';
+import { GoalsModule } from './modules/goals/goals.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { EmailModule } from './modules/email/email.module';
 
@@ -39,6 +40,7 @@ import { EmailModule } from './modules/email/email.module';
     TransactionsModule,
     StatsModule,
     BudgetsModule,
+    GoalsModule,
     ReportsModule,
     EmailModule,
   ],
