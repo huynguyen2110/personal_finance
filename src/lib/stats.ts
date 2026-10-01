@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import prisma from './prisma';
-import { endOfVNDayExclusive, monthRange, startOfVNDay } from './dates';
+import { endOfVNDayExclusive, startOfVNDay } from './dates';
 import { EMAIL_PROVIDERS } from './email/providers';
 
 // Mọi thống kê: bỏ qua giao dịch excludeFromStats, gom nhóm theo giờ Việt Nam.
@@ -164,13 +164,6 @@ export async function getCategoryMonthMatrix(
     WHERE ${scopeWhere(s)} AND t.direction = ${direction}
     GROUP BY t.categoryId, month`;
   return rows.map((r) => ({ categoryId: r.categoryId, month: r.month, total: n(r.total) }));
-}
-
-// Chi tiêu theo danh mục trong một tháng (dùng cho ngân sách)
-export async function getMonthExpenseByCategory(month: string): Promise<Map<number | null, number>> {
-  const { from, to } = monthRange(month);
-  const rows = await getByCategory({ from, to }, 'OUT');
-  return new Map(rows.map((r) => [r.categoryId, r.total]));
 }
 
 // Cách web ghi nhận giao dịch của một tài khoản (để giải thích độ đầy đủ của số dư)

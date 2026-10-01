@@ -23,15 +23,15 @@ export const CATEGORY_COLORS = [
 interface Props {
   icon?: string | null;
   color?: string | null;
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md' | 'lg';
 }
 
 // Chip icon danh mục: nền nhạt theo màu danh mục, icon cùng màu.
 export default function CategoryIcon({ icon, color, size = 'md' }: Props) {
   const Icon = (icon && CATEGORY_ICONS[icon]) || CircleHelp;
   const c = color || '#94A3B8';
-  const box = size === 'sm' ? 'w-6 h-6 rounded-md' : 'w-8 h-8 rounded-lg';
-  const ic = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4';
+  const box = size === 'sm' ? 'w-6 h-6 rounded-md' : size === 'lg' ? 'w-10 h-10 rounded-xl' : 'w-8 h-8 rounded-lg';
+  const ic = size === 'sm' ? 'w-3.5 h-3.5' : size === 'lg' ? 'w-5 h-5' : 'w-4 h-4';
   return (
     <span
       className={`${box} inline-flex items-center justify-center flex-shrink-0`}

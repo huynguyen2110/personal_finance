@@ -1,0 +1,195 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
+import { Trash2 } from 'lucide-react';
+import Modal from '@/components/shared/Modal';
+import CategoryIcon from '@/components/shared/CategoryIcon';
+import { api } from '@/lib/client';
+import { formatVND } from '@/lib/money';
+import { formatMonthLabel } from '@/lib/dates';
+import type { BudgetLine } from '@/lib/budget';
+
+type Scope = 'DEFAULT' | 'MONTH';
+
+interface Props {
+  lines: BudgetLine[];
+  month: string;
+  // Có: sửa hạn mức của danh mục này; không: chọn danh mục để đặt hạn mức mới
+  line: BudgetLine | null;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+const nf = new Intl.NumberFormat('vi-VN');
+const round100k = (v: number) => Math.ceil(v / 100_000) * 100_000;
+
+export default function BudgetEditModal({ lines, month, line, onClose, onSaved }: Props) {
+  const [categoryId, setCategoryId] = useState<number>(
+    line?.categoryId ?? lines.find((l) => l.amount === null)?.categoryId ?? lines[0]?.categoryId ?? 0
+  );
+  const current = lines.find((l) => l.categoryId === categoryId) ?? null;
+  const [scope, setScope] = useState<Scope>(line?.source === 'MONTH' ? 'MONTH' : 'DEFAULT');
+  const initial = (l: BudgetLine | null, sc: Scope) =>
+    l ? (sc === 'MONTH' ? (l.source === 'MONTH' ? l.amount : null) : l.defaultAmount) : null;
+  const [value, setValue] = useState(() => {
+    const v = initial(current, scope) ?? (line && line.amount !== null && line.spent > line.amount ? round100k(line.spent) : null);
+    return v ? String(v) : '';
+  });
+  const [saving, setSaving] = useState(false);
+
+  const amountNum = Number(value.replace(/[^\d]/g, ''));
+  const existing = initial(current, scope);
+
+  // Gợi ý nhanh từ dữ liệu thật
+  const chips = useMemo(() => {
+    if (!current) return [];
+    const out: { label: string; value: number }[] = [];
+    if (current.prevSpent > 0) out.push({ label: `Bằng tháng trước`, value: round100k(current.prevSpent) });
+    if (current.spent > 0) out.push({ label: 'Theo mức đã chi', value: round100k(current.spent) });
+    if (current.defaultAmount && scope === 'MONTH') out.push({ label: 'Như mặc định', value: current.defaultAmount });
+    return out.filter((c, i, a) => a.findIndex((x) => x.value === c.value) === i);
+  }, [current, scope]);
+
+  async function put(amount: number | null) {
+    if (!categoryId) return;
+    setSaving(true);
+    try {
+      await api('/api/budgets', {
+        method: 'PUT',
+        body: JSON.stringify({ categoryId, month: scope === 'DEFAULT' ? '*' : month, amount }),
+      });
+      toast.success(amount === null ? 'Đã bỏ hạn mức' : 'Đã lưu hạn mức');
+      onSaved();
+      onClose();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal isOpen onClose={onClose} title={line ? `Hạn mức · ${line.name}` : 'Đặt hạn mức mới'} size="md">
+      <form
+        className="space-y-4 font-jakarta"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!amountNum) return toast.error('Nhập số tiền hạn mức');
+          put(amountNum);
+        }}
+      >
+        {!line && (
+          <label className="block">
+            <span className="fin-label block mb-1.5">Danh mục chi</span>
+            <select
+              className="select-field"
+              value={categoryId}
+              onChange={(e) => {
+                const id = Number(e.target.value);
+                setCategoryId(id);
+                const l = lines.find((x) => x.categoryId === id) ?? null;
+                const v = initial(l, scope);
+                setValue(v ? String(v) : '');
+              }}
+            >
+              {lines.map((l) => (
+                <option key={l.categoryId} value={l.categoryId}>
+                  {l.name}
+                  {l.amount !== null ? ` — đang ${formatVND(l.amount)}` : ' — chưa đặt'}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {current && (
+          <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
+            <CategoryIcon icon={current.icon} color={current.color} />
+            <div className="text-xs text-slate-600 fin-num">
+              <p>
+                Tháng này đã chi <b className="text-slate-900">{formatVND(current.spent)}</b> ({current.count} giao dịch)
+              </p>
+              <p>Tháng trước: {formatVND(current.prevSpent)}</p>
+            </div>
+          </div>
+        )}
+
+        <div>
+          <span className="fin-label block mb-1.5">Áp dụng cho</span>
+          <div className="inline-flex p-1 rounded-lg bg-slate-100 w-full">
+            {(
+              [
+                ['DEFAULT', 'Mọi tháng (mặc định)'],
+                ['MONTH', `Chỉ ${formatMonthLabel(month)}`],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={scope === k}
+                onClick={() => {
+                  setScope(k);
+                  const v = initial(current, k);
+                  if (v) setValue(String(v));
+                }}
+                className={`flex-1 px-3 py-1.5 rounded-md text-sm font-semibold transition-colors ${
+                  scope === k ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-500 mt-1.5">
+            {scope === 'DEFAULT'
+              ? 'Tự áp dụng cho mọi tháng chưa đặt riêng — không cần sao chép mỗi tháng.'
+              : `Chỉ ghi đè cho ${formatMonthLabel(month)}; các tháng khác vẫn dùng mức mặc định.`}
+          </p>
+        </div>
+
+        <label className="block">
+          <span className="fin-label block mb-1.5">Hạn mức (₫)</span>
+          <input
+            inputMode="numeric"
+            autoFocus
+            className="input-field fin-num !text-lg !font-semibold"
+            value={amountNum ? nf.format(amountNum) : value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="VD: 3.000.000"
+          />
+        </label>
+        {chips.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {chips.map((c) => (
+              <button
+                key={c.label}
+                type="button"
+                onClick={() => setValue(String(c.value))}
+                className="px-2.5 py-1 rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:border-teal-600 hover:text-teal-700 fin-num"
+              >
+                {c.label}: {nf.format(c.value)} ₫
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 pt-1">
+          {existing !== null && (
+            <button type="button" className="fin-btn fin-btn-ghost text-rose-600" disabled={saving} onClick={() => put(null)}>
+              <Trash2 className="w-4 h-4" /> Bỏ hạn mức {scope === 'MONTH' ? 'riêng tháng' : 'mặc định'}
+            </button>
+          )}
+          <div className="ml-auto flex gap-2">
+            <button type="button" className="fin-btn fin-btn-outline" onClick={onClose}>
+              Hủy
+            </button>
+            <button type="submit" className="fin-btn fin-btn-primary" disabled={saving}>
+              {saving ? 'Đang lưu…' : 'Lưu hạn mức'}
+            </button>
+          </div>
+        </div>
+      </form>
+    </Modal>
+  );
+}
