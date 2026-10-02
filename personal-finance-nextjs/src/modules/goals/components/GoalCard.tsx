@@ -89,7 +89,7 @@ export default function GoalCard({ goal, month, suggestion, onDeposit, onSpend, 
   if (done || archived) {
     return (
       <div className={`${CARD} p-4 md:p-5 pl-5 md:pl-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${archived ? 'opacity-75' : ''}`}>
-        <Stripe color={archived ? '#cbd5e1' : STATUS.done.fill} />
+        <Stripe color={archived ? '#bdc9c6' : STATUS.done.fill} />
         <div className="flex items-start gap-3 min-w-0">
           <GoalIcon goal={goal} />
           <div className="min-w-0">

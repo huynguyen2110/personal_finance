@@ -11,6 +11,7 @@ import {
   Landmark,
   Wallet,
   PiggyBank,
+  Settings,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -49,6 +50,7 @@ const menuGroups: NavGroup[] = [
     items: [
       { href: '/categories', icon: Tags, label: 'Danh mục & Quy tắc' },
       { href: '/accounts', icon: Landmark, label: 'Tài khoản' },
+      { href: '/settings', icon: Settings, label: 'Cài đặt' },
     ],
   },
 ];

@@ -16,11 +16,11 @@ export const STATE_STYLE: Record<
   BudgetState,
   { stripe: string; fill: string; badge: string; text: string; Icon: LucideIcon }
 > = {
-  over: { stripe: 'bg-rose-500', fill: '#F43F5E', badge: 'bg-rose-50 text-rose-600 border-rose-200', text: 'text-rose-600', Icon: OctagonAlert },
+  over: { stripe: 'bg-rose-500', fill: '#cc1e44', badge: 'bg-rose-50 text-rose-600 border-rose-200', text: 'text-rose-600', Icon: OctagonAlert },
   near: { stripe: 'bg-amber-500', fill: '#F59E0B', badge: 'bg-amber-100 text-amber-800 border-amber-200', text: 'text-amber-700', Icon: TriangleAlert },
   ok: { stripe: 'bg-teal-700', fill: '#0F766E', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', text: 'text-emerald-700', Icon: CircleCheck },
   unused: { stripe: 'bg-slate-300', fill: '#0F766E', badge: 'bg-slate-100 text-slate-600 border-slate-200', text: 'text-slate-600', Icon: Circle },
-  none: { stripe: 'bg-slate-200', fill: '#CBD5E1', badge: 'bg-slate-100 text-slate-500 border-slate-200', text: 'text-slate-500', Icon: CircleDashed },
+  none: { stripe: 'bg-slate-200', fill: '#bdc9c6', badge: 'bg-slate-100 text-slate-500 border-slate-200', text: 'text-slate-500', Icon: CircleDashed },
 };
 
 const pct = (v: number) => `${(v * 100).toFixed(1).replace('.', ',')}%`;
@@ -72,6 +72,8 @@ interface Props {
   // Danh mục con của dòng này (số liệu của chúng đã được gộp vào `line`)
   subLines?: BudgetLine[];
   month: string;
+  // Ngày bắt đầu tháng tài chính (để link sang giao dịch đúng khoảng ngày của tháng)
+  startDay?: number;
   clock: MonthClock;
   onEdit: (line: BudgetLine) => void;
   // Mặc định thu gọn: chỉ hiện tên, trạng thái, đã chi / hạn mức và thanh tiến độ
@@ -81,11 +83,11 @@ interface Props {
 const SOURCE_LABEL = (source: BudgetLine['source'], month: string) =>
   source === 'MONTH' ? `Riêng ${formatMonthLabel(month)}` : source === 'DEFAULT' ? 'Mặc định hàng tháng' : source === 'CHILDREN' ? 'Tổng hạn mức các con' : null;
 
-export default function BudgetCard({ line, subLines = [], month, clock, onEdit, defaultExpanded = false }: Props) {
+export default function BudgetCard({ line, subLines = [], month, startDay = 1, clock, onEdit, defaultExpanded = false }: Props) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const state = budgetState(line);
   const st = STATE_STYLE[state];
-  const { from, to } = monthRange(month);
+  const { from, to } = monthRange(month, startDay);
   const amount = line.amount;
   const remaining = amount !== null ? amount - line.spent : null;
   const showMarker = clock.phase === 'current' ? clock.timePct : null;

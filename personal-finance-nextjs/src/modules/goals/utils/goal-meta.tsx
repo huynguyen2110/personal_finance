@@ -49,11 +49,11 @@ export const GOAL_ICONS: Record<string, LucideIcon> = {
 // Nhóm hũ tài chính: nhãn, icon mặc định, màu
 export const JARS: Record<GoalJar, { label: string; icon: LucideIcon; defaultIcon: string; color: string }> = {
   SAFETY: { label: 'An toàn tài chính', icon: ShieldCheck, defaultIcon: 'ShieldCheck', color: '#0f766e' },
-  PURCHASE: { label: 'Mua sắm lớn', icon: ShoppingBag, defaultIcon: 'Laptop', color: '#2a78d6' },
+  PURCHASE: { label: 'Mua sắm lớn', icon: ShoppingBag, defaultIcon: 'Laptop', color: '#0f766e' },
   EXPERIENCE: { label: 'Trải nghiệm & du lịch', icon: Plane, defaultIcon: 'Plane', color: '#059669' },
   INVESTMENT: { label: 'Đầu tư / Hưu trí', icon: TrendingUp, defaultIcon: 'TrendingUp', color: '#4a3aa7' },
-  SELF: { label: 'Nâng tầm bản thân', icon: GraduationCap, defaultIcon: 'GraduationCap', color: '#eb6834' },
-  OTHER: { label: 'Hũ khác', icon: Ellipsis, defaultIcon: 'PiggyBank', color: '#64748b' },
+  SELF: { label: 'Nâng tầm bản thân', icon: GraduationCap, defaultIcon: 'GraduationCap', color: '#cc1e44' },
+  OTHER: { label: 'Hũ khác', icon: Ellipsis, defaultIcon: 'PiggyBank', color: '#3e4947' },
 };
 
 export const PRIORITIES: Record<GoalPriority, { label: string; short: string; badge: string; rank: number }> = {
@@ -67,9 +67,9 @@ export const STATUS: Record<GoalStatus, { label: string; badge: string; fill: st
   done: { label: 'Hoàn thành', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', fill: '#059669', Icon: BadgeCheck },
   on_track: { label: 'Đúng lộ trình', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', fill: '#0f766e', Icon: CircleCheck },
   behind: { label: 'Chậm tiến độ', badge: 'bg-amber-100 text-amber-800 border-amber-200', fill: '#f59e0b', Icon: Clock },
-  overdue: { label: 'Quá hạn', badge: 'bg-rose-50 text-rose-600 border-rose-200', fill: '#f43f5e', Icon: CircleAlert },
+  overdue: { label: 'Quá hạn', badge: 'bg-rose-50 text-rose-600 border-rose-200', fill: '#cc1e44', Icon: CircleAlert },
   no_deadline: { label: 'Không đặt hạn', badge: 'bg-slate-100 text-slate-600 border-slate-200', fill: '#0f766e', Icon: CircleDashed },
-  no_plan: { label: 'Chưa có kế hoạch nạp', badge: 'bg-slate-100 text-slate-500 border-slate-200', fill: '#94a3b8', Icon: CircleDashed },
+  no_plan: { label: 'Chưa có kế hoạch nạp', badge: 'bg-slate-100 text-slate-500 border-slate-200', fill: '#6e7977', Icon: CircleDashed },
 };
 
 // Tình trạng sử dụng tiền của quỹ (màu tím: tách khỏi màu trạng thái tích lũy)

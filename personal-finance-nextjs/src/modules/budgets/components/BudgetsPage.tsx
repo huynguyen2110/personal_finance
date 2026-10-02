@@ -29,7 +29,8 @@ import { errorMessage } from '@/lib/api-client';
 import { invalidateFinanceData } from '@/lib/query-client';
 import { copyBudgetsFromPrevMonth, useBudgetPage } from '../lib';
 import { formatCompactVND, formatVND } from '@/lib/money';
-import { addMonths, currentMonthVN, formatMonthLabel } from '@/lib/dates';
+import { addMonths, currentMonthVN, formatMonthLabel, formatMonthRange } from '@/lib/dates';
+import { useMonthStartDay } from '@/modules/settings/lib';
 import { budgetState, budgetUnits, childrenByParent, monthClock, sortByState, topLevelLines, type BudgetState } from '../utils/budget-insights';
 import type { BudgetLine } from '../types';
 
@@ -69,7 +70,11 @@ function Kpi({
 }
 
 export default function BudgetsPage() {
-  const [month, setMonth] = useState(currentMonthVN);
+  // Tháng tài chính (ngày bắt đầu tháng trong cài đặt, VD ngày lương 5: "T10" = 05/10 → 04/11); chưa chọn thì là tháng hiện tại
+  const sd = useMonthStartDay();
+  const [monthOverride, setMonthOverride] = useState<string | null>(null);
+  const month = monthOverride ?? currentMonthVN(sd);
+  const setMonth = (next: string | ((prev: string) => string)) => setMonthOverride(typeof next === 'function' ? next(month) : next);
   const [filter, setFilter] = useState<Filter>('all');
   const [editing, setEditing] = useState<BudgetLine | 'new' | null>(null);
   const [quickEdit, setQuickEdit] = useState(false);
@@ -82,7 +87,7 @@ export default function BudgetsPage() {
     if (error) toast.error(errorMessage(error));
   }, [error]);
 
-  const clock = useMemo(() => monthClock(month), [month]);
+  const clock = useMemo(() => monthClock(month, sd), [month, sd]);
   // Hiển thị theo dòng cấp cao nhất (danh mục cha đã gộp số liệu các con); con nằm trong thẻ của cha
   const lines = useMemo(() => (data ? sortByState(topLevelLines(data.lines)) : []), [data]);
   const subLines = useMemo(() => childrenByParent(data?.lines ?? []), [data]);
@@ -95,7 +100,7 @@ export default function BudgetsPage() {
   for (const l of lines) counts[budgetState(l)]++;
   const healthy = counts.ok + counts.unused;
   const visible = lines.filter((l) => FILTER_STATES[filter].includes(budgetState(l)));
-  const isCurrent = month === currentMonthVN();
+  const isCurrent = month === currentMonthVN(sd);
 
   // Danh mục kéo nhịp chi nhanh nhất (chi vượt phần "đáng lẽ" theo thời gian nhiều nhất)
   const fastest =
@@ -133,6 +138,11 @@ export default function BudgetsPage() {
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <DatePicker mode="month" variant="ghost" ariaLabel="Chọn tháng" value={month} onChange={(v) => v && setMonth(v)} className="text-sm" />
+              {sd > 1 && (
+                <span className="hidden md:inline px-1.5 text-[11px] text-slate-500 fin-num whitespace-nowrap" title={`Tháng tính từ ngày ${sd} (đổi ở Cài đặt)`}>
+                  {formatMonthRange(month, sd)}
+                </span>
+              )}
               <button type="button" className="p-1.5 rounded-md text-slate-600 hover:bg-slate-100" onClick={() => setMonth((m) => addMonths(m, 1))} aria-label="Tháng sau">
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -140,7 +150,7 @@ export default function BudgetsPage() {
             {isCurrent ? (
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">Kỳ hiện tại</span>
             ) : (
-              <button type="button" className="fin-btn fin-btn-ghost fin-btn-sm" onClick={() => setMonth(currentMonthVN())}>
+              <button type="button" className="fin-btn fin-btn-ghost fin-btn-sm" onClick={() => setMonthOverride(null)}>
                 Về tháng này
               </button>
             )}
@@ -316,7 +326,7 @@ export default function BudgetsPage() {
 
                 <ProgressTrack
                   percent={usedPct}
-                  fill={usedPct > 1 ? '#F43F5E' : '#0F766E'}
+                  fill={usedPct > 1 ? '#cc1e44' : '#0F766E'}
                   timePct={clock.phase === 'current' ? clock.timePct : null}
                   height="h-3"
                   label="Tỷ lệ đã chi trên tổng ngân sách"
@@ -389,7 +399,7 @@ export default function BudgetsPage() {
                   <div className="fin-card p-8 text-center text-sm text-slate-500">Không có danh mục nào trong nhóm này</div>
                 ) : (
                   visible.map((l) => (
-                    <BudgetCard key={l.categoryId} line={l} subLines={subLines.get(l.categoryId) ?? []} month={month} clock={clock} onEdit={setEditing} />
+                    <BudgetCard key={l.categoryId} line={l} subLines={subLines.get(l.categoryId) ?? []} month={month} startDay={sd} clock={clock} onEdit={setEditing} />
                   ))
                 )}
               </div>

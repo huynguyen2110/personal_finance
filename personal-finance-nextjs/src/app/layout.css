@@ -9,14 +9,15 @@
   --core-sidebar-width: 260px;
   --core-sidebar-collapsed: 72px;
   --core-header-height: 70px;
-  --core-bg: #F8FAFC;
+  /* Theo bản thiết kế: nền surface #faf8ff, viền outline-variant, chữ on-surface-variant / outline */
+  --core-bg: #faf8ff;
   --core-primary: var(--color-primary);
   --core-sidebar-bg: #ffffff;
-  --core-border: #E2E8F0;
-  --core-border-strong: #CBD5E1;
-  --core-text-secondary: #475569;
-  --core-text-muted: #94A3B8;
-  --core-hover-bg: #F1F5F9;
+  --core-border: #dae2fd;
+  --core-border-strong: #bdc9c6;
+  --core-text-secondary: #3e4947;
+  --core-text-muted: #6e7977;
+  --core-hover-bg: #f2f3ff;
   --core-shadow-1: 0 1px 2px 0 rgba(15, 23, 42, 0.04), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
   --core-shadow-2: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 12px 24px -4px rgba(15, 23, 42, 0.08);
 }

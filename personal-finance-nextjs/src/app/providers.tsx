@@ -15,7 +15,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           style: {
             background: '#FFFFFF',
             color: '#1E293B',
-            border: '1px solid #E2E8F0',
+            border: '1px solid #dae2fd',
             borderRadius: '12px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
           },

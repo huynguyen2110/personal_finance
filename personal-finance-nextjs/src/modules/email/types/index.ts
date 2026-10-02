@@ -5,6 +5,9 @@ export interface EmailPollSummary {
   merged: number;
   duplicates: number;
   skipped: number;
+  // Giao dịch trước "ngày bắt đầu lấy dữ liệu" → bỏ qua (có từ bản sau, bản ghi cũ có thể thiếu)
+  beforeStart?: number;
+  startDate?: string | null;
   error?: string;
 }
 
@@ -20,8 +23,17 @@ export interface EmailProviderInfo {
 export interface EmailStatus {
   configured: boolean;
   pollMinutes: number;
+  // Ngày bắt đầu lấy dữ liệu từ email (Cài đặt); null = không giới hạn
+  startDate: string | null;
   lastRun: EmailPollSummary | null;
   providers: EmailProviderInfo[];
+}
+
+// Số giao dịch email có ngày trước ngày bắt đầu (để quyết định xóa)
+export interface EmailBeforeStart {
+  startDate: string | null;
+  count: number;
+  total: number;
 }
 
 export interface EmailPreview {

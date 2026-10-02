@@ -29,7 +29,7 @@ interface Props {
 // Chip icon danh mục: nền nhạt theo màu danh mục, icon cùng màu.
 export default function CategoryIcon({ icon, color, size = 'md' }: Props) {
   const Icon = (icon && CATEGORY_ICONS[icon]) || CircleHelp;
-  const c = color || '#94A3B8';
+  const c = color || '#6e7977';
   const box = size === 'sm' ? 'w-6 h-6 rounded-md' : size === 'lg' ? 'w-10 h-10 rounded-xl' : 'w-8 h-8 rounded-lg';
   const ic = size === 'sm' ? 'w-3.5 h-3.5' : size === 'lg' ? 'w-5 h-5' : 'w-4 h-4';
   return (

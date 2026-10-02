@@ -24,6 +24,7 @@ import { invalidateFinanceData } from '@/lib/query-client';
 import { normalizeText } from '@/lib/text';
 import { formatCompactVND, formatVND } from '@/lib/money';
 import { currentMonthVN, formatMonthLabel } from '@/lib/dates';
+import { useMonthStartDay } from '@/modules/settings/lib';
 import type { CategoryKind } from '@/types/common';
 import { useAccounts } from '@/modules/accounts/lib';
 import { useBudgetPage } from '@/modules/budgets/lib';
@@ -55,7 +56,8 @@ interface Rollup {
 export default function CategoryTreeTab({ categories, rules }: Props) {
   const qc = useQueryClient();
   const reload = () => invalidateFinanceData(qc);
-  const month = currentMonthVN();
+  // Tháng tài chính hiện tại (theo ngày bắt đầu tháng trong cài đặt)
+  const month = currentMonthVN(useMonthStartDay());
   const { data: budget } = useBudgetPage(month);
   const { data: categoryGroups = [] } = useCategoryGroups();
   const { data: accounts = [] } = useAccounts();

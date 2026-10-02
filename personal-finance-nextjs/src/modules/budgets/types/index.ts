@@ -50,6 +50,9 @@ export interface AccountBudgetLine {
 
 export interface BudgetPageData {
   month: string;
+  // Khoảng ngày thực của tháng theo cài đặt ngày bắt đầu tháng (VD ngày lương 5: 05/10 → 04/11)
+  range: { from: string; to: string };
+  monthStartDay: number;
   lines: BudgetLine[];
   income: number;
   expense: number;

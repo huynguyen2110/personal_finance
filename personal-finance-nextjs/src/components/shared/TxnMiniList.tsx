@@ -20,7 +20,7 @@ export default function TxnMiniList({ items, empty = 'Chưa có giao dịch' }: 
             </p>
           </div>
           <span
-            className={`text-sm font-semibold tabular whitespace-nowrap ${t.direction === 'IN' ? 'text-[#1d4ed8]' : 'text-text'}`}
+            className={`text-sm font-semibold tabular whitespace-nowrap ${t.direction === 'IN' ? 'text-[#005c55]' : 'text-text'}`}
           >
             {t.direction === 'IN' ? '+' : '−'}
             {formatVND(t.amount)}

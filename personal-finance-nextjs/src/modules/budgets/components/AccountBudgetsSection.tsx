@@ -68,7 +68,7 @@ function GroupRow({ g, lines, onEditCategory, onQuickEdit }: { g: GroupBudgetLin
       </div>
       {g.budget !== null && (
         <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden" aria-hidden>
-          <div className="h-full rounded-full" style={{ width: `${Math.min(100, ratio * 100)}%`, backgroundColor: over ? '#F43F5E' : g.color }} />
+          <div className="h-full rounded-full" style={{ width: `${Math.min(100, ratio * 100)}%`, backgroundColor: over ? '#cc1e44' : g.color }} />
         </div>
       )}
     </li>
@@ -150,7 +150,7 @@ export default function AccountBudgetsSection({ accounts, unassignedGroups, cloc
 
               {a.planned > 0 ? (
                 <div className="flex flex-col gap-1">
-                  <ProgressTrack percent={used} fill={used > 1 ? '#F43F5E' : '#0F766E'} timePct={clock.phase === 'current' ? clock.timePct : null} height="h-2" label={`Đã chi của ${a.name}`} />
+                  <ProgressTrack percent={used} fill={used > 1 ? '#cc1e44' : '#0F766E'} timePct={clock.phase === 'current' ? clock.timePct : null} height="h-2" label={`Đã chi của ${a.name}`} />
                   <div className="flex justify-between text-[11px] text-slate-600 fin-num">
                     <span>
                       Đã chi <b className={used > 1 ? 'text-rose-600' : 'text-slate-900'}>{pct(used)}</b> ({formatCompactVND(a.spent)} ₫)

@@ -51,7 +51,8 @@ export interface GoalDTO {
   monthlyInterest: number;
   interestToFinish: number;
 
-  thisMonth: { deposited: number; due: number; dueNow: boolean };
+  // planDate: ngày nạp kế hoạch trong tháng (tài chính) này, null nếu không đặt ngày
+  thisMonth: { deposited: number; due: number; dueNow: boolean; planDate: string | null };
   milestone: { amount: number; label: string; reached: boolean } | null;
   coverMonths: number | null; // quỹ khẩn cấp: đủ chi tiêu bao nhiêu tháng
 }
@@ -84,6 +85,9 @@ export interface GoalsOverviewData {
 
 export interface GoalsPageData {
   month: string;
+  // Khoảng ngày của tháng (tài chính) hiện tại theo cài đặt ngày bắt đầu tháng
+  range: { from: string; to: string };
+  monthStartDay: number;
   today: string;
   goals: GoalDTO[];
   avgMonthlyExpense: number | null;

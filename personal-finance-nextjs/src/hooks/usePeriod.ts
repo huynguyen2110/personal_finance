@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { resolvePeriod, type Period, type PeriodPreset } from '@/lib/period';
+import { useMonthStartDay } from '@/modules/settings/lib';
 
 const KEY = 'pf.period';
 
@@ -36,7 +37,9 @@ export function usePeriod(defaultPreset: PeriodPreset = 'this_month') {
     }
   }, [state, ready]);
 
-  const period = useMemo(() => resolvePeriod(state.preset, state.custom), [state.preset, state.custom]);
+  // "Tháng này / tháng trước…" theo tháng tài chính (ngày bắt đầu tháng trong cài đặt)
+  const startDay = useMonthStartDay();
+  const period = useMemo(() => resolvePeriod(state.preset, state.custom, startDay), [state.preset, state.custom, startDay]);
 
   return {
     ready,

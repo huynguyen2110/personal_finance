@@ -2,6 +2,8 @@ import {
   addDaysStr,
   addMonths,
   daysBetween,
+  DEFAULT_MONTH_START_DAY,
+  monthOfDate,
   monthRange,
   todayVN,
 } from './dates';
@@ -30,24 +32,26 @@ export interface Period {
   to: string;
 }
 
-export function resolvePeriod(preset: PeriodPreset, custom?: Period): Period {
+// Kỳ theo tháng tài chính (startDay = ngày bắt đầu tháng, mặc định 1). "Năm nay" bắt đầu từ tháng 1 tài chính.
+export function resolvePeriod(preset: PeriodPreset, custom?: Period, startDay = DEFAULT_MONTH_START_DAY): Period {
   const today = todayVN();
-  const month = today.slice(0, 7);
+  const month = monthOfDate(today, startDay);
+  const startOf = (m: string) => monthRange(m, startDay).from;
   switch (preset) {
     case 'this_month':
-      return { from: `${month}-01`, to: today };
+      return { from: startOf(month), to: today };
     case 'last_month':
-      return monthRange(addMonths(month, -1));
+      return monthRange(addMonths(month, -1), startDay);
     case 'last_3m':
-      return { from: `${addMonths(month, -2)}-01`, to: today };
+      return { from: startOf(addMonths(month, -2)), to: today };
     case 'last_6m':
-      return { from: `${addMonths(month, -5)}-01`, to: today };
+      return { from: startOf(addMonths(month, -5)), to: today };
     case 'last_12m':
-      return { from: `${addMonths(month, -11)}-01`, to: today };
+      return { from: startOf(addMonths(month, -11)), to: today };
     case 'this_year':
-      return { from: `${today.slice(0, 4)}-01-01`, to: today };
+      return { from: startOf(`${month.slice(0, 4)}-01`), to: today };
     case 'custom':
-      return custom ?? { from: `${month}-01`, to: today };
+      return custom ?? { from: startOf(month), to: today };
   }
 }
 
@@ -60,19 +64,18 @@ function shiftDateByMonths(date: string, n: number): string {
 }
 
 // Kỳ liền trước để so sánh:
-// - kỳ bắt đầu từ ngày 1 → lùi đúng số tháng (VD: 1–15/9 so với 1–15/8)
+// - kỳ bắt đầu đúng ngày đầu tháng (tài chính) → lùi đúng số tháng (VD: 5–15/9 so với 5–15/8)
 // - kỳ tùy chọn khác → lùi bằng số ngày
-export function previousPeriod(p: Period): Period {
-  if (p.from.endsWith('-01')) {
+export function previousPeriod(p: Period, startDay = DEFAULT_MONTH_START_DAY): Period {
+  const fromMonth = monthOfDate(p.from, startDay);
+  const toMonth = monthOfDate(p.to, startDay);
+  if (monthRange(fromMonth, startDay).from === p.from) {
     const months =
-      (Number(p.to.slice(0, 4)) - Number(p.from.slice(0, 4))) * 12 +
-      Number(p.to.slice(5, 7)) -
-      Number(p.from.slice(5, 7)) +
-      1;
-    const isFullLastMonth = monthRange(p.to.slice(0, 7)).to === p.to;
+      (Number(toMonth.slice(0, 4)) - Number(fromMonth.slice(0, 4))) * 12 + Number(toMonth.slice(5, 7)) - Number(fromMonth.slice(5, 7)) + 1;
+    const isFullLastMonth = monthRange(toMonth, startDay).to === p.to;
     return {
-      from: shiftDateByMonths(p.from, -months),
-      to: isFullLastMonth ? monthRange(addMonths(p.to.slice(0, 7), -months)).to : shiftDateByMonths(p.to, -months),
+      from: monthRange(addMonths(fromMonth, -months), startDay).from,
+      to: isFullLastMonth ? monthRange(addMonths(toMonth, -months), startDay).to : shiftDateByMonths(p.to, -months),
     };
   }
   const len = daysBetween(p.from, p.to);

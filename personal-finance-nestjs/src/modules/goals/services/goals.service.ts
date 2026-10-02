@@ -4,11 +4,12 @@ import { PrismaService } from '../../../database/prisma.service';
 import {
   addMonths,
   currentMonthVN,
+  monthOfDateVN,
   monthRange,
   todayVN,
-  toVNMonthString,
   VN_OFFSET,
 } from '../../../common/utils/dates.util';
+import { SettingsService } from '../../../services/settings.service';
 import { StatsService } from '../../stats/services/stats.service';
 import type { CreateContributionDto, CreateGoalDto, UpdateGoalDto } from '../dto/goal.dto';
 import {
@@ -69,8 +70,12 @@ export type SpendStatus = 'unspent' | 'partial' | 'spent';
 const progressAmount = (ongoing: boolean, cs: Pick<ContributionRow, 'kind' | 'amount'>[]) =>
   ongoing ? Math.max(0, savedOf(cs) - spentOf(cs)) : savedOf(cs);
 
-function daysInMonth(month: string): number {
-  return Number(monthRange(month).to.slice(8));
+// Ngày nạp kế hoạch (ngày lịch `planDay`) rơi vào đâu trong tháng tài chính `month`:
+// từ ngày bắt đầu tháng trở đi → tháng lịch này; nhỏ hơn → tháng lịch kế tiếp. Kẹp theo độ dài tháng lịch.
+function planDateIn(month: string, planDay: number, startDay: number): string {
+  const calMonth = planDay >= startDay ? month : addMonths(month, 1);
+  const last = Number(monthRange(calMonth).to.slice(8));
+  return `${calMonth}-${String(Math.min(planDay, last)).padStart(2, '0')}`;
 }
 
 @Injectable()
@@ -78,28 +83,32 @@ export class GoalsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stats: StatsService,
+    private readonly settings: SettingsService,
   ) {}
 
   // ─── Trang mục tiêu ───
 
+  // Mọi mốc "tháng" theo tháng tài chính (ngày bắt đầu tháng trong cài đặt, VD ngày lương)
   async getPage() {
-    const month = currentMonthVN();
+    const sd = await this.settings.monthStartDay();
+    const month = currentMonthVN(sd);
     const today = todayVN();
+    const range = monthRange(month, sd);
     const [goals, avgMonthlyExpense, summary, last3] = await Promise.all([
       this.prisma.savingsGoal.findMany({ include: goalInclude, orderBy: { id: 'asc' } }),
-      this.avgMonthlyExpense(month),
-      this.stats.getSummary(monthRange(month)),
+      this.avgMonthlyExpense(month, sd),
+      this.stats.getSummary(range),
       // Tỷ lệ tiết kiệm trên 3 tháng đã trọn vẹn gần nhất
-      this.stats.getSummary({ from: monthRange(addMonths(month, -3)).from, to: monthRange(addMonths(month, -1)).to }),
+      this.stats.getSummary({ from: monthRange(addMonths(month, -3), sd).from, to: monthRange(addMonths(month, -1), sd).to }),
     ]);
 
-    const views = goals.map((g) => this.toView(g, month, today, avgMonthlyExpense));
+    const views = goals.map((g) => this.toView(g, month, today, avgMonthlyExpense, sd));
 
     // Thặng dư tháng này còn chưa phân bổ vào mục tiêu nào.
     // Khoản nạp gắn với giao dịch vẫn đang tính là chi thì đã bị trừ trong "chi", không trừ lần nữa.
     const deposited = goals
       .flatMap((g) => g.contributions)
-      .filter((c) => toVNMonthString(c.date) === month && (!c.transactionId || c.transaction?.excludeFromStats))
+      .filter((c) => monthOfDateVN(c.date, sd) === month && (!c.transactionId || c.transaction?.excludeFromStats))
       .reduce((s, c) => s + netDeposit(c), 0);
     const available = summary.income - summary.expense - deposited;
 
@@ -109,14 +118,16 @@ export class GoalsService {
       .filter((v) => !v.archivedAt && v.status !== 'done' && v.remaining > 0 && v.remaining <= available)
       .sort((a, b) => rank[a.priority] - rank[b.priority] || a.remaining - b.remaining)[0];
 
-    const discipline = this.discipline(goals, month, today);
+    const discipline = this.discipline(goals, month, today, sd);
 
     return {
       month,
+      range,
+      monthStartDay: sd,
       today,
       goals: views,
       avgMonthlyExpense,
-      overview: this.overview(goals, views, month, avgMonthlyExpense, last3.savingsRate, discipline?.ratio ?? null),
+      overview: this.overview(goals, views, month, avgMonthlyExpense, last3.savingsRate, discipline?.ratio ?? null, sd),
       surplus: {
         income: summary.income,
         expense: summary.expense,
@@ -137,11 +148,12 @@ export class GoalsService {
     avgMonthlyExpense: number | null,
     savingsRate: number | null,
     disciplineRatio: number | null,
+    sd: number,
   ) {
     const live = views.filter((v) => !v.archivedAt);
     const liveIds = new Set(live.map((v) => v.id));
     const contributions = goals.filter((g) => liveIds.has(g.id)).flatMap((g) => g.contributions);
-    const savedIn = (m: string) => contributions.filter((c) => toVNMonthString(c.date) === m).reduce((s, c) => s + newSavings(c), 0);
+    const savedIn = (m: string) => contributions.filter((c) => monthOfDateVN(c.date, sd) === m).reduce((s, c) => s + newSavings(c), 0);
     const sum = (xs: typeof live, f: (v: (typeof live)[number]) => number) => xs.reduce((s, v) => s + f(v), 0);
 
     const ongoing = live.filter((v) => v.ongoing);
@@ -199,7 +211,7 @@ export class GoalsService {
     };
   }
 
-  private toView(g: GoalWithRelations, month: string, today: string, avgMonthlyExpense: number | null) {
+  private toView(g: GoalWithRelations, month: string, today: string, avgMonthlyExpense: number | null, sd: number) {
     const target = Number(g.targetAmount);
     const saved = savedOf(g.contributions);
     // Đã tiêu cho mục đích của quỹ, và số tiền thực còn nằm trong quỹ
@@ -214,10 +226,10 @@ export class GoalsService {
     const monthlyPlan = g.monthlyPlan !== null ? Number(g.monthlyPlan) : null;
 
     // Tốc độ nạp thực tế: trung bình các tháng gần nhất kể từ khi tạo mục tiêu
-    const createdMonth = toVNMonthString(g.createdAt);
+    const createdMonth = monthOfDateVN(g.createdAt, sd);
     const paceFrom = createdMonth > addMonths(month, -(PACE_MONTHS - 1)) ? createdMonth : addMonths(month, -(PACE_MONTHS - 1));
     const paceMonths = Math.max(1, monthDiff(paceFrom, month) + 1);
-    const paceNet = g.contributions.filter((c) => toVNMonthString(c.date) >= paceFrom).reduce((s, c) => s + netDeposit(c), 0);
+    const paceNet = g.contributions.filter((c) => monthOfDateVN(c.date, sd) >= paceFrom).reduce((s, c) => s + netDeposit(c), 0);
     const pace = Math.max(0, Math.round(paceNet / paceMonths));
 
     // Dự báo theo kế hoạch nạp nếu có, không thì theo tốc độ thực tế
@@ -228,8 +240,9 @@ export class GoalsService {
     const monthsLeft = g.deadline && g.deadline >= month ? monthsLeftUntil(month, g.deadline) : null;
 
     // Kế hoạch tháng này: đã nạp bao nhiêu, còn thiếu bao nhiêu, đã tới ngày nạp chưa
-    const depositedThisMonth = g.contributions.filter((c) => toVNMonthString(c.date) === month).reduce((s, c) => s + netDeposit(c), 0);
-    const planDay = g.planDay ? Math.min(g.planDay, daysInMonth(month)) : null;
+    const depositedThisMonth = g.contributions.filter((c) => monthOfDateVN(c.date, sd) === month).reduce((s, c) => s + netDeposit(c), 0);
+    // Ngày nạp kế hoạch của tháng (tài chính) này
+    const planDate = g.planDay ? planDateIn(month, g.planDay, sd) : null;
     const due = monthlyPlan && status !== 'done' ? Math.max(0, Math.min(monthlyPlan, remaining) - Math.max(0, depositedThisMonth)) : 0;
 
     // Quỹ khẩn cấp: mốc an toàn 3 tháng chi tiêu, và số tháng chi tiêu đã đủ
@@ -286,7 +299,8 @@ export class GoalsService {
       thisMonth: {
         deposited: depositedThisMonth,
         due,
-        dueNow: due > 0 && (planDay === null || Number(today.slice(8)) >= planDay),
+        planDate,
+        dueNow: due > 0 && (planDate === null || today >= planDate),
       },
       milestone:
         milestoneAmount !== null && milestoneAmount < target
@@ -297,10 +311,11 @@ export class GoalsService {
   }
 
   // Chi tiêu trung bình/tháng của 6 tháng đã qua (chỉ tính tháng có phát sinh chi)
-  private async avgMonthlyExpense(month: string): Promise<number | null> {
+  private async avgMonthlyExpense(month: string, sd: number): Promise<number | null> {
     const points = await this.stats.getMonthly({
-      from: monthRange(addMonths(month, -6)).from,
-      to: monthRange(addMonths(month, -1)).to,
+      from: monthRange(addMonths(month, -6), sd).from,
+      to: monthRange(addMonths(month, -1), sd).to,
+      monthStartDay: sd,
     });
     const withExpense = points.filter((p) => p.expense > 0);
     if (!withExpense.length) return null;
@@ -308,20 +323,21 @@ export class GoalsService {
   }
 
   // Kỷ luật nạp: thực nạp / kế hoạch, trên các mục tiêu có kế hoạch nạp định kỳ, tối đa 3 tháng gần nhất
-  private discipline(goals: GoalWithRelations[], month: string, today: string) {
+  private discipline(goals: GoalWithRelations[], month: string, today: string, sd: number) {
     let planned = 0;
     let actual = 0;
     let goalCount = 0;
     for (const g of goals) {
       if (!g.monthlyPlan || g.monthlyPlan <= 0n || g.archivedAt) continue;
       // Đã đạt trước kỳ chấm thì không cần nạp nữa
-      if (g.completedAt && toVNMonthString(g.completedAt) < addMonths(month, -3)) continue;
-      const planDay = g.planDay ? Math.min(g.planDay, daysInMonth(month)) : daysInMonth(month);
-      const months = disciplineMonths(toVNMonthString(g.createdAt), month, Number(today.slice(8)) >= planDay);
+      if (g.completedAt && monthOfDateVN(g.completedAt, sd) < addMonths(month, -3)) continue;
+      // Chưa có ngày nạp → tính tới hết tháng (tài chính)
+      const planDate = g.planDay ? planDateIn(month, g.planDay, sd) : monthRange(month, sd).to;
+      const months = disciplineMonths(monthOfDateVN(g.createdAt, sd), month, today >= planDate);
       if (!months.length) continue;
       goalCount++;
       planned += Number(g.monthlyPlan) * months.length;
-      actual += g.contributions.filter((c) => months.includes(toVNMonthString(c.date))).reduce((s, c) => s + netDeposit(c), 0);
+      actual += g.contributions.filter((c) => months.includes(monthOfDateVN(c.date, sd))).reduce((s, c) => s + netDeposit(c), 0);
     }
     if (planned <= 0) return null;
     const ratio = Math.max(0, actual / planned);

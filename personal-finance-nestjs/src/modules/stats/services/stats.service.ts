@@ -16,6 +16,10 @@ import type {
 // Prisma lưu DateTime ở UTC → cộng 7 giờ trước khi lấy ngày/tháng.
 const VN_DATE = Prisma.sql`DATE_ADD(t.transactionDate, INTERVAL 7 HOUR)`;
 
+// "Tháng" của một giao dịch theo tháng tài chính: lùi (startDay − 1) ngày rồi lấy YYYY-MM.
+// VD startDay = 5: 05/10 → 01/10 → "2026-10"; 04/11 → 31/10 → "2026-10"; 04/10 → 30/09 → "2026-09".
+const monthExpr = (s: StatsScope) => Prisma.sql`DATE_FORMAT(DATE_SUB(${VN_DATE}, INTERVAL ${(s.monthStartDay ?? 1) - 1} DAY), '%Y-%m')`;
+
 function scopeWhere(s: StatsScope): Prisma.Sql {
   const parts = [
     Prisma.sql`t.excludeFromStats = false`,
@@ -61,7 +65,7 @@ export class StatsService {
 
   async getMonthly(s: StatsScope): Promise<MonthlyPoint[]> {
     const rows = await this.prisma.$queryRaw<{ month: string; direction: 'IN' | 'OUT'; total: bigint }[]>`
-      SELECT DATE_FORMAT(${VN_DATE}, '%Y-%m') AS month, t.direction, CAST(SUM(t.amount) AS SIGNED) AS total
+      SELECT ${monthExpr(s)} AS month, t.direction, CAST(SUM(t.amount) AS SIGNED) AS total
       FROM \`Transaction\` t
       WHERE ${scopeWhere(s)}
       GROUP BY month, t.direction`;
@@ -138,7 +142,7 @@ export class StatsService {
 
   async getCategoryMonthMatrix(s: StatsScope, direction: 'IN' | 'OUT'): Promise<CategoryMonthCell[]> {
     const rows = await this.prisma.$queryRaw<{ categoryId: number | null; month: string; total: bigint }[]>`
-      SELECT t.categoryId, DATE_FORMAT(${VN_DATE}, '%Y-%m') AS month, CAST(SUM(t.amount) AS SIGNED) AS total
+      SELECT t.categoryId, ${monthExpr(s)} AS month, CAST(SUM(t.amount) AS SIGNED) AS total
       FROM \`Transaction\` t
       WHERE ${scopeWhere(s)} AND t.direction = ${direction}
       GROUP BY t.categoryId, month`;
