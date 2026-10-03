@@ -1,6 +1,6 @@
 import type { TransactionDTO } from '@/modules/transactions/types';
 import type { AccountDTO } from '@/modules/accounts/types';
-import type { BudgetLine } from '@/modules/budgets/types';
+import type { BudgetLine, GroupBudgetStatus } from '@/modules/budgets/types';
 
 export interface Summary {
   income: number;
@@ -56,6 +56,7 @@ export interface DashboardData {
     totalSpent: number;
     showOnDailyChart: boolean;
     alerts: BudgetLine[];
+    groupAlerts: GroupBudgetStatus[];
   };
   uncategorizedCount: number;
 }

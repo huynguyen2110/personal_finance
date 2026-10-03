@@ -22,10 +22,17 @@ export class BudgetQueryDto {
   month?: string;
 }
 
+// Hạn mức của một danh mục (categoryId) hoặc của cả một nhóm chi tiêu (groupId) — gửi đúng một trong hai
 export class BudgetItemDto {
+  @ValidateIf((o) => o.groupId === undefined)
   @IsInt()
   @IsPositive()
-  categoryId: number;
+  categoryId?: number;
+
+  @ValidateIf((o) => o.categoryId === undefined)
+  @IsInt()
+  @IsPositive()
+  groupId?: number;
 
   // "YYYY-MM" = chỉ tháng đó; "*" = mặc định mọi tháng
   @IsString()

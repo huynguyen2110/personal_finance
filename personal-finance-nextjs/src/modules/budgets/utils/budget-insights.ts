@@ -52,6 +52,22 @@ export function budgetUnits<T extends TreeLine>(lines: T[]): T[] {
   return lines.filter((l) => own(l) && (l.parentId === null || !own(lines.find((p) => p.categoryId === l.parentId))));
 }
 
+// Tổng hạn mức / đã chi của tháng, không cộng trùng (giống tính toán ở backend):
+// nhóm có hạn mức riêng tính theo nhóm, danh mục cha còn lại có hạn mức tính theo danh mục.
+export function budgetTotals(
+  lines: { categoryId: number; parentId: number | null; amount: number | null; spent: number }[],
+  groups: { categoryIds: number[]; amount: number | null; spent: number }[],
+): { budget: number; spent: number; coveredIds: Set<number> } {
+  const budgetedGroups = groups.filter((g) => g.amount !== null);
+  const coveredIds = new Set(budgetedGroups.flatMap((g) => g.categoryIds));
+  const cats = lines.filter((l) => l.parentId === null && l.amount !== null && !coveredIds.has(l.categoryId));
+  return {
+    budget: budgetedGroups.reduce((s, g) => s + (g.amount ?? 0), 0) + cats.reduce((s, l) => s + (l.amount ?? 0), 0),
+    spent: budgetedGroups.reduce((s, g) => s + g.spent, 0) + cats.reduce((s, l) => s + l.spent, 0),
+    coveredIds,
+  };
+}
+
 export const NEAR_THRESHOLD = 0.8; // từ 80% hạn mức là "sắp chạm" (đồng bộ với cảnh báo ở Tổng quan)
 
 export function budgetState(l: BudgetLineLike): BudgetState {

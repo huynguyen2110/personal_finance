@@ -27,7 +27,9 @@ import { useMonthStartDay } from '@/modules/settings/lib';
 import type { CategoryKind } from '@/types/common';
 import { useAccounts } from '@/modules/accounts/lib';
 import { useBudgetPage } from '@/modules/budgets/lib';
-import type { BudgetLine } from '@/modules/budgets/types';
+import type { BudgetLine, GroupBudgetStatus } from '@/modules/budgets/types';
+import GroupBudgetModal from '@/modules/budgets/components/GroupBudgetModal';
+import { budgetTotals } from '@/modules/budgets/utils/budget-insights';
 import RuleModal from '@/modules/rules/components/RuleModal';
 import { IconBtn } from '@/modules/rules/components/RulesTab';
 import type { RuleDTO } from '@/modules/rules/types';
@@ -91,6 +93,7 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
   const [inspect, setInspect] = useState<Inspect>(null);
   const [deleting, setDeleting] = useState<CategoryDTO | null>(null);
   const [ruleFor, setRuleFor] = useState<number | null>(null);
+  const [editingGroup, setEditingGroup] = useState<GroupBudgetStatus | null>(null);
 
   const rulesByCat = useMemo(() => {
     const m = new Map<number, RuleDTO[]>();
@@ -101,6 +104,9 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
     return m;
   }, [rules]);
   const budgetByCat = useMemo(() => new Map<number, BudgetLine>((budget?.lines ?? []).map((l) => [l.categoryId, l])), [budget]);
+  const groupBudgetById = useMemo(() => new Map((budget?.groups ?? []).map((g) => [g.groupId, g])), [budget]);
+  // Tổng hạn mức tháng của loại chi, không cộng trùng: nhóm có hạn mức riêng tính theo nhóm
+  const expenseBudgetTotal = budget ? budgetTotals(budget.lines, budget.groups ?? []).budget : 0;
 
   const q = normalizeText(search);
   const hit = (c: CategoryDTO) => !q || normalizeText(c.name).includes(q) || (rulesByCat.get(c.id) ?? []).some((r) => normalizeText(r.pattern).includes(q));
@@ -131,13 +137,13 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
 
   const rollup = (n: CategoryNode): Rollup => {
     const all = [n.cat, ...n.children];
-    const lines = all.map((c) => budgetByCat.get(c.id)).filter((l): l is BudgetLine => !!l);
     const own = budgetByCat.get(n.cat.id);
     const childAmounts = n.children.map((c) => budgetByCat.get(c.id)?.amount ?? null).filter((a): a is number => a !== null);
     return {
       txns: all.reduce((s, c) => s + (c._count?.transactions ?? 0), 0),
       rules: all.reduce((s, c) => s + (rulesByCat.get(c.id)?.length ?? 0), 0),
-      spent: lines.reduce((s, l) => s + l.spent, 0),
+      // Số đã chi của dòng cha từ API đã gộp sẵn các con → không cộng con thêm lần nữa
+      spent: own?.spent ?? 0,
       amount: own?.amount ?? (childAmounts.length ? childAmounts.reduce((s, a) => s + a, 0) : null),
     };
   };
@@ -208,7 +214,7 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
         {/* Cột trái: cây danh mục */}
         <div className="xl:col-span-8 flex flex-col gap-4 md:gap-6">
           {groups.map((g) => {
-            const groupAmount = g.nodes.map(rollup).reduce<number | null>((s, r) => (r.amount === null ? s : (s ?? 0) + r.amount), null);
+            const groupAmount = expenseBudgetTotal > 0 ? expenseBudgetTotal : null;
             const monthTotal = g.kind === 'EXPENSE' ? budget?.expense : budget?.income;
             return (
               <div key={g.kind} className="fin-card overflow-hidden">
@@ -271,7 +277,39 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
                               <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Chưa thuộc nhóm nào</span>
                             )}
                           </div>
-                          <span className="fin-label fin-num">{cl.nodes.length} danh mục cha</span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {(() => {
+                              const gb = cl.group && cl.group.kind === 'EXPENSE' ? groupBudgetById.get(cl.group.id) : undefined;
+                              if (!gb) return null;
+                              const over = gb.amount !== null && gb.spent > gb.amount;
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingGroup(gb)}
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold fin-num transition-colors ${
+                                    gb.amount === null
+                                      ? 'text-teal-700 hover:bg-teal-50'
+                                      : over
+                                        ? 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                  }`}
+                                  title="Hạn mức chung cho cả nhóm"
+                                >
+                                  {gb.amount === null ? (
+                                    <>
+                                      <Plus className="w-3 h-3" aria-hidden /> Hạn mức nhóm
+                                    </>
+                                  ) : (
+                                    <>
+                                      Nhóm: {formatVND(gb.spent)} / {formatVND(gb.amount)}
+                                      <Pencil className="w-3 h-3 opacity-60" aria-hidden />
+                                    </>
+                                  )}
+                                </button>
+                              );
+                            })()}
+                            <span className="fin-label fin-num">{cl.nodes.length} danh mục cha</span>
+                          </div>
                         </div>
                       )}
                       {cl.nodes.map((node) => {
@@ -563,6 +601,9 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
         </div>
       </section>
 
+      {editingGroup && budget && (
+        <GroupBudgetModal group={editingGroup} lines={budget.lines} month={month} onClose={() => setEditingGroup(null)} onSaved={reload} />
+      )}
       {ruleFor !== null && <RuleModal rule={null} defaultCategoryId={ruleFor} categories={categories} onClose={() => setRuleFor(null)} onSaved={reload} />}
       <ConfirmModal
         isOpen={!!deleting}

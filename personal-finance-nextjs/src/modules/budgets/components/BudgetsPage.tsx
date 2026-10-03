@@ -19,6 +19,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import AccountBudgetsSection from './AccountBudgetsSection';
 import BudgetCard from './BudgetCard';
 import BudgetEditModal from './BudgetEditModal';
+import GroupBudgetModal from './GroupBudgetModal';
+import GroupBudgetsSection from './GroupBudgetsSection';
 import QuickEditModal from './QuickEditModal';
 import { HistoryCard, RebalanceCard } from './SideCards';
 import { errorMessage } from '@/lib/api-client';
@@ -27,8 +29,8 @@ import { copyBudgetsFromPrevMonth, useBudgetPage } from '../lib';
 import { formatCompactVND, formatVND } from '@/lib/money';
 import { addMonths, currentMonthVN, formatMonthLabel, formatMonthRange } from '@/lib/dates';
 import { useMonthStartDay } from '@/modules/settings/lib';
-import { budgetState, budgetUnits, childrenByParent, monthClock, sortByState, topLevelLines, type BudgetState } from '../utils/budget-insights';
-import type { BudgetLine } from '../types';
+import { budgetState, budgetTotals, budgetUnits, childrenByParent, monthClock, sortByState, topLevelLines, type BudgetState } from '../utils/budget-insights';
+import type { BudgetLine, GroupBudgetStatus } from '../types';
 
 
 type Filter = 'all' | 'alert' | 'safe' | 'none';
@@ -74,6 +76,7 @@ export default function BudgetsPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [editing, setEditing] = useState<BudgetLine | 'new' | null>(null);
   const [quickEdit, setQuickEdit] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<GroupBudgetStatus | null>(null);
   const qc = useQueryClient();
   const reload = useCallback(() => invalidateFinanceData(qc), [qc]);
   const { data, error } = useBudgetPage(month);
@@ -88,13 +91,23 @@ export default function BudgetsPage() {
   const lines = useMemo(() => (data ? sortByState(topLevelLines(data.lines)) : []), [data]);
   const subLines = useMemo(() => childrenByParent(data?.lines ?? []), [data]);
   const budgeted = lines.filter((l) => l.amount !== null);
-  const totalBudget = budgeted.reduce((s, l) => s + (l.amount ?? 0), 0);
-  const spentBudgeted = budgeted.reduce((s, l) => s + l.spent, 0);
+  const groups = useMemo(() => data?.groups ?? [], [data]);
+  const budgetedGroups = groups.filter((g) => g.amount !== null);
+  // Tổng không cộng trùng: nhóm có hạn mức riêng tính theo nhóm, còn lại theo danh mục cha
+  const totals = budgetTotals(lines, groups);
+  const totalBudget = totals.budget;
+  const spentBudgeted = totals.spent;
   const remaining = totalBudget - spentBudgeted;
   const usedPct = totalBudget > 0 ? spentBudgeted / totalBudget : 0;
   const counts = { over: 0, near: 0, ok: 0, unused: 0, none: 0 } as Record<BudgetState, number>;
   for (const l of lines) counts[budgetState(l)]++;
-  const healthy = counts.ok + counts.unused;
+  // Tình trạng theo "đơn vị hạn mức": từng nhóm có hạn mức + từng danh mục cha có hạn mức không nằm trong các nhóm đó
+  const budgetedOutside = budgeted.filter((l) => !totals.coveredIds.has(l.categoryId));
+  const units = [...budgetedGroups, ...budgetedOutside];
+  const unitCounts = { over: 0, near: 0, ok: 0, unused: 0, none: 0 } as Record<BudgetState, number>;
+  for (const u of units) unitCounts[budgetState({ ...u, categoryId: 0 })]++;
+  const healthy = unitCounts.ok + unitCounts.unused;
+  const hasAnyBudget = budgeted.length > 0 || budgetedGroups.length > 0;
   const visible = lines.filter((l) => FILTER_STATES[filter].includes(budgetState(l)));
   const isCurrent = month === currentMonthVN(sd);
 
@@ -173,7 +186,8 @@ export default function BudgetsPage() {
                 </p>
                 <div className="flex items-center justify-between text-xs text-slate-600">
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-teal-700" /> {budgeted.length} danh mục áp dụng
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-700" />{' '}
+                    {[budgetedGroups.length ? `${budgetedGroups.length} nhóm` : '', budgetedOutside.length ? `${budgetedOutside.length} danh mục` : ''].filter(Boolean).join(' · ') || 'Chưa áp dụng'}
                   </span>
                   <span className="font-semibold text-teal-700 fin-num">
                     {data.income > 0 ? `${pct(totalBudget / data.income)} thu nhập` : 'Chưa có thu nhập tháng này'}
@@ -224,22 +238,22 @@ export default function BudgetsPage() {
               <Kpi label="Tình trạng hạn mức" icon={HeartPulse} iconClass="text-rose-500">
                 <div className="flex items-baseline gap-2">
                   <span className="text-[28px] leading-9 font-bold tracking-[-0.02em] text-slate-900 fin-num">{healthy}</span>
-                  <span className="text-base font-semibold text-slate-500 fin-num">/{budgeted.length} an toàn</span>
-                  {counts.over > 0 && (
+                  <span className="text-base font-semibold text-slate-500 fin-num">/{units.length} an toàn</span>
+                  {unitCounts.over > 0 && (
                     <span className="ml-auto px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-600 text-xs font-semibold">
-                      {counts.over} vượt mức
+                      {unitCounts.over} vượt mức
                     </span>
                   )}
                 </div>
-                {budgeted.length > 0 ? (
+                {units.length > 0 ? (
                   <div className="flex items-center gap-2">
                     <div className="flex flex-1 h-1.5 gap-0.5 rounded-full overflow-hidden" aria-hidden>
-                      {counts.over > 0 && <span className="bg-rose-500" style={{ flex: counts.over }} />}
-                      {counts.near > 0 && <span className="bg-amber-500" style={{ flex: counts.near }} />}
+                      {unitCounts.over > 0 && <span className="bg-rose-500" style={{ flex: unitCounts.over }} />}
+                      {unitCounts.near > 0 && <span className="bg-amber-500" style={{ flex: unitCounts.near }} />}
                       {healthy > 0 && <span className="bg-teal-700" style={{ flex: healthy }} />}
                     </div>
                     <span className="text-[11px] text-slate-500 whitespace-nowrap fin-num">
-                      {counts.over} vượt · {counts.near} sắp chạm
+                      {unitCounts.over} vượt · {unitCounts.near} sắp chạm
                     </span>
                   </div>
                 ) : (
@@ -249,14 +263,14 @@ export default function BudgetsPage() {
             </div>
 
             {/* Chưa có hạn mức nào */}
-            {budgeted.length === 0 && (
+            {!hasAnyBudget && (
               <section className="fin-card p-5 md:p-6 flex flex-col md:flex-row md:items-center gap-4">
                 <span className="w-11 h-11 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
                   <Wallet className="w-6 h-6" aria-hidden />
                 </span>
                 <div className="flex-1">
                   <h2 className="text-[16px] font-semibold text-slate-900">Bắt đầu đặt hạn mức chi tiêu</h2>
-                  <p className="text-xs text-slate-600 mt-0.5">Đặt hạn mức cho từng danh mục, web sẽ theo dõi và cảnh báo khi sắp vượt.</p>
+                  <p className="text-xs text-slate-600 mt-0.5">Đặt hạn mức cho từng danh mục hoặc cả nhóm, web sẽ theo dõi và cảnh báo khi sắp vượt.</p>
                 </div>
                 <div className="flex gap-2">
                   <button type="button" className="fin-btn fin-btn-outline text-teal-700" onClick={() => setQuickEdit(true)}>
@@ -269,13 +283,16 @@ export default function BudgetsPage() {
               </section>
             )}
 
+            {/* Hạn mức chung cho cả nhóm chi tiêu */}
+            <GroupBudgetsSection groups={groups} lines={data.lines} clock={clock} onEdit={setEditingGroup} />
+
             {/* Phân bổ đầu tháng theo tài khoản → nhóm chi tiêu */}
             <AccountBudgetsSection
               accounts={data.accounts ?? []}
               unassignedGroups={data.unassignedGroups ?? []}
               clock={clock}
               lines={data.lines}
-              onEditCategory={(l) => setEditing(l)}
+              onEditGroup={(id) => setEditingGroup(groups.find((g) => g.groupId === id) ?? null)}
               onQuickEdit={() => setQuickEdit(true)}
             />
 
@@ -331,8 +348,9 @@ export default function BudgetsPage() {
       </div>
 
       {editing && data && (
-        <BudgetEditModal lines={data.lines} month={month} line={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={reload} />
+        <BudgetEditModal lines={data.lines} groups={groups} month={month} line={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={reload} />
       )}
+      {editingGroup && data && <GroupBudgetModal group={editingGroup} lines={data.lines} month={month} onClose={() => setEditingGroup(null)} onSaved={reload} />}
       {quickEdit && data && <QuickEditModal lines={data.lines} month={month} onClose={() => setQuickEdit(false)} onSaved={reload} />}
     </div>
   );

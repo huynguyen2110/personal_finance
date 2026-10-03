@@ -14,8 +14,8 @@ interface Props {
   unassignedGroups: GroupBudgetLine[];
   clock: MonthClock;
   lines: BudgetLine[];
-  // Mở sửa hạn mức của một danh mục cha (nhóm chỉ có một danh mục cha)
-  onEditCategory: (line: BudgetLine) => void;
+  // Mở đặt hạn mức cho cả nhóm
+  onEditGroup: (groupId: number) => void;
   // Mở bảng chỉnh sửa nhanh nhiều danh mục
   onQuickEdit: () => void;
 }
@@ -38,11 +38,11 @@ function Avatar({ a }: { a: AccountBudgetLine }) {
   );
 }
 
-function GroupRow({ g, lines, onEditCategory, onQuickEdit }: { g: GroupBudgetLine; lines: BudgetLine[]; onEditCategory: (l: BudgetLine) => void; onQuickEdit: () => void }) {
+function GroupRow({ g, lines, onEditGroup }: { g: GroupBudgetLine; lines: BudgetLine[]; onEditGroup: (groupId: number) => void }) {
   const over = g.budget !== null && g.spent > g.budget;
   const ratio = g.budget && g.budget > 0 ? g.spent / g.budget : 0;
   const parents = g.categoryIds.map((id) => lines.find((l) => l.categoryId === id)).filter((l): l is BudgetLine => !!l);
-  const edit = () => (parents.length === 1 ? onEditCategory(parents[0]) : onQuickEdit());
+  const edit = () => onEditGroup(g.groupId);
   return (
     <li className="flex flex-col gap-1.5 py-2">
       <div className="flex items-center justify-between gap-2">
@@ -76,7 +76,7 @@ function GroupRow({ g, lines, onEditCategory, onQuickEdit }: { g: GroupBudgetLin
 }
 
 // Hạn mức các nhóm đã gán đang "phân bổ" cho từng tài khoản bao nhiêu, và tài khoản đó đã chi bao nhiêu
-export default function AccountBudgetsSection({ accounts, unassignedGroups, clock, lines, onEditCategory, onQuickEdit }: Props) {
+export default function AccountBudgetsSection({ accounts, unassignedGroups, clock, lines, onEditGroup, onQuickEdit }: Props) {
   const totalPlanned = accounts.reduce((s, a) => s + a.planned, 0);
   const totalSpent = accounts.reduce((s, a) => s + a.spent, 0);
   const withGroups = accounts.filter((a) => a.groups.length > 0);
@@ -165,7 +165,7 @@ export default function AccountBudgetsSection({ accounts, unassignedGroups, cloc
 
               <ul className="divide-y divide-slate-100 -my-1">
                 {a.groups.map((g) => (
-                  <GroupRow key={g.groupId} g={g} lines={lines} onEditCategory={onEditCategory} onQuickEdit={onQuickEdit} />
+                  <GroupRow key={g.groupId} g={g} lines={lines} onEditGroup={onEditGroup} />
                 ))}
                 {a.spentOutside > 0 && (
                   <li className="flex items-center justify-between gap-2 py-2 text-xs text-slate-500">
@@ -196,7 +196,7 @@ export default function AccountBudgetsSection({ accounts, unassignedGroups, cloc
             </div>
             <ul className="divide-y divide-slate-200/70 -my-1">
               {unassignedGroups.map((g) => (
-                <GroupRow key={g.groupId} g={g} lines={lines} onEditCategory={onEditCategory} onQuickEdit={onQuickEdit} />
+                <GroupRow key={g.groupId} g={g} lines={lines} onEditGroup={onEditGroup} />
               ))}
             </ul>
           </div>
