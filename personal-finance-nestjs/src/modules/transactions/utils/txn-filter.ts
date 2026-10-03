@@ -45,16 +45,11 @@ export function buildTxnWhere(sp: URLSearchParams): Prisma.TransactionWhereInput
 
   const q = sp.get('q')?.trim();
   if (q) {
-    // MySQL collation utf8mb4_unicode_ci đã không phân biệt hoa thường;
-    // tìm thêm bản bỏ dấu để khớp nội dung CK thường không dấu.
+    // PostgreSQL phân biệt hoa thường → mode insensitive; tìm thêm bản bỏ dấu để khớp nội dung CK thường không dấu.
     const plain = normalizeText(q);
+    const ci = (v: string) => ({ contains: v, mode: 'insensitive' as const });
     and.push({
-      OR: [
-        { content: { contains: q } },
-        { content: { contains: plain } },
-        { note: { contains: q } },
-        { referenceCode: { contains: q } },
-      ],
+      OR: [{ content: ci(q) }, { content: ci(plain) }, { note: ci(q) }, { referenceCode: ci(q) }],
     });
   }
 

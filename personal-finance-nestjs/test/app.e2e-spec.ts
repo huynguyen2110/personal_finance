@@ -1,4 +1,4 @@
-// Kiểm tra toàn bộ API với DB thật (MySQL local), chỉ ĐỌC dữ liệu tài chính
+// Kiểm tra toàn bộ API với DB thật (PostgreSQL local), chỉ ĐỌC dữ liệu tài chính
 // (riêng mục tiêu tiết kiệm: tạo một mục tiêu tạm rồi xóa ngay, không gắn giao dịch nào).
 // Tạo một user tạm với mật khẩu ngẫu nhiên → không cần biết mật khẩu admin; xóa user khi xong.
 //   npm run test:e2e
