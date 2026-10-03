@@ -32,5 +32,5 @@ export function bankBrand(name: string | null | undefined): BankBrand {
       .slice(0, 3)
       .map((w) => w[0]?.toUpperCase() ?? '')
       .join('') || 'NH';
-  return { short, color: '#475569' };
+  return { short, color: '#3e4947' };
 }

@@ -19,7 +19,7 @@ export function BudgetBar({ percent }: { percent: number | null }) {
       aria-valuemin={0}
       aria-valuemax={100}
     >
-      <div className="h-full rounded-full" style={{ width: `${width}%`, backgroundColor: level?.color ?? '#cbd5e1' }} />
+      <div className="h-full rounded-full" style={{ width: `${width}%`, backgroundColor: level?.color ?? '#bdc9c6' }} />
     </div>
   );
 }

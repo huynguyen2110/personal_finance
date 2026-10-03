@@ -2,16 +2,16 @@
 
 import { formatVND } from '@/lib/money';
 
-// Bảng màu dataviz (light). Thu = slot 1, Chi = slot 2; kỳ so sánh dùng màu muted.
+// Bảng màu dataviz theo bản thiết kế: thu = primary (teal), chi = tertiary (đỏ); kỳ so sánh dùng màu muted.
 export const CHART = {
-  income: '#2a78d6',
-  expense: '#eb6834',
-  muted: '#b5b3ab',
-  mutedInk: '#898781',
-  grid: '#e1e0d9',
-  axis: '#c3c2b7',
-  ink: '#0b0b0b',
-  inkSecondary: '#52514e',
+  income: '#0f766e',
+  expense: '#cc1e44',
+  muted: '#bdc9c6',
+  mutedInk: '#6e7977',
+  grid: '#e2e7ff',
+  axis: '#bdc9c6',
+  ink: '#131b2e',
+  inkSecondary: '#3e4947',
   surface: '#ffffff',
 };
 

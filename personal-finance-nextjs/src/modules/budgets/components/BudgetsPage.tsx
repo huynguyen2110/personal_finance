@@ -6,30 +6,27 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
-  Gauge,
   HeartPulse,
-  Info,
   PiggyBank,
   Plus,
   ShoppingBag,
   SquarePen,
-  TrendingDown,
-  TrendingUp,
   Wallet,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import DatePicker from '@/components/shared/DatePicker';
 import { useQueryClient } from '@tanstack/react-query';
 import AccountBudgetsSection from './AccountBudgetsSection';
-import BudgetCard, { ProgressTrack } from './BudgetCard';
+import BudgetCard from './BudgetCard';
 import BudgetEditModal from './BudgetEditModal';
 import QuickEditModal from './QuickEditModal';
-import { HistoryCard, HowItWorksCard, RebalanceCard } from './SideCards';
+import { HistoryCard, RebalanceCard } from './SideCards';
 import { errorMessage } from '@/lib/api-client';
 import { invalidateFinanceData } from '@/lib/query-client';
 import { copyBudgetsFromPrevMonth, useBudgetPage } from '../lib';
 import { formatCompactVND, formatVND } from '@/lib/money';
-import { addMonths, currentMonthVN, formatMonthLabel } from '@/lib/dates';
+import { addMonths, currentMonthVN, formatMonthLabel, formatMonthRange } from '@/lib/dates';
+import { useMonthStartDay } from '@/modules/settings/lib';
 import { budgetState, budgetUnits, childrenByParent, monthClock, sortByState, topLevelLines, type BudgetState } from '../utils/budget-insights';
 import type { BudgetLine } from '../types';
 
@@ -69,7 +66,11 @@ function Kpi({
 }
 
 export default function BudgetsPage() {
-  const [month, setMonth] = useState(currentMonthVN);
+  // Tháng tài chính (ngày bắt đầu tháng trong cài đặt, VD ngày lương 5: "T10" = 05/10 → 04/11); chưa chọn thì là tháng hiện tại
+  const sd = useMonthStartDay();
+  const [monthOverride, setMonthOverride] = useState<string | null>(null);
+  const month = monthOverride ?? currentMonthVN(sd);
+  const setMonth = (next: string | ((prev: string) => string)) => setMonthOverride(typeof next === 'function' ? next(month) : next);
   const [filter, setFilter] = useState<Filter>('all');
   const [editing, setEditing] = useState<BudgetLine | 'new' | null>(null);
   const [quickEdit, setQuickEdit] = useState(false);
@@ -82,7 +83,7 @@ export default function BudgetsPage() {
     if (error) toast.error(errorMessage(error));
   }, [error]);
 
-  const clock = useMemo(() => monthClock(month), [month]);
+  const clock = useMemo(() => monthClock(month, sd), [month, sd]);
   // Hiển thị theo dòng cấp cao nhất (danh mục cha đã gộp số liệu các con); con nằm trong thẻ của cha
   const lines = useMemo(() => (data ? sortByState(topLevelLines(data.lines)) : []), [data]);
   const subLines = useMemo(() => childrenByParent(data?.lines ?? []), [data]);
@@ -95,16 +96,9 @@ export default function BudgetsPage() {
   for (const l of lines) counts[budgetState(l)]++;
   const healthy = counts.ok + counts.unused;
   const visible = lines.filter((l) => FILTER_STATES[filter].includes(budgetState(l)));
-  const isCurrent = month === currentMonthVN();
+  const isCurrent = month === currentMonthVN(sd);
 
-  // Danh mục kéo nhịp chi nhanh nhất (chi vượt phần "đáng lẽ" theo thời gian nhiều nhất)
-  const fastest =
-    clock.phase === 'current'
-      ? budgeted
-          .map((l) => ({ l, ahead: l.spent - (l.amount ?? 0) * clock.timePct }))
-          .filter((x) => x.ahead > 0)
-          .sort((a, b) => b.ahead - a.ahead)[0]
-      : undefined;
+  // Chênh lệch giữa % đã chi và % thời gian đã qua (dương = tiêu nhanh hơn nhịp tháng)
   const paceDiff = usedPct - clock.timePct;
 
   async function copyPrev() {
@@ -133,6 +127,11 @@ export default function BudgetsPage() {
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <DatePicker mode="month" variant="ghost" ariaLabel="Chọn tháng" value={month} onChange={(v) => v && setMonth(v)} className="text-sm" />
+              {sd > 1 && (
+                <span className="hidden md:inline px-1.5 text-[11px] text-slate-500 fin-num whitespace-nowrap" title={`Tháng tính từ ngày ${sd} (đổi ở Cài đặt)`}>
+                  {formatMonthRange(month, sd)}
+                </span>
+              )}
               <button type="button" className="p-1.5 rounded-md text-slate-600 hover:bg-slate-100" onClick={() => setMonth((m) => addMonths(m, 1))} aria-label="Tháng sau">
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -140,7 +139,7 @@ export default function BudgetsPage() {
             {isCurrent ? (
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">Kỳ hiện tại</span>
             ) : (
-              <button type="button" className="fin-btn fin-btn-ghost fin-btn-sm" onClick={() => setMonth(currentMonthVN())}>
+              <button type="button" className="fin-btn fin-btn-ghost fin-btn-sm" onClick={() => setMonthOverride(null)}>
                 Về tháng này
               </button>
             )}
@@ -257,10 +256,7 @@ export default function BudgetsPage() {
                 </span>
                 <div className="flex-1">
                   <h2 className="text-[16px] font-semibold text-slate-900">Bắt đầu đặt hạn mức chi tiêu</h2>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    Đặt hạn mức <b>mặc định hàng tháng</b> cho từng danh mục — web tự áp dụng cho mọi tháng, theo dõi nhịp chi và cảnh
-                    báo khi chạm 80%. Mức chi tháng trước của mỗi danh mục được gợi ý sẵn khi đặt.
-                  </p>
+                  <p className="text-xs text-slate-600 mt-0.5">Đặt hạn mức cho từng danh mục, web sẽ theo dõi và cảnh báo khi sắp vượt.</p>
                 </div>
                 <div className="flex gap-2">
                   <button type="button" className="fin-btn fin-btn-outline text-teal-700" onClick={() => setQuickEdit(true)}>
@@ -283,75 +279,6 @@ export default function BudgetsPage() {
               onQuickEdit={() => setQuickEdit(true)}
             />
 
-            {/* Nhịp chi so với thời gian */}
-            {budgeted.length > 0 && clock.phase !== 'future' && (
-              <section className="fin-card p-4 md:p-6 flex flex-col gap-3.5">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-teal-700">
-                      <Gauge className="w-5 h-5" aria-hidden />
-                    </span>
-                    <div>
-                      <h2 className="text-[16px] leading-6 font-semibold text-slate-900">Tiến độ chi tiêu so với nhịp thời gian</h2>
-                      <p className="text-xs text-slate-500 fin-num">
-                        {clock.phase === 'current'
-                          ? `Hôm nay là ngày ${clock.elapsed}/${clock.daysInMonth} (đã qua ${pct(clock.timePct)} tháng)`
-                          : `${formatMonthLabel(month)} đã kết thúc`}
-                      </p>
-                    </div>
-                  </div>
-                  {clock.phase === 'current' &&
-                    (paceDiff > 0.02 ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 text-xs font-semibold self-start fin-num">
-                        <TrendingUp className="w-4 h-4" aria-hidden /> Tiêu nhanh hơn thời gian +{pct(paceDiff)}
-                      </span>
-                    ) : paceDiff < -0.02 ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold self-start fin-num">
-                        <TrendingDown className="w-4 h-4" aria-hidden /> Chậm hơn thời gian {pct(-paceDiff)}
-                      </span>
-                    ) : (
-                      <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold self-start">Đúng nhịp</span>
-                    ))}
-                </div>
-
-                <ProgressTrack
-                  percent={usedPct}
-                  fill={usedPct > 1 ? '#F43F5E' : '#0F766E'}
-                  timePct={clock.phase === 'current' ? clock.timePct : null}
-                  height="h-3"
-                  label="Tỷ lệ đã chi trên tổng ngân sách"
-                />
-                <div className="flex flex-wrap justify-between gap-2 text-xs text-slate-600 fin-num">
-                  <span className="flex items-center gap-2">
-                    <span className="inline-block w-3 h-2 rounded bg-teal-700" />
-                    Đã chi: <b className="text-slate-900">{pct(usedPct)} ({formatCompactVND(spentBudgeted)} ₫)</b>
-                  </span>
-                  {clock.phase === 'current' && (
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-0.5 h-3 bg-slate-900" /> Mốc ngày {clock.elapsed} ({pct(clock.timePct)})
-                    </span>
-                  )}
-                  <span>
-                    {remaining >= 0 ? 'Còn lại' : 'Vượt'}:{' '}
-                    <b className={remaining >= 0 ? 'text-teal-700' : 'text-rose-600'}>
-                      {formatCompactVND(Math.abs(remaining))} ₫{clock.phase === 'current' ? ` (${clock.daysLeft} ngày)` : ''}
-                    </b>
-                  </span>
-                </div>
-
-                {fastest && paceDiff > 0.02 && (
-                  <div className="p-2.5 rounded-lg bg-slate-50 flex items-start gap-2.5 text-xs text-slate-600">
-                    <Info className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" aria-hidden />
-                    <span>
-                      <b className="text-slate-900">Cảnh báo nhịp chi:</b> danh mục kéo nhịp nhanh nhất là{' '}
-                      <b className="text-slate-900">{fastest.l.name}</b> — đã chi nhiều hơn mức “đáng lẽ” theo thời gian{' '}
-                      <b className="fin-num">{formatVND(Math.round(fastest.ahead))}</b>. Nên ưu tiên kiểm soát danh mục này trong{' '}
-                      {clock.daysLeft} ngày còn lại.
-                    </span>
-                  </div>
-                )}
-              </section>
-            )}
 
             {/* Danh sách + cột phải */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 items-start">
@@ -389,7 +316,7 @@ export default function BudgetsPage() {
                   <div className="fin-card p-8 text-center text-sm text-slate-500">Không có danh mục nào trong nhóm này</div>
                 ) : (
                   visible.map((l) => (
-                    <BudgetCard key={l.categoryId} line={l} subLines={subLines.get(l.categoryId) ?? []} month={month} clock={clock} onEdit={setEditing} />
+                    <BudgetCard key={l.categoryId} line={l} subLines={subLines.get(l.categoryId) ?? []} month={month} startDay={sd} clock={clock} onEdit={setEditing} />
                   ))
                 )}
               </div>
@@ -397,7 +324,6 @@ export default function BudgetsPage() {
               <div className="lg:col-span-4 flex flex-col gap-4">
                 <RebalanceCard lines={budgetUnits(data.lines)} month={month} clock={clock} onApplied={reload} />
                 <HistoryCard history={data.history} month={month} />
-                <HowItWorksCard />
               </div>
             </div>
           </>

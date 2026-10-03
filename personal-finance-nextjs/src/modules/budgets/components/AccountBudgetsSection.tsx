@@ -68,7 +68,7 @@ function GroupRow({ g, lines, onEditCategory, onQuickEdit }: { g: GroupBudgetLin
       </div>
       {g.budget !== null && (
         <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden" aria-hidden>
-          <div className="h-full rounded-full" style={{ width: `${Math.min(100, ratio * 100)}%`, backgroundColor: over ? '#F43F5E' : g.color }} />
+          <div className="h-full rounded-full" style={{ width: `${Math.min(100, ratio * 100)}%`, backgroundColor: over ? '#cc1e44' : g.color }} />
         </div>
       )}
     </li>
@@ -112,7 +112,6 @@ export default function AccountBudgetsSection({ accounts, unassignedGroups, cloc
           </span>
           <div>
             <h2 className="text-[16px] leading-6 font-semibold text-slate-900">Phân bổ theo tài khoản</h2>
-            <p className="text-xs text-slate-500">Hạn mức các nhóm chi tiêu đã gán cho mỗi tài khoản, và tài khoản đó đã chi thực tế bao nhiêu trong tháng.</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 fin-num">
@@ -150,7 +149,7 @@ export default function AccountBudgetsSection({ accounts, unassignedGroups, cloc
 
               {a.planned > 0 ? (
                 <div className="flex flex-col gap-1">
-                  <ProgressTrack percent={used} fill={used > 1 ? '#F43F5E' : '#0F766E'} timePct={clock.phase === 'current' ? clock.timePct : null} height="h-2" label={`Đã chi của ${a.name}`} />
+                  <ProgressTrack percent={used} fill={used > 1 ? '#cc1e44' : '#0F766E'} timePct={clock.phase === 'current' ? clock.timePct : null} height="h-2" label={`Đã chi của ${a.name}`} />
                   <div className="flex justify-between text-[11px] text-slate-600 fin-num">
                     <span>
                       Đã chi <b className={used > 1 ? 'text-rose-600' : 'text-slate-900'}>{pct(used)}</b> ({formatCompactVND(a.spent)} ₫)
@@ -161,7 +160,7 @@ export default function AccountBudgetsSection({ accounts, unassignedGroups, cloc
                   </div>
                 </div>
               ) : (
-                <p className="text-[11px] text-slate-500 fin-num">Đã chi {formatCompactVND(a.spent)} ₫. Đặt hạn mức cho danh mục trong nhóm để theo dõi tiến độ.</p>
+                <p className="text-[11px] text-slate-500 fin-num">Đã chi {formatCompactVND(a.spent)} ₫ · chưa đặt hạn mức</p>
               )}
 
               <ul className="divide-y divide-slate-100 -my-1">

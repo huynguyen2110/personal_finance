@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import { startOfVNDay } from '../../../common/utils/dates.util';
 import { isUniqueViolation } from '../../../common/utils/prisma-errors.util';
 import { CategorizeService } from '../../rules/services/categorize.service';
 import type { CategorizeContext } from '../../rules/services/categorize.service';
@@ -37,6 +38,25 @@ export class IngestEmailService {
       where: { id: accountId, OR: [{ bankBalanceAt: null }, { bankBalanceAt: { lte: p.transactionDate } }] },
       data: { bankBalance: BigInt(p.balanceAfter), bankBalanceAt: p.transactionDate },
     });
+  }
+
+  // Giao dịch nguồn EMAIL có ngày trước "ngày bắt đầu lấy dữ liệu" (dữ liệu các tháng cũ không đầy đủ)
+  private beforeStartWhere(startDate: string): Prisma.TransactionWhereInput {
+    return { source: 'EMAIL', transactionDate: { lt: startOfVNDay(startDate) } };
+  }
+
+  async countBeforeStart(startDate: string): Promise<{ count: number; total: number }> {
+    const [count, total] = await Promise.all([
+      this.prisma.transaction.count({ where: this.beforeStartWhere(startDate) }),
+      this.prisma.transaction.count({ where: { source: 'EMAIL' } }),
+    ]);
+    return { count, total };
+  }
+
+  // Xóa giao dịch email trước ngày bắt đầu. Khoản nạp quỹ gắn với các giao dịch này được giữ lại (chỉ mất liên kết).
+  async purgeBeforeStart(startDate: string): Promise<{ deleted: number }> {
+    const r = await this.prisma.transaction.deleteMany({ where: this.beforeStartWhere(startDate) });
+    return { deleted: r.count };
   }
 
   // Lưu một giao dịch đọc từ email ngân hàng. Idempotent theo externalId (mã giao dịch của ngân hàng).

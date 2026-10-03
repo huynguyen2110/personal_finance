@@ -52,11 +52,31 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((startOfVNDay(to).getTime() - startOfVNDay(from).getTime()) / 86400000) + 1;
 }
 
-// "YYYY-MM" → { from: "YYYY-MM-01", to: "YYYY-MM-<last>" }
-export function monthRange(month: string): { from: string; to: string } {
+// ─── Tháng tài chính ───
+// Người dùng có thể đặt "ngày bắt đầu tháng" (VD ngày nhận lương 5): tháng "2026-10" khi đó = 05/10 → 04/11.
+// Mọi hàm nhận `startDay` mặc định 1 = tháng lịch thông thường.
+export const MIN_MONTH_START_DAY = 1;
+export const MAX_MONTH_START_DAY = 28;
+export const DEFAULT_MONTH_START_DAY = 1;
+
+// "YYYY-MM" → khoảng ngày của tháng (lịch: 01 → cuối tháng; tài chính: startDay → ngày trước startDay tháng sau)
+export function monthRange(month: string, startDay = DEFAULT_MONTH_START_DAY): { from: string; to: string } {
   const [y, m] = month.split('-').map(Number);
-  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  return { from: `${month}-01`, to: `${month}-${pad(last)}` };
+  if (startDay <= 1) {
+    const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return { from: `${month}-01`, to: `${month}-${pad(last)}` };
+  }
+  return { from: `${month}-${pad(startDay)}`, to: addDaysStr(`${addMonths(month, 1)}-${pad(startDay)}`, -1) };
+}
+
+// Ngày "YYYY-MM-DD" thuộc tháng (tài chính) nào: trước ngày bắt đầu → tính vào tháng trước
+export function monthOfDate(date: string, startDay = DEFAULT_MONTH_START_DAY): string {
+  const month = date.slice(0, 7);
+  return Number(date.slice(8, 10)) < startDay ? addMonths(month, -1) : month;
+}
+
+export function monthOfDateVN(d: Date, startDay = DEFAULT_MONTH_START_DAY): string {
+  return monthOfDate(toVNDateString(d), startDay);
 }
 
 export function addMonths(month: string, delta: number): string {
@@ -80,8 +100,9 @@ export function todayVN(): string {
   return toVNDateString(new Date());
 }
 
-export function currentMonthVN(): string {
-  return toVNMonthString(new Date());
+// Tháng (tài chính) hiện tại
+export function currentMonthVN(startDay = DEFAULT_MONTH_START_DAY): string {
+  return monthOfDate(todayVN(), startDay);
 }
 
 export function isValidDateStr(s: string | null | undefined): s is string {

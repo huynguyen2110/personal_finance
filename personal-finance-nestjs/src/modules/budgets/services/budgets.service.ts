@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { addMonths, monthRange } from '../../../common/utils/dates.util';
+import { SettingsService } from '../../../services/settings.service';
 import { StatsService } from '../../stats/services/stats.service';
 import type { BudgetItemDto } from '../dto/budget.dto';
 
@@ -70,10 +71,16 @@ export class BudgetsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stats: StatsService,
+    private readonly settings: SettingsService,
   ) {}
 
+  // Khoảng ngày của một tháng theo ngày bắt đầu tháng trong cài đặt (VD ngày lương 5: 05/10 → 04/11)
+  private async range(month: string) {
+    return monthRange(month, await this.settings.monthStartDay());
+  }
+
   private async expenseByCategory(month: string) {
-    const { from, to } = monthRange(month);
+    const { from, to } = await this.range(month);
     const rows = await this.stats.getByCategory({ from, to }, 'OUT');
     return new Map(rows.map((r) => [r.categoryId, r]));
   }
@@ -141,22 +148,26 @@ export class BudgetsService {
   }
 
   private async monthTotals(month: string): Promise<BudgetMonthTotals> {
-    const { from, to } = monthRange(month);
+    const { from, to } = await this.range(month);
     const [lines, summary] = await Promise.all([this.getBudgetStatus(month), this.stats.getSummary({ from, to })]);
     return this.totals(month, lines, summary.expense);
   }
 
   // Dữ liệu cho trang Ngân sách: từng danh mục + thu nhập tháng + lịch sử 3 tháng gần nhất + ngân sách theo tài khoản.
   async getBudgetPage(month: string) {
-    const { from, to } = monthRange(month);
+    const monthStartDay = await this.settings.monthStartDay();
+    const range = monthRange(month, monthStartDay);
     const [lines, summary, history] = await Promise.all([
       this.getBudgetStatus(month),
-      this.stats.getSummary({ from, to }),
+      this.stats.getSummary(range),
       Promise.all([addMonths(month, -2), addMonths(month, -1)].map((m) => this.monthTotals(m))),
     ]);
     const { accounts, unassignedGroups } = await this.getAccountBudgets(month, lines);
     return {
       month,
+      // Khoảng ngày thực của tháng này theo cài đặt ngày bắt đầu tháng
+      range,
+      monthStartDay,
       lines,
       income: summary.income,
       expense: summary.expense,
@@ -169,7 +180,7 @@ export class BudgetsService {
   // Ngân sách theo tài khoản: mỗi tài khoản đang hoạt động + các nhóm chi tiêu đã gán cho nó.
   // Hạn mức nhóm = tổng hạn mức hiệu lực của các danh mục cha trong nhóm (lines đã gộp con vào cha).
   async getAccountBudgets(month: string, lines: BudgetLine[]): Promise<{ accounts: AccountBudgetLine[]; unassignedGroups: GroupBudgetLine[] }> {
-    const { from, to } = monthRange(month);
+    const { from, to } = await this.range(month);
     const [accounts, groups, spentRows] = await Promise.all([
       this.prisma.account.findMany({
         where: { isActive: true },

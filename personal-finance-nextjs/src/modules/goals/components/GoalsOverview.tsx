@@ -11,7 +11,7 @@ const LEVEL: Record<HealthLevel, { label: string; badge: string; ring: string }>
   excellent: { label: 'Rất tốt', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', ring: '#059669' },
   stable: { label: 'Ổn định', badge: 'bg-teal-50 text-teal-700 border-teal-200', ring: '#0f766e' },
   improve: { label: 'Cần cải thiện', badge: 'bg-amber-100 text-amber-800 border-amber-200', ring: '#f59e0b' },
-  alert: { label: 'Báo động', badge: 'bg-rose-50 text-rose-600 border-rose-200', ring: '#f43f5e' },
+  alert: { label: 'Báo động', badge: 'bg-rose-50 text-rose-600 border-rose-200', ring: '#cc1e44' },
 };
 
 const FACTOR_LABEL: Record<HealthFactorKey, string> = {
@@ -73,7 +73,7 @@ function factorText(key: HealthFactorKey, h: GoalsOverviewData['health']): { val
   }
 }
 
-const scoreColor = (s: number) => (s >= 0.8 ? '#059669' : s >= 0.5 ? '#0f766e' : s >= 0.3 ? '#f59e0b' : '#f43f5e');
+const scoreColor = (s: number) => (s >= 0.8 ? '#059669' : s >= 0.5 ? '#0f766e' : s >= 0.3 ? '#f59e0b' : '#cc1e44');
 
 export default function GoalsOverview({ data }: { data: GoalsOverviewData }) {
   const { ongoing, oneTime, statusCounts: sc, health } = data;
@@ -131,7 +131,7 @@ export default function GoalsOverview({ data }: { data: GoalsOverviewData }) {
             </div>
           </>
         ) : (
-          <p className="text-xs text-slate-500">Chưa có quỹ duy trì. Quỹ khẩn cấp nên là quỹ duy trì.</p>
+          <p className="text-xs text-slate-500">Chưa có quỹ duy trì.</p>
         )}
       </Kpi>
 
@@ -170,13 +170,13 @@ export default function GoalsOverview({ data }: { data: GoalsOverviewData }) {
       {/* Sức khỏe tài chính */}
       <Kpi label="Sức khỏe tài chính" icon={HeartPulse} iconClass="text-rose-500">
         {health.score === null || !level ? (
-          <p className="text-xs text-slate-500">Chưa đủ dữ liệu để chấm điểm. Hãy tạo quỹ khẩn cấp và ghi nhận thu chi vài tháng.</p>
+          <p className="text-xs text-slate-500">Chưa đủ dữ liệu để chấm điểm.</p>
         ) : (
           <>
             <div className="flex items-center gap-3">
               <div
                 className="relative w-14 h-14 rounded-full shrink-0"
-                style={{ background: `conic-gradient(${level.ring} ${health.score * 3.6}deg, #e2e8f0 0deg)` }}
+                style={{ background: `conic-gradient(${level.ring} ${health.score * 3.6}deg, #dae2fd 0deg)` }}
                 role="img"
                 aria-label={`Điểm sức khỏe tài chính ${health.score}/100`}
               >
@@ -186,7 +186,6 @@ export default function GoalsOverview({ data }: { data: GoalsOverviewData }) {
               </div>
               <div className="min-w-0">
                 <span className={`inline-flex px-2 py-0.5 rounded-full border text-xs font-semibold ${level.badge}`}>{level.label}</span>
-                <p className="text-[11px] text-slate-500 mt-1">Điểm /100, tính từ 4 yếu tố bên dưới</p>
               </div>
             </div>
             <ul className="flex flex-col gap-1.5 mt-1">

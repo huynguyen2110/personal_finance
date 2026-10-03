@@ -7,6 +7,11 @@ export class PollEmailDto {
   @Min(1)
   @Max(365)
   sinceDays?: number;
+
+  // Đọc lại toàn bộ thư kể từ "ngày bắt đầu lấy dữ liệu" trong cài đặt (bỏ qua mốc đã đọc)
+  @IsOptional()
+  @IsBoolean()
+  fromStart?: boolean;
 }
 
 export class ImportEmailDto {

@@ -1,5 +1,6 @@
 import { BadGatewayException, BadRequestException, Body, Controller, Get, HttpCode, Post, UnprocessableEntityException } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { SettingsService } from '../../../services/settings.service';
 import { EMAIL_PROVIDERS, parseBankEmail } from '../providers';
 import { emailContent, isSelfTransfer } from '../utils/email-content';
 import { ImapService } from '../services/imap.service';
@@ -13,6 +14,7 @@ export class EmailController {
   constructor(
     private readonly imap: ImapService,
     private readonly ingestEmail: IngestEmailService,
+    private readonly settings: SettingsService,
   ) {}
 
   // Không trả về tài khoản / mật khẩu email, chỉ trạng thái
@@ -21,6 +23,7 @@ export class EmailController {
     return {
       configured: this.imap.isConfigured(),
       pollMinutes: this.imap.pollMinutes(),
+      startDate: await this.settings.emailStartDate(),
       lastRun: await this.imap.getLastRun(),
       providers: EMAIL_PROVIDERS.map((p) => ({
         id: p.id,
@@ -40,6 +43,23 @@ export class EmailController {
     const summary = await this.imap.poll(dto);
     if (summary.error) throw new BadGatewayException(`Không đọc được hộp thư: ${summary.error}`);
     return summary;
+  }
+
+  // Giao dịch đọc từ email có ngày trước "ngày bắt đầu lấy dữ liệu": đếm để người dùng quyết định xóa
+  @Get('before-start')
+  async beforeStart() {
+    const startDate = await this.settings.emailStartDate();
+    if (!startDate) return { startDate: null, count: 0, total: 0 };
+    return { startDate, ...(await this.ingestEmail.countBeforeStart(startDate)) };
+  }
+
+  // Xóa các giao dịch email trước ngày bắt đầu (giao dịch nhập tay/nhập file giữ nguyên)
+  @Post('purge-before-start')
+  @HttpCode(200)
+  async purgeBeforeStart() {
+    const startDate = await this.settings.emailStartDate();
+    if (!startDate) throw new BadRequestException('Chưa đặt ngày bắt đầu lấy dữ liệu trong Cài đặt');
+    return { startDate, ...(await this.ingestEmail.purgeBeforeStart(startDate)) };
   }
 
   @Post('import')

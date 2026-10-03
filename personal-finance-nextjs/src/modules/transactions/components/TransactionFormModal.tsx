@@ -6,6 +6,7 @@ import { ArrowLeftRight } from 'lucide-react';
 import Modal from '@/components/shared/Modal';
 import CategorySelect from '@/components/shared/CategorySelect';
 import DatePicker from '@/components/shared/DatePicker';
+import TimePicker from '@/components/shared/TimePicker';
 import AccountSelect from '@/components/shared/AccountSelect';
 import { errorMessage } from '@/lib/api-client';
 import { formatVND } from '@/lib/money';
@@ -116,7 +117,7 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
           <div className="rounded-xl bg-surface-light px-4 py-3 text-sm space-y-1">
             <div className="flex justify-between gap-3">
               <span className="text-text-secondary">Số tiền</span>
-              <span className={`font-semibold tabular ${transaction.direction === 'IN' ? 'text-[#1d4ed8]' : 'text-text'}`}>
+              <span className={`font-semibold tabular ${transaction.direction === 'IN' ? 'text-[#005c55]' : 'text-text'}`}>
                 {transaction.direction === 'IN' ? '+' : '−'}
                 {formatVND(transaction.amount)}
               </span>
@@ -153,8 +154,8 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
                   className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
                     direction === d
                       ? d === 'OUT'
-                        ? 'border-[#eb6834] bg-[#eb6834]/10 text-[#c2410c]'
-                        : 'border-[#2a78d6] bg-[#2a78d6]/10 text-[#1d4ed8]'
+                        ? 'border-[#cc1e44] bg-[#cc1e44]/10 text-[#c2410c]'
+                        : 'border-[#0f766e] bg-[#0f766e]/10 text-[#005c55]'
                       : 'border-slate-200 text-text-secondary hover:bg-slate-50'
                   }`}
                   aria-pressed={direction === d}
@@ -191,7 +192,7 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
               </label>
               <label className="block">
                 <span className="block text-xs font-medium text-text-secondary mb-1">Giờ</span>
-                <input type="time" className="input-field" value={time} onChange={(e) => setTime(e.target.value)} />
+                <TimePicker value={time} onChange={setTime} className="w-full" />
               </label>
             </div>
           </>
@@ -229,12 +230,7 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
         {!transaction?.transferPair && (
           <label className="flex items-start gap-2 text-sm text-text-secondary cursor-pointer">
             <input type="checkbox" className="mt-0.5" checked={exclude} onChange={(e) => setExclude(e.target.checked)} />
-            <span>
-              Loại khỏi thống kê
-              <span className="block text-xs text-text-muted">
-                Chuyển khoản nội bộ được tự nhận diện. Đánh dấu tay cho các trường hợp khác không muốn tính.
-              </span>
-            </span>
+            <span>Loại khỏi thống kê</span>
           </label>
         )}
 

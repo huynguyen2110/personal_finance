@@ -178,11 +178,7 @@ export default function CategoryInspector({
               value={effectiveGroupId ?? 0}
               onChange={(v) => setGroupId(v ? v : null)}
             />
-            <span className="text-[11px] text-slate-500">
-              {groupOptions.length
-                ? 'Nhóm gán cho tài khoản ngân hàng để gợi ý và tự phân loại giao dịch. Danh mục con đi theo nhóm của cha.'
-                : 'Chưa có nhóm nào. Tạo nhóm ở tab "Nhóm & Tài khoản".'}
-            </span>
+            {!groupOptions.length && <span className="text-[11px] text-slate-500">Chưa có nhóm nào. Tạo ở tab &ldquo;Nhóm &amp; Tài khoản&rdquo;.</span>}
           </label>
         )}
 

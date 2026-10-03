@@ -21,13 +21,13 @@ export class ReportsController {
   }
 
   @Get('report')
-  report(@Query() query: ReportQueryDto) {
-    return this.reports.getReport(this.reports.parseReportScope(query));
+  async report(@Query() query: ReportQueryDto) {
+    return this.reports.getReport(await this.reports.parseReportScope(query));
   }
 
   @Get('report/export')
   async export(@Query() query: ReportQueryDto, @Res({ passthrough: true }) res: Response) {
-    const { workbook, filename } = await this.exporter.build(this.reports.parseReportScope(query));
+    const { workbook, filename } = await this.exporter.build(await this.reports.parseReportScope(query));
     return xlsxFile(workbook, filename, res);
   }
 }

@@ -120,7 +120,7 @@ export default function GoalsPage() {
     <div className="font-jakarta">
       <Header
         title="Mục tiêu Tiết kiệm & Tích lũy"
-        subtitle="Lập kế hoạch, theo dõi tiến độ từng hũ tài chính và phân bổ phần thặng dư mỗi tháng"
+        subtitle="Hũ tiết kiệm và phân bổ thặng dư hàng tháng"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {discipline && (
@@ -220,10 +220,7 @@ export default function GoalsPage() {
             </span>
             <div className="flex-1">
               <h2 className="text-[16px] font-semibold text-slate-900">Tạo mục tiêu tiết kiệm đầu tiên</h2>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Bắt đầu với <b>quỹ khẩn cấp</b> (3–6 tháng chi tiêu — web gợi ý số tiền từ chi tiêu thực tế của bạn), rồi đến các mục tiêu
-                mua sắm, du lịch. Đặt thời hạn để web tính số cần nạp mỗi tháng và nhắc bạn đúng kỳ.
-              </p>
+              <p className="text-xs text-slate-600 mt-0.5">Bắt đầu với quỹ khẩn cấp, rồi đến các mục tiêu mua sắm, du lịch.</p>
             </div>
             <button type="button" className="fin-btn fin-btn-primary" onClick={() => setEditing('new')}>
               <PlusCircle className="w-4 h-4" /> Tạo mục tiêu

@@ -33,6 +33,7 @@ import { normalizeText } from '@/lib/text';
 import { formatVND } from '@/lib/money';
 import { addMonths, currentMonthVN, formatMonthLabel, formatVNDateTime, monthRange } from '@/lib/dates';
 import type { CategoryDTO } from '@/modules/categories/types';
+import { useMonthStartDay } from '@/modules/settings/lib';
 import { exportTransactions, useTransactions } from '@/modules/transactions/lib';
 import type { TransactionDTO, TransactionFilters } from '@/modules/transactions/types';
 import { reapplyRules } from '../lib';
@@ -58,7 +59,11 @@ export default function MatchLogTab({ categories, rules, initialStatus = 'ALL' }
   const qc = useQueryClient();
   const reload = () => invalidateFinanceData(qc);
 
-  const [month, setMonth] = useState(currentMonthVN);
+  // Tháng tài chính (ngày bắt đầu tháng trong cài đặt); chưa chọn thì là tháng hiện tại
+  const sd = useMonthStartDay();
+  const [monthOverride, setMonthOverride] = useState<string | null>(null);
+  const month = monthOverride ?? currentMonthVN(sd);
+  const setMonth = (next: string | ((prev: string) => string)) => setMonthOverride(typeof next === 'function' ? next(month) : next);
   const [qInput, setQInput] = useState('');
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<LogStatus>(initialStatus);
@@ -83,7 +88,7 @@ export default function MatchLogTab({ categories, rules, initialStatus = 'ALL' }
       return { key: filterKey, page: typeof next === 'function' ? next(cur) : next };
     });
 
-  const { from, to } = monthRange(month);
+  const { from, to } = monthRange(month, sd);
   const baseFilters: TransactionFilters = useMemo(
     () => ({ from, to, q: q || undefined, source: source === 'ALL' ? undefined : source }),
     [from, to, q, source]
@@ -108,7 +113,7 @@ export default function MatchLogTab({ categories, rules, initialStatus = 'ALL' }
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const focus = items.find((t) => t.id === selectedId) ?? items[0] ?? null;
   const focusRule = focus ? findMatchingRule(rules, focus.content, focus.direction, focus.accountId) : null;
-  const isCurrent = month === currentMonthVN();
+  const isCurrent = month === currentMonthVN(sd);
 
   async function reapply() {
     setApplying(true);
@@ -131,7 +136,6 @@ export default function MatchLogTab({ categories, rules, initialStatus = 'ALL' }
           <p className="text-[28px] leading-9 font-bold tracking-[-0.02em] text-slate-900 fin-num">
             {totalMonth ?? '—'} <span className="text-sm font-semibold text-slate-500">giao dịch</span>
           </p>
-          <p className="text-xs text-slate-500">Mọi nguồn: email ngân hàng, nhập tay, nhập file</p>
         </Kpi>
         <Kpi label="Khớp tự động" icon={<CircleCheck className="w-4 h-4" />} iconClass="bg-emerald-50 text-emerald-700">
           <p className="text-[28px] leading-9 font-bold tracking-[-0.02em] text-slate-900 fin-num">
@@ -196,7 +200,7 @@ export default function MatchLogTab({ categories, rules, initialStatus = 'ALL' }
               </button>
             </div>
             {!isCurrent && (
-              <button type="button" className="fin-btn fin-btn-ghost fin-btn-sm" onClick={() => setMonth(currentMonthVN())}>
+              <button type="button" className="fin-btn fin-btn-ghost fin-btn-sm" onClick={() => setMonthOverride(null)}>
                 Về tháng này
               </button>
             )}

@@ -32,6 +32,7 @@ export interface WeekdayPoint {
 export interface DashboardData {
   period: { from: string; to: string };
   prevPeriod: { from: string; to: string };
+  monthStartDay: number; // ngày bắt đầu tháng tài chính đang áp dụng
   summary: Summary;
   prevSummary: Summary;
   monthly: { month: string; income: number; expense: number }[];
@@ -72,6 +73,7 @@ export interface ReportRow {
 
 export interface ReportData {
   months: string[];
+  monthStartDay: number; // ngày bắt đầu tháng tài chính đang áp dụng
   monthly: {
     month: string;
     income: number;

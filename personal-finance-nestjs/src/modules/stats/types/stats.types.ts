@@ -2,6 +2,8 @@ export interface StatsScope {
   from: string; // YYYY-MM-DD (VN)
   to: string; // YYYY-MM-DD (VN), bao gồm
   accountId?: number | null;
+  // Ngày bắt đầu tháng tài chính (mặc định 1): gom theo "tháng" khi khác 1 sẽ dời mốc theo ngày này
+  monthStartDay?: number;
 }
 
 export interface Summary {

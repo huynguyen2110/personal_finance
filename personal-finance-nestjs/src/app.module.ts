@@ -18,6 +18,7 @@ import { BudgetsModule } from './modules/budgets/budgets.module';
 import { GoalsModule } from './modules/goals/goals.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { EmailModule } from './modules/email/email.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { EmailModule } from './modules/email/email.module';
     GoalsModule,
     ReportsModule,
     EmailModule,
+    SettingsModule,
   ],
   // Mọi route cần đăng nhập, trừ route đánh dấu @Public()
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],

@@ -1,5 +1,5 @@
 // Logic thuần cho trang Ngân sách (dùng được ở client): trạng thái, nhịp chi, gợi ý cân đối hạn mức.
-import { monthRange, todayVN } from '@/lib/dates';
+import { daysBetween, monthRange, todayVN } from '@/lib/dates';
 
 export interface BudgetLineLike {
   categoryId: number;
@@ -79,12 +79,13 @@ export interface MonthClock {
   timePct: number; // 0..1
 }
 
-export function monthClock(month: string, today = todayVN()): MonthClock {
-  const { from, to } = monthRange(month);
-  const daysInMonth = Number(to.slice(8, 10));
+// Nhịp thời gian của tháng (tài chính): ngày thứ mấy của kỳ, còn bao nhiêu ngày. `startDay` = ngày bắt đầu tháng trong cài đặt.
+export function monthClock(month: string, startDay = 1, today = todayVN()): MonthClock {
+  const { from, to } = monthRange(month, startDay);
+  const daysInMonth = daysBetween(from, to);
   if (today < from) return { phase: 'future', daysInMonth, elapsed: 0, daysLeft: daysInMonth, timePct: 0 };
   if (today > to) return { phase: 'past', daysInMonth, elapsed: daysInMonth, daysLeft: 0, timePct: 1 };
-  const elapsed = Number(today.slice(8, 10));
+  const elapsed = daysBetween(from, today);
   return { phase: 'current', daysInMonth, elapsed, daysLeft: daysInMonth - elapsed, timePct: elapsed / daysInMonth };
 }
 

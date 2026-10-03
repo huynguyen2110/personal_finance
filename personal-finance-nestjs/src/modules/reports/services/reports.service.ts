@@ -7,12 +7,14 @@ import {
   endOfVNDayExclusive,
   isValidDateStr,
   isValidMonthStr,
+  currentMonthVN,
+  monthOfDate,
   monthRange,
   monthsBetween,
   startOfVNDay,
-  toVNMonthString,
 } from '../../../common/utils/dates.util';
 import { previousPeriod } from '../../../common/utils/period.util';
+import { SettingsService } from '../../../services/settings.service';
 import { StatsService } from '../../stats/services/stats.service';
 import type { CategoryMonthCell, StatsScope } from '../../stats/types/stats.types';
 import { foldCategoryTotals } from '../../stats/utils/category-rollup';
@@ -48,6 +50,7 @@ export class ReportsService {
     private readonly stats: StatsService,
     private readonly budgets: BudgetsService,
     private readonly accounts: AccountsService,
+    private readonly settings: SettingsService,
   ) {}
 
   parseDashboardScope(q: DashboardQueryDto): StatsScope {
@@ -57,8 +60,9 @@ export class ReportsService {
     return { from, to, accountId: Number(q.accountId) || null };
   }
 
-  parseReportScope(q: ReportQueryDto): ReportScope {
-    const toDefault = toVNMonthString(new Date());
+  // Mặc định: 6 tháng tài chính gần nhất (theo ngày bắt đầu tháng trong cài đặt)
+  async parseReportScope(q: ReportQueryDto): Promise<ReportScope> {
+    const toDefault = currentMonthVN(await this.settings.monthStartDay());
     const fromMonth = q.fromMonth ?? addMonths(toDefault, -5);
     const toMonth = q.toMonth ?? toDefault;
     if (!isValidMonthStr(fromMonth) || !isValidMonthStr(toMonth) || fromMonth > toMonth) {
@@ -71,15 +75,17 @@ export class ReportsService {
   // ─── Tổng quan ───
 
   async getDashboard(scope: StatsScope) {
-    const prev = previousPeriod(scope);
+    // Mọi mốc "tháng" theo tháng tài chính (ngày bắt đầu tháng trong cài đặt)
+    const sd = await this.settings.monthStartDay();
+    const prev = previousPeriod(scope, sd);
     const prevScope = { ...prev, accountId: scope.accountId };
-    const toMonth = scope.to.slice(0, 7);
-    const monthlyFrom = `${addMonths(toMonth, -11)}-01`;
+    const toMonth = monthOfDate(scope.to, sd);
+    const monthlyFrom = monthRange(addMonths(toMonth, -11), sd).from;
     const accountFilter = scope.accountId ? { accountId: scope.accountId } : {};
 
-    // Ngân sách: theo tháng cuối của kỳ
+    // Ngân sách: theo tháng (tài chính) chứa ngày cuối của kỳ
     const budgetMonth = toMonth;
-    const budgetMonthRange = monthRange(budgetMonth);
+    const budgetMonthRange = monthRange(budgetMonth, sd);
 
     const [
       summary,
@@ -99,7 +105,7 @@ export class ReportsService {
     ] = await Promise.all([
       this.stats.getSummary(scope),
       this.stats.getSummary(prevScope),
-      this.stats.getMonthly({ from: monthlyFrom, to: monthRange(toMonth).to, accountId: scope.accountId }),
+      this.stats.getMonthly({ from: monthlyFrom, to: budgetMonthRange.to, accountId: scope.accountId, monthStartDay: sd }),
       this.stats.getDaily(scope),
       this.stats.getDaily(prevScope),
       this.stats.getByCategory(scope, 'OUT'),
@@ -160,6 +166,7 @@ export class ReportsService {
     return {
       period: { from: scope.from, to: scope.to },
       prevPeriod: prev,
+      monthStartDay: sd,
       summary,
       prevSummary,
       monthly,
@@ -188,12 +195,14 @@ export class ReportsService {
   // ─── Thống kê theo tháng / danh mục ───
 
   async getReport(r: ReportScope) {
+    const sd = await this.settings.monthStartDay();
     const months = monthsBetween(r.fromMonth, r.toMonth);
-    const scope: StatsScope = { from: monthRange(r.fromMonth).from, to: monthRange(r.toMonth).to, accountId: r.accountId };
+    const scope: StatsScope = { from: monthRange(r.fromMonth, sd).from, to: monthRange(r.toMonth, sd).to, accountId: r.accountId, monthStartDay: sd };
     const prevYearScope: StatsScope = {
-      from: monthRange(addMonths(r.fromMonth, -12)).from,
-      to: monthRange(addMonths(r.toMonth, -12)).to,
+      from: monthRange(addMonths(r.fromMonth, -12), sd).from,
+      to: monthRange(addMonths(r.toMonth, -12), sd).to,
       accountId: r.accountId,
+      monthStartDay: sd,
     };
 
     const [monthlyRaw, prevYearRaw, expenseCells, incomeCells, categories, summary] = await Promise.all([
@@ -253,6 +262,7 @@ export class ReportsService {
 
     return {
       months,
+      monthStartDay: sd,
       monthly,
       summary,
       monthCount: months.length,

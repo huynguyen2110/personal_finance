@@ -89,7 +89,7 @@ export default function GoalCard({ goal, month, suggestion, onDeposit, onSpend, 
   if (done || archived) {
     return (
       <div className={`${CARD} p-4 md:p-5 pl-5 md:pl-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${archived ? 'opacity-75' : ''}`}>
-        <Stripe color={archived ? '#cbd5e1' : STATUS.done.fill} />
+        <Stripe color={archived ? '#bdc9c6' : STATUS.done.fill} />
         <div className="flex items-start gap-3 min-w-0">
           <GoalIcon goal={goal} />
           <div className="min-w-0">
@@ -465,8 +465,8 @@ export default function GoalCard({ goal, month, suggestion, onDeposit, onSpend, 
               <Lightbulb className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" aria-hidden />
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 w-full">
                 <span className="text-xs fin-num">
-                  Gợi ý: thặng dư {monthText(month).toLowerCase()} còn <strong className="text-emerald-700">+{formatVND(suggestion.available)}</strong>{' '}
-                  chưa phân bổ. Trích {formatVND(suggestion.amount)} để về đích mục tiêu này ngay?
+                  Thặng dư {monthText(month).toLowerCase()} còn <strong className="text-emerald-700">+{formatVND(suggestion.available)}</strong>. Trích{' '}
+                  {formatVND(suggestion.amount)} để về đích?
                 </span>
                 <button type="button" className="fin-btn fin-btn-sm shrink-0 bg-emerald-700 text-white hover:bg-emerald-800" onClick={() => onDeposit(goal, suggestion.amount)}>
                   Hoàn tất ngay

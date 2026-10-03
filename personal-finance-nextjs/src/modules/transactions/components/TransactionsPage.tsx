@@ -48,6 +48,7 @@ import { invalidateFinanceData } from '@/lib/query-client';
 import { bulkUpdateTransactions, deleteTransaction, exportTransactions, updateTransaction, useTransactions } from '../lib';
 import { formatVND } from '@/lib/money';
 import { addMonths, currentMonthVN, formatMonthLabel, formatVNDate, formatVNDateTime, monthRange } from '@/lib/dates';
+import { useMonthStartDay } from '@/modules/settings/lib';
 import type { TransactionDTO } from '../types';
 
 const FILTER_KEYS = ['from', 'to', 'accountId', 'direction', 'categoryId', 'q', 'source', 'excluded', 'transfer', 'min', 'max', 'sort'] as const;
@@ -91,35 +92,36 @@ const SORT_CHOICES = [
 ];
 const PRESET_PERIODS: Period[] = ['this_month', 'last_month', 'last_3_months', 'this_year'];
 
-function periodRange(p: Period): { from?: string; to?: string } {
-  const cur = currentMonthVN();
+// Khoảng ngày của kỳ nhanh theo tháng tài chính (`sd` = ngày bắt đầu tháng trong cài đặt)
+function periodRange(p: Period, sd = 1): { from?: string; to?: string } {
+  const cur = currentMonthVN(sd);
   switch (p) {
     case 'this_month':
-      return monthRange(cur);
+      return monthRange(cur, sd);
     case 'last_month':
-      return monthRange(addMonths(cur, -1));
+      return monthRange(addMonths(cur, -1), sd);
     case 'last_3_months':
-      return { from: monthRange(addMonths(cur, -2)).from, to: monthRange(cur).to };
+      return { from: monthRange(addMonths(cur, -2), sd).from, to: monthRange(cur, sd).to };
     case 'this_year': {
       const y = cur.slice(0, 4);
-      return { from: `${y}-01-01`, to: `${y}-12-31` };
+      return { from: monthRange(`${y}-01`, sd).from, to: monthRange(`${y}-12`, sd).to };
     }
     default:
       return {};
   }
 }
 
-function detectPeriod(from?: string, to?: string): Period {
+function detectPeriod(from?: string, to?: string, sd = 1): Period {
   if (!from && !to) return 'all';
   for (const p of PRESET_PERIODS) {
-    const r = periodRange(p);
+    const r = periodRange(p, sd);
     if (r.from === from && r.to === to) return p;
   }
   return 'custom';
 }
 
-function periodLabel(p: Period, from?: string, to?: string): string {
-  const cur = currentMonthVN();
+function periodLabel(p: Period, from?: string, to?: string, sd = 1): string {
+  const cur = currentMonthVN(sd);
   switch (p) {
     case 'all':
       return 'Toàn bộ thời gian';
@@ -439,9 +441,10 @@ export default function TransactionsPage() {
   }
 
   // ───────── Dẫn xuất hiển thị ─────────
-  const period = detectPeriod(filters.from, filters.to);
+  const sd = useMonthStartDay();
+  const period = detectPeriod(filters.from, filters.to, sd);
   const showCustomDates = customPeriod || period === 'custom';
-  const curPeriodLabel = periodLabel(period, filters.from, filters.to);
+  const curPeriodLabel = periodLabel(period, filters.from, filters.to, sd);
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   const rangeFrom = data && data.total ? (data.page - 1) * data.pageSize + 1 : 0;
@@ -485,7 +488,6 @@ export default function TransactionsPage() {
 
   const baseTotal = allData?.total ?? 0;
   const noneCount = noneData?.total ?? 0;
-  const emailCount = emailData?.total ?? 0;
   const classifiedRatio = baseTotal > 0 ? (baseTotal - noneCount) / baseTotal : 1;
 
   return (
@@ -583,9 +585,6 @@ export default function TransactionsPage() {
                 ) : (
                   <span className="text-teal-700 font-semibold">Tất cả đã có danh mục</span>
                 )}
-                <span className="inline-flex items-center gap-1 text-slate-500 fin-num">
-                  <Mail className="w-3.5 h-3.5" aria-hidden /> {fmtNum(emailCount)} từ email
-                </span>
               </div>
             </Kpi>
           </div>
@@ -628,7 +627,7 @@ export default function TransactionsPage() {
                     return;
                   }
                   setCustomPeriod(false);
-                  const r = periodRange(p);
+                  const r = periodRange(p, sd);
                   setParams({ from: r.from, to: r.to });
                 }}
                 triggerIcon={<CalendarDays className="w-4 h-4 text-slate-400" aria-hidden />}
@@ -857,12 +856,10 @@ export default function TransactionsPage() {
                           <Search className="w-5 h-5 text-slate-400" aria-hidden />
                         </span>
                         <p className="text-sm font-semibold text-slate-700">Không có giao dịch nào khớp bộ lọc</p>
-                        {hasFilters ? (
+                        {hasFilters && (
                           <button type="button" className="text-xs font-semibold text-teal-700 hover:underline" onClick={resetAll}>
                             Đặt lại bộ lọc
                           </button>
-                        ) : (
-                          <p className="text-xs">Giao dịch sẽ xuất hiện khi đọc được email ngân hàng hoặc bạn nhập tay.</p>
                         )}
                       </div>
                     </td>
@@ -929,11 +926,11 @@ export default function TransactionsPage() {
                                 title={`Chuyển khoản nội bộ với ${t.transferPair.account.name} lúc ${formatVNDateTime(t.transferPair.transactionDate)}`}
                               >
                                 <Link2 className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                                {t.direction === 'OUT' ? 'Sang' : 'Từ'} {t.transferPair.account.name} · tự loại khỏi thu/chi
+                                {t.direction === 'OUT' ? 'Sang' : 'Từ'} {t.transferPair.account.name}
                               </span>
                             ) : uncategorized ? (
                               <span className="inline-flex items-center gap-1 text-amber-700 font-medium whitespace-nowrap shrink-0">
-                                <TriangleAlert className="w-3.5 h-3.5 shrink-0" aria-hidden /> Chưa khớp quy tắc tự động nào
+                                <TriangleAlert className="w-3.5 h-3.5 shrink-0" aria-hidden /> Chưa phân loại
                               </span>
                             ) : t.excludeFromStats ? (
                               <span className="inline-flex items-center gap-1 text-slate-500 whitespace-nowrap shrink-0">

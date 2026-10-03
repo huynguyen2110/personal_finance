@@ -192,7 +192,7 @@ export default function AccountsPage() {
     <div className="font-jakarta">
       <Header
         title="Tài khoản & Thẻ ngân hàng"
-        subtitle="Quản lý nguồn tiền, tự động ghi nhận giao dịch từ email thông báo và khử trùng lặp chuyển khoản nội bộ"
+        subtitle="Nguồn tiền và đồng bộ email ngân hàng"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" className="fin-btn fin-btn-outline" onClick={reload}>
@@ -283,13 +283,7 @@ export default function AccountsPage() {
         {/* Danh sách tài khoản */}
         <section className="fin-card overflow-hidden">
           <div className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100">
-            <div>
-              <h2 className="text-[16px] leading-6 font-semibold text-slate-900">Danh sách tài khoản</h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Tài khoản Vietcombank / Cake / ACB tự tạo khi đọc được email đầu tiên. Nên thêm trước các tài khoản khác của bạn để
-                chuyển khoản giữa chúng được nhận diện là chuyển nội bộ.
-              </p>
-            </div>
+            <h2 className="text-[16px] leading-6 font-semibold text-slate-900">Danh sách tài khoản</h2>
             <span className="self-start sm:self-auto px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold whitespace-nowrap fin-num">
               {summary.activeCount} tài khoản khả dụng
             </span>
@@ -410,16 +404,9 @@ export default function AccountsPage() {
               <ArrowLeftRight className="w-6 h-6" aria-hidden />
             </span>
             <div className="flex flex-col gap-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-[16px] leading-6 font-semibold text-slate-900">Tự nhận diện & Khử trùng lặp chuyển khoản nội bộ</h2>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">
-                  Luôn bật
-                </span>
-              </div>
+              <h2 className="text-[16px] leading-6 font-semibold text-slate-900">Chuyển khoản nội bộ</h2>
               <p className="text-xs text-slate-600">
-                Một khoản <b className="text-slate-900">RA</b> và một khoản <b className="text-slate-900">VÀO</b> cùng số tiền, ở hai tài
-                khoản khác nhau, cách nhau tối đa {transfers?.windowMinutes ?? 15} phút được ghép cặp và loại khỏi báo cáo thu / chi.
-                Email chuyển tiền có người nhận trùng tên bạn, hoặc tới một tài khoản đã có ở trên, cũng được loại khỏi thống kê.
+                Khoản ra và khoản vào cùng số tiền ở hai tài khoản, cách nhau tối đa {transfers?.windowMinutes ?? 15} phút, được ghép cặp và loại khỏi thu chi.
               </p>
               {transfers && (
                 <Link href="/transactions?transfer=1" className="text-xs font-semibold text-teal-700 hover:underline fin-num">

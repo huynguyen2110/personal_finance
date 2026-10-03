@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Info, Link2 } from 'lucide-react';
+import { Link2 } from 'lucide-react';
 import Modal from '@/components/shared/Modal';
 import DatePicker from '@/components/shared/DatePicker';
 import TreeSelect from '@/components/shared/TreeSelect';
@@ -241,14 +241,6 @@ export default function ContributionModal({ goal, preset, initialKind = 'DEPOSIT
           )}
         </div>
 
-        <p className="flex items-start gap-2 text-xs text-slate-500">
-          <Info className="w-4 h-4 shrink-0" aria-hidden />
-          {spending && goal.ongoing
-            ? 'Quỹ duy trì: tiến độ tính theo số tiền còn trong quỹ, nên tiêu bao nhiêu thì cần nạp bù bấy nhiêu.'
-            : spending
-            ? 'Ghi lại khoản bạn đã dùng tiền của quỹ. Quỹ vẫn giữ tiến độ tích lũy, chỉ giảm số tiền còn lại trong quỹ.'
-            : 'Web chỉ ghi lại số tiền trong hũ, không chuyển tiền thật. Hãy chuyển tiền trong app ngân hàng của bạn.'}
-        </p>
 
         <div className="flex justify-end gap-2">
           <button type="button" className="fin-btn fin-btn-outline" onClick={onClose}>
