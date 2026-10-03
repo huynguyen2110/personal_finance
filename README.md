@@ -6,7 +6,7 @@ Gồm hai phần trong cùng repo:
 
 | Thư mục | Vai trò | Stack | Cổng |
 |---|---|---|---|
-| `personal-finance-nestjs/` | API (BE) | NestJS 11, Prisma 5, MySQL 8 (Laragon), JWT, ExcelJS, imapflow + mailparser | 4000 |
+| `personal-finance-nestjs/` | API (BE) | NestJS 11, Prisma 5, PostgreSQL (Laragon hoặc Neon), JWT, ExcelJS, imapflow + mailparser | 4000 |
 | `personal-finance-nextjs/` | Giao diện (FE) | Next.js 16, React Query, axios, Tailwind 4, Recharts | dev 3003, prod 3002 |
 
 ## Cấu trúc
@@ -32,7 +32,11 @@ personal-finance-nextjs/
 
 ## Chạy lần đầu
 
-Tạo DB `personal_finance` trước (HeidiSQL/Laragon).
+Tạo DB `personal_finance` trong PostgreSQL trước (Laragon mặc định user `postgres`/`postgres`):
+
+```bash
+psql -U postgres -c "CREATE DATABASE personal_finance;"
+```
 
 ```bash
 cd personal-finance-nestjs
@@ -54,7 +58,7 @@ npm run build && npm start  # web ở http://localhost:3002
 
 Khi phát triển: `npm run start:dev` (BE) và `npm run dev` (FE, cổng 3003).
 
-Kiểm tra BE: `npm test` (unit, gồm bộ đọc email) và `npm run test:e2e` (cần MySQL đang chạy).
+Kiểm tra BE: `npm test` (unit, gồm bộ đọc email) và `npm run test:e2e` (cần PostgreSQL đang chạy).
 
 Đọc email theo lịch từ Task Scheduler (tùy chọn): gọi `http://localhost:4000/api/cron/sync?secret=<CRON_SECRET>`.
 

@@ -2,7 +2,7 @@
   "name": "personal-finance-nestjs",
   "version": "0.1.0",
   "private": true,
-  "description": "API theo dõi chi tiêu cá nhân (NestJS + Prisma + MySQL)",
+  "description": "API theo dõi chi tiêu cá nhân (NestJS + Prisma + PostgreSQL)",
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",

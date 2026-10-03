@@ -33,15 +33,15 @@ export class AccountsService {
         include: { categoryGroups: { select: { groupId: true } } },
       }),
       this.prisma.$queryRaw<{ accountId: number; direction: 'IN' | 'OUT'; total: bigint; cnt: bigint }[]>`
-        SELECT t.accountId, t.direction, CAST(SUM(t.amount) AS SIGNED) AS total, COUNT(*) AS cnt
-        FROM \`Transaction\` t
-        GROUP BY t.accountId, t.direction`,
+        SELECT t."accountId", t.direction, SUM(t.amount)::bigint AS total, COUNT(*) AS cnt
+        FROM "Transaction" t
+        GROUP BY t."accountId", t.direction`,
       this.prisma.$queryRaw<{ accountId: number; direction: 'IN' | 'OUT'; total: bigint }[]>`
-        SELECT t.accountId, t.direction, CAST(SUM(t.amount) AS SIGNED) AS total
-        FROM \`Transaction\` t
-        JOIN Account a ON a.id = t.accountId
-        WHERE a.bankBalanceAt IS NOT NULL AND t.transactionDate > a.bankBalanceAt
-        GROUP BY t.accountId, t.direction`,
+        SELECT t."accountId", t.direction, SUM(t.amount)::bigint AS total
+        FROM "Transaction" t
+        JOIN "Account" a ON a.id = t."accountId"
+        WHERE a."bankBalanceAt" IS NOT NULL AND t."transactionDate" > a."bankBalanceAt"
+        GROUP BY t."accountId", t.direction`,
     ]);
     const sumOf = (rows: { accountId: number; direction: 'IN' | 'OUT'; total: bigint }[], id: number, d: 'IN' | 'OUT') =>
       n(rows.find((s) => s.accountId === id && s.direction === d)?.total);

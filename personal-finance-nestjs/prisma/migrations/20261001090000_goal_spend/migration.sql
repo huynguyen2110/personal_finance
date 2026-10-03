@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE `GoalContribution` MODIFY `kind` ENUM('OPENING', 'DEPOSIT', 'WITHDRAW', 'INTEREST', 'SPEND') NOT NULL;
-
