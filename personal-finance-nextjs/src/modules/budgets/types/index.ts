@@ -22,6 +22,23 @@ export interface BudgetMonthTotals {
   expense: number; // tổng chi cả tháng (mọi danh mục, kể cả chưa phân loại)
 }
 
+// Hạn mức của cả một nhóm chi tiêu trong tháng (trần chung cho mọi danh mục trong nhóm)
+export interface GroupBudgetStatus {
+  groupId: number;
+  name: string;
+  icon: string;
+  color: string;
+  categoryIds: number[]; // danh mục cha trong nhóm
+  amount: number | null; // hạn mức riêng của nhóm hiệu lực trong tháng (null = chưa đặt)
+  source: 'MONTH' | 'DEFAULT' | null;
+  defaultAmount: number | null;
+  categoriesBudget: number | null; // tổng hạn mức đã đặt cho các danh mục trong nhóm
+  spent: number; // đã chi vào mọi danh mục của nhóm (kể cả con)
+  count: number;
+  prevSpent: number;
+  percent: number | null;
+}
+
 // Một nhóm chi tiêu trong khung của một tài khoản
 export interface GroupBudgetLine {
   groupId: number;
@@ -29,7 +46,7 @@ export interface GroupBudgetLine {
   icon: string;
   color: string;
   categoryIds: number[]; // danh mục cha trong nhóm
-  budget: number | null; // tổng hạn mức hiệu lực của các danh mục cha (null = chưa đặt)
+  budget: number | null; // hạn mức riêng của nhóm, không thì tổng hạn mức các danh mục cha (null = chưa đặt)
   spent: number; // đã chi từ tài khoản này vào các danh mục của nhóm
   count: number;
   sharedAccounts: number; // số tài khoản khác cũng gán nhóm này
@@ -54,6 +71,7 @@ export interface BudgetPageData {
   range: { from: string; to: string };
   monthStartDay: number;
   lines: BudgetLine[];
+  groups: GroupBudgetStatus[];
   income: number;
   expense: number;
   history: BudgetMonthTotals[];
@@ -62,9 +80,9 @@ export interface BudgetPageData {
 }
 
 
+// Hạn mức của một danh mục (categoryId) hoặc cả một nhóm (groupId) — gửi đúng một trong hai.
 // month: "YYYY-MM" (riêng tháng) hoặc "*" (mặc định); amount null = xóa hạn mức
-export interface BudgetItemInput {
-  categoryId: number;
+export type BudgetItemInput = ({ categoryId: number; groupId?: never } | { groupId: number; categoryId?: never }) & {
   month: string;
   amount: number | null;
-}
+};

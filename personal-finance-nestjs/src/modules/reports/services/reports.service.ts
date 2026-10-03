@@ -158,8 +158,9 @@ export class ReportsService {
       return { date, income: d?.income ?? 0, expense: d?.expense ?? 0, cumulativeExpense: cum, prevCumulativeExpense: prevCumulative };
     });
 
-    // Ngân sách: tổng theo dòng cấp cao nhất (đã gộp con); cảnh báo theo từng đơn vị hạn mức
-    const { budget: totalBudget, spentBudgeted: totalBudgetSpent } = this.budgets.totals(budgetMonth, budgetLines, summary.expense);
+    // Ngân sách: nhóm có hạn mức riêng tính theo nhóm, còn lại theo dòng cấp cao nhất (đã gộp con); cảnh báo theo từng đơn vị hạn mức
+    const budgetGroups = await this.budgets.getGroupBudgetStatus(budgetMonth, budgetLines);
+    const { budget: totalBudget, spentBudgeted: totalBudgetSpent } = this.budgets.totals(budgetMonth, budgetLines, summary.expense, budgetGroups);
     const periodIsBudgetMonth = scope.from === budgetMonthRange.from && scope.to <= budgetMonthRange.to;
     const visibleBalances = balances.filter((b) => b.isActive);
 
@@ -187,6 +188,7 @@ export class ReportsService {
         alerts: budgetUnits(budgetLines)
           .filter((l) => (l.percent ?? 0) >= 0.8)
           .sort((a, b) => (b.percent ?? 0) - (a.percent ?? 0)),
+        groupAlerts: budgetGroups.filter((g) => (g.percent ?? 0) >= 0.8).sort((a, b) => (b.percent ?? 0) - (a.percent ?? 0)),
       },
       uncategorizedCount,
     };

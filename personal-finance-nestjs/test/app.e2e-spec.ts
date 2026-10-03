@@ -38,6 +38,8 @@ describe('Personal Finance API (e2e)', () => {
 
   afterAll(async () => {
     await prisma?.savingsGoal.deleteMany({ where: { name: { startsWith: username } } });
+    await prisma?.categoryGroup.deleteMany({ where: { name: { startsWith: username } } }); // hạn mức nhóm bị xóa theo
+    await prisma?.category.deleteMany({ where: { name: { startsWith: username } } }); // hạn mức danh mục bị xóa theo
     await prisma?.account.deleteMany({ where: { name: { startsWith: username } } }); // giao dịch tạm bị xóa theo
     await prisma?.user.deleteMany({ where: { username } }); // refresh token bị xóa theo (cascade)
     await app?.close();
@@ -226,6 +228,45 @@ describe('Personal Finance API (e2e)', () => {
       expect((await view()).archivedAt).not.toBeNull();
       await authed('delete', `/api/goals/${goalId}`).expect(200);
       expect(await view()).toBeUndefined();
+    });
+  });
+
+  describe('hạn mức theo nhóm', () => {
+    let groupId = 0;
+    let categoryId = 0;
+    const groupOf = async () => {
+      const r = await authed('get', '/api/budgets').expect(200);
+      return r.body.data.groups.find((g: { groupId: number }) => g.groupId === groupId);
+    };
+
+    beforeAll(async () => {
+      const g = await prisma.categoryGroup.create({ data: { name: `${username} nhóm`, kind: 'EXPENSE' } });
+      const c = await prisma.category.create({ data: { name: `${username} di chuyển`, kind: 'EXPENSE', groupId: g.id } });
+      groupId = g.id;
+      categoryId = c.id;
+    });
+
+    it('đặt hạn mức mặc định cho nhóm → trang ngân sách trả về nhóm có hạn mức', async () => {
+      await authed('put', '/api/budgets').send({ items: [{ groupId, month: '*', amount: 1_000_000 }] }).expect(200);
+      const g = await groupOf();
+      expect(g).toMatchObject({ amount: 1_000_000, source: 'DEFAULT', categoryIds: [categoryId], categoriesBudget: null });
+    });
+
+    it('hạn mức danh mục trong nhóm không được vượt hạn mức nhóm', async () => {
+      const r = await authed('put', '/api/budgets').send({ items: [{ categoryId, month: '*', amount: 2_000_000 }] }).expect(400);
+      expect(r.body.message).toMatch(/vượt hạn mức nhóm/);
+      await authed('put', '/api/budgets').send({ items: [{ categoryId, month: '*', amount: 600_000 }] }).expect(200);
+      expect((await groupOf()).categoriesBudget).toBe(600_000);
+    });
+
+    it('không hạ hạn mức nhóm xuống dưới tổng các danh mục; gửi cả hai khóa → 400', async () => {
+      await authed('put', '/api/budgets').send({ items: [{ groupId, month: '*', amount: 500_000 }] }).expect(400);
+      await authed('put', '/api/budgets').send({ items: [{ groupId, categoryId, month: '*', amount: 1 }] }).expect(400);
+    });
+
+    it('xóa hạn mức nhóm', async () => {
+      await authed('put', '/api/budgets').send({ items: [{ groupId, month: '*', amount: null }] }).expect(200);
+      expect((await groupOf()).amount).toBeNull();
     });
   });
 

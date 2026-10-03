@@ -201,7 +201,7 @@ export default function DashboardPage() {
             </section>
 
             {/* Cảnh báo */}
-            {(data.uncategorizedCount > 0 || data.budget.alerts.length > 0) && (
+            {(data.uncategorizedCount > 0 || data.budget.alerts.length > 0 || (data.budget.groupAlerts?.length ?? 0) > 0) && (
               <div className="flex flex-wrap gap-2">
                 {data.uncategorizedCount > 0 && (
                   <Link href="/transactions?categoryId=none" className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100">
@@ -209,6 +209,12 @@ export default function DashboardPage() {
                     {data.uncategorizedCount} giao dịch chưa phân loại
                   </Link>
                 )}
+                {(data.budget.groupAlerts ?? []).map((g) => (
+                  <Link key={`g${g.groupId}`} href="/budgets" className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold ${(g.percent ?? 0) >= 1 ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'}`}>
+                    <TriangleAlert className="w-4 h-4" aria-hidden />
+                    Nhóm {g.name} · <span className="fin-num">{pct(g.percent)}</span> hạn mức
+                  </Link>
+                ))}
                 {data.budget.alerts.map((a) => (
                   <Link key={a.categoryId} href="/budgets" className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold ${(a.percent ?? 0) >= 1 ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'}`}>
                     <TriangleAlert className="w-4 h-4" aria-hidden />

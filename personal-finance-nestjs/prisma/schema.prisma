@@ -109,6 +109,7 @@ model CategoryGroup {
   defaultCategory Category?              @relation("GroupDefault", fields: [defaultCategoryId], references: [id], onDelete: SetNull)
   categories      Category[]             @relation("GroupCategories")
   accounts        AccountCategoryGroup[]
+  budgets         GroupBudget[]
 
   @@unique([name, kind])
 }
@@ -214,6 +215,21 @@ model Budget {
   category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([categoryId, month])
+}
+
+// Hạn mức cho cả một nhóm chi tiêu: trần tổng chi của mọi danh mục trong nhóm (kể cả danh mục con).
+// Hợp với khoản biến động theo tháng (di chuyển, điện nước): đặt một hạn mức chung thay vì từng danh mục.
+// Hạn mức riêng của các danh mục cha trong nhóm (nếu có) cộng lại không được vượt hạn mức nhóm.
+model GroupBudget {
+  id      Int    @id @default(autoincrement())
+  groupId Int
+  // "YYYY-MM", hoặc "*" = mặc định cho tháng chưa đặt riêng
+  month   String @db.VarChar(7)
+  amount  BigInt
+
+  group CategoryGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, month])
 }
 
 // ─── Mục tiêu tiết kiệm ───

@@ -11,12 +11,14 @@ import { saveBudgets } from '../lib';
 import { formatVND } from '@/lib/money';
 import { formatMonthLabel } from '@/lib/dates';
 import { orderByTree } from '../utils/budget-insights';
-import type { BudgetLine } from '../types';
+import type { BudgetLine, GroupBudgetStatus } from '../types';
 
 type Scope = 'DEFAULT' | 'MONTH';
 
 interface Props {
   lines: BudgetLine[];
+  // Nhóm chi tiêu: danh mục cha thuộc nhóm có hạn mức riêng thì không được vượt phần còn lại của nhóm
+  groups?: GroupBudgetStatus[];
   month: string;
   // Có: sửa hạn mức của danh mục này; không: chọn danh mục để đặt hạn mức mới
   line: BudgetLine | null;
@@ -27,7 +29,7 @@ interface Props {
 const nf = new Intl.NumberFormat('vi-VN');
 const round100k = (v: number) => Math.ceil(v / 100_000) * 100_000;
 
-export default function BudgetEditModal({ lines, month, line, onClose, onSaved }: Props) {
+export default function BudgetEditModal({ lines, groups = [], month, line, onClose, onSaved }: Props) {
   const [categoryId, setCategoryId] = useState<number>(
     line?.categoryId ?? lines.find((l) => l.amount === null)?.categoryId ?? lines[0]?.categoryId ?? 0
   );
@@ -49,13 +51,23 @@ export default function BudgetEditModal({ lines, month, line, onClose, onSaved }
   const effFor = (l: BudgetLine) => (scope === 'DEFAULT' ? l.defaultAmount : l.amount);
   const parent = current?.parentId !== null ? lines.find((l) => l.categoryId === current?.parentId) : undefined;
   const children = current ? lines.filter((l) => l.parentId === current.categoryId) : [];
-  const ceiling = parent ? effFor(parent) : null;
-  const siblingsSum = parent ? children.length === 0 ? lines.filter((l) => l.parentId === parent.categoryId && l.categoryId !== current?.categoryId).reduce((s, l) => s + (effFor(l) ?? 0), 0) : 0 : 0;
+  // Danh mục cha trong nhóm có hạn mức riêng: trần là hạn mức nhóm trừ phần các danh mục cha khác trong nhóm
+  const group = current && current.parentId === null ? groups.find((g) => g.categoryIds.includes(current.categoryId)) : undefined;
+  const groupCeiling = group ? (scope === 'DEFAULT' ? group.defaultAmount : group.amount) : null;
+  const ceilingOwner = parent ? parent.name : group && groupCeiling !== null ? `nhóm ${group.name}` : '';
+  const ceiling = parent ? effFor(parent) : groupCeiling;
+  const siblingsSum = parent
+    ? children.length === 0
+      ? lines.filter((l) => l.parentId === parent.categoryId && l.categoryId !== current?.categoryId).reduce((s, l) => s + (effFor(l) ?? 0), 0)
+      : 0
+    : group && groupCeiling !== null
+      ? lines.filter((l) => group.categoryIds.includes(l.categoryId) && l.categoryId !== current?.categoryId).reduce((s, l) => s + (effFor(l) ?? 0), 0)
+      : 0;
   const childrenSum = children.reduce((s, l) => s + (effFor(l) ?? 0), 0);
   const maxAllowed = ceiling !== null ? Math.max(0, ceiling - siblingsSum) : null;
   const ceilingError =
     amountNum > 0 && maxAllowed !== null && amountNum > maxAllowed
-      ? `Vượt trần của "${parent!.name}": tối đa ${formatVND(maxAllowed)} (trần ${formatVND(ceiling!)}, các con khác đang dùng ${formatVND(siblingsSum)})`
+      ? `Vượt trần của "${ceilingOwner}": tối đa ${formatVND(maxAllowed)} (trần ${formatVND(ceiling!)}, các danh mục khác đang dùng ${formatVND(siblingsSum)})`
       : amountNum > 0 && children.length > 0 && amountNum < childrenSum
         ? `Các danh mục con đang đặt tổng ${formatVND(childrenSum)}, hạn mức cha không được thấp hơn`
         : null;
@@ -183,7 +195,7 @@ export default function BudgetEditModal({ lines, month, line, onClose, onSaved }
             <span className="block text-xs text-rose-600 mt-1.5 fin-num">{ceilingError}</span>
           ) : maxAllowed !== null ? (
             <span className="block text-xs text-slate-500 mt-1.5 fin-num">
-              Trần nhóm cha &ldquo;{parent!.name}&rdquo;: {formatVND(ceiling!)} · các con khác đang dùng {formatVND(siblingsSum)} · tối đa cho danh mục này{' '}
+              Trần của &ldquo;{ceilingOwner}&rdquo;: {formatVND(ceiling!)} · các danh mục khác đang dùng {formatVND(siblingsSum)} · tối đa cho danh mục này{' '}
               <b className="text-slate-800">{formatVND(maxAllowed)}</b>
             </span>
           ) : children.length > 0 && childrenSum > 0 ? (
