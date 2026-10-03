@@ -291,7 +291,6 @@ export default function GoalFormModal({ goal, month, avgMonthlyExpense, onClose,
                 Số tiền đã có sẵn
               </Label>
               <MoneyInput id="goal-initial" value={initial} onChange={setInitial} size="lg" />
-              <p className="text-xs text-slate-500 pt-1.5">Ghi làm số dư ban đầu của hũ. Web không tự trừ tiền tài khoản.</p>
             </div>
           )}
         </div>
@@ -372,7 +371,6 @@ export default function GoalFormModal({ goal, month, avgMonthlyExpense, onClose,
               <AccountSelect id="goal-source" ariaLabel="Tài khoản nguồn" accounts={accounts} value={sourceAccountId} onChange={setSourceAccountId} allLabel="Không chọn" disabled={!monthlyPlan} className="w-full" />
             </div>
           </div>
-          <p className="text-xs text-slate-500">Web nhắc khi tới ngày nạp mà tháng này chưa nạp đủ. Bạn tự chuyển tiền trong app ngân hàng rồi bấm ghi nhận.</p>
         </div>
 
         {/* Nơi giữ tiền + lãi suất */}

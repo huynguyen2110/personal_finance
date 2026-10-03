@@ -7,7 +7,6 @@ import {
   ArrowDownLeft,
   ArrowRight,
   ArrowUpRight,
-  Lightbulb,
   ListFilter,
   Pencil,
   Play,
@@ -399,13 +398,9 @@ export default function RulesTab({ categories, rules, pending, onGoToTree, onGoT
                     {formatVND(suggestion.amount)}
                   </span>
                 </div>
-                <div className="flex items-start gap-2 text-xs text-slate-600 bg-white border border-slate-200 p-2 rounded-lg">
-                  <Lightbulb className="w-4 h-4 text-teal-700 shrink-0" aria-hidden />
-                  <span>
-                    Tạo từ khóa <strong className="text-teal-800">[{suggestKeyword(suggestion.content) || '…'}]</strong> để các giao dịch tương tự tự
-                    động được phân loại?
-                  </span>
-                </div>
+                <p className="text-xs text-slate-600">
+                  Từ khóa gợi ý: <strong className="text-teal-800">{suggestKeyword(suggestion.content) || '…'}</strong>
+                </p>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -436,7 +431,6 @@ export default function RulesTab({ categories, rules, pending, onGoToTree, onGoT
               </span>
               <div className="min-w-0">
                 <h2 className="font-jakarta text-[15px] font-semibold text-slate-900 leading-tight">Tái áp dụng hàng loạt</h2>
-                <p className="text-xs text-slate-500">Chạy lại quy tắc cho giao dịch cũ sau khi thêm/sửa</p>
               </div>
             </div>
             <div className="flex flex-col gap-2">
@@ -455,26 +449,8 @@ export default function RulesTab({ categories, rules, pending, onGoToTree, onGoT
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" aria-hidden />
               </button>
             </div>
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-2.5">
-              <ShieldCheck className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" aria-hidden />
-              <p className="text-xs text-slate-600 leading-relaxed">
-                <strong className="text-slate-800">Nguyên tắc bảo vệ dữ liệu:</strong> giao dịch bạn đã tự chọn danh mục bằng tay được giữ nguyên và
-                không bao giờ bị quy tắc ghi đè.
-              </p>
-            </div>
           </section>
 
-          {/* Mẹo */}
-          <section className="rounded-2xl bg-gradient-to-br from-teal-50 via-slate-50 to-white border border-slate-200 p-4 flex items-start gap-3">
-            <span className="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-200 flex items-center justify-center text-teal-700 shrink-0">
-              <Lightbulb className="w-5 h-5" aria-hidden />
-            </span>
-            <div className="min-w-0 text-xs text-slate-600 leading-relaxed">
-              <p className="font-jakarta text-sm font-semibold text-slate-900">Mẹo tạo từ khóa</p>
-              Viết HOA không dấu, nhiều từ khóa ngăn cách bằng dấu phẩy. Từ khóa khớp nguyên từ: <code className="font-mono">GRAB</code> khớp{' '}
-              <code className="font-mono">GRAB*123</code> nhưng không khớp <code className="font-mono">GRABFOOD</code>.
-            </div>
-          </section>
         </div>
       </section>
 

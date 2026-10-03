@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { CalendarRange, CircleCheck, Info, MailSearch, PiggyBank, RefreshCw, Save, Target, Trash2, TrendingUp } from 'lucide-react';
+import { CalendarRange, ChevronRight, CircleCheck, Info, MailSearch, RefreshCw, Save, Trash2 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import DatePicker from '@/components/shared/DatePicker';
+import TreeSelect from '@/components/shared/TreeSelect';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import { errorMessage } from '@/lib/api-client';
 import { invalidateFinanceData } from '@/lib/query-client';
@@ -18,17 +19,71 @@ export default function SettingsPage() {
   return (
     <div className="font-jakarta">
       <Header title="Cài đặt" subtitle="Tùy chỉnh cách ứng dụng tính toán và hiển thị" />
-      <div className="px-4 md:px-6 pb-8 flex flex-col gap-4 md:gap-6 max-w-4xl">
-        {isLoading || !data ? (
-          <div className="fin-card h-64 animate-pulse" />
-        ) : (
-          <>
-            <MonthStartCard key={`m-${data.monthStartDay}`} initial={data.monthStartDay} />
-            <EmailStartCard key={`e-${data.emailStartDate ?? ''}`} initial={data.emailStartDate} />
-          </>
-        )}
+      <div className="px-4 md:px-6 pb-8 grid grid-cols-1 xl:grid-cols-[272px_minmax(0,1fr)] gap-4 md:gap-6 items-start">
+        <SettingsNav
+          items={[
+            {
+              href: '#month-start',
+              icon: CalendarRange,
+              tone: 'bg-teal-50 text-teal-700',
+              title: 'Ngày bắt đầu tháng',
+              status: data ? (data.monthStartDay === 1 ? 'Tháng lịch (ngày 1)' : `Ngày ${data.monthStartDay} hàng tháng`) : '…',
+            },
+            {
+              href: '#email-start',
+              icon: MailSearch,
+              tone: 'bg-emerald-50 text-emerald-700',
+              title: 'Dữ liệu từ email',
+              status: data ? (data.emailStartDate ? `Từ ${formatVNDate(data.emailStartDate)}` : 'Không giới hạn') : '…',
+            },
+          ]}
+        />
+        <div className="flex flex-col gap-4 md:gap-6 max-w-5xl min-w-0">
+          {isLoading || !data ? (
+            <div className="fin-card h-64 animate-pulse" />
+          ) : (
+            <>
+              <MonthStartCard key={`m-${data.monthStartDay}`} initial={data.monthStartDay} />
+              <EmailStartCard key={`e-${data.emailStartDate ?? ''}`} initial={data.emailStartDate} />
+            </>
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+interface NavItem {
+  href: string;
+  icon: typeof CalendarRange;
+  tone: string;
+  title: string;
+  status: string;
+}
+
+// Cột trái: danh sách mục cài đặt kèm giá trị đang áp dụng, dính khi cuộn trên màn rộng
+function SettingsNav({ items }: { items: NavItem[] }) {
+  return (
+    <aside className="xl:sticky xl:top-20 flex flex-col gap-3">
+      <nav className="fin-card p-2 flex xl:flex-col gap-1 overflow-x-auto" aria-label="Mục cài đặt">
+        {items.map((it) => (
+          <a
+            key={it.href}
+            href={it.href}
+            className="group flex items-center gap-3 rounded-xl px-3 py-2.5 min-w-[220px] xl:min-w-0 hover:bg-slate-50 transition-colors"
+          >
+            <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${it.tone}`}>
+              <it.icon className="w-4 h-4" aria-hidden />
+            </span>
+            <span className="flex flex-col min-w-0 flex-1">
+              <span className="text-sm font-semibold text-slate-900 truncate">{it.title}</span>
+              <span className="text-[11px] text-slate-500 truncate fin-num">{it.status}</span>
+            </span>
+            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 shrink-0 hidden xl:block" aria-hidden />
+          </a>
+        ))}
+      </nav>
+    </aside>
   );
 }
 
@@ -59,7 +114,7 @@ function MonthStartCard({ initial }: { initial: number }) {
   }
 
   return (
-    <section className="fin-card p-5 md:p-6 flex flex-col gap-5">
+    <section id="month-start" className="fin-card p-5 md:p-6 flex flex-col gap-5 scroll-mt-20">
       <div className="flex items-start gap-3">
         <span className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
           <CalendarRange className="w-5 h-5" aria-hidden />
@@ -67,24 +122,26 @@ function MonthStartCard({ initial }: { initial: number }) {
         <div>
           <h2 className="text-[16px] font-semibold text-slate-900">Ngày bắt đầu tháng</h2>
           <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
-            Nếu bạn nhận lương vào một ngày cố định, hãy đặt ngày đó làm đầu tháng. Ngân sách, thống kê theo tháng và kế hoạch nạp quỹ sẽ
-            tính theo chu kỳ lương thay vì tháng lịch.
+            Ngân sách, thống kê và kế hoạch nạp quỹ tính theo chu kỳ bắt đầu từ ngày này.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <label className="flex flex-col gap-1.5">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-4">
+        <div className="flex flex-col gap-1.5">
           <span className="fin-label">Tháng bắt đầu từ ngày</span>
-          <select className="select-field !rounded-lg !bg-slate-50 text-sm font-semibold fin-num" value={day} onChange={(e) => setDay(Number(e.target.value))}>
-            {Array.from({ length: MAX_MONTH_START_DAY - MIN_MONTH_START_DAY + 1 }, (_, i) => i + MIN_MONTH_START_DAY).map((d) => (
-              <option key={d} value={d}>
-                {d === 1 ? 'Ngày 1 — tháng lịch thông thường' : `Ngày ${d} hàng tháng`}
-              </option>
-            ))}
-          </select>
-          <span className="text-[11px] text-slate-500">Tối đa ngày 28 để tháng nào cũng có ngày này.</span>
-        </label>
+          <TreeSelect<number>
+            ariaLabel="Tháng bắt đầu từ ngày"
+            className="!rounded-lg !bg-slate-50 hover:!bg-white fin-num"
+            options={Array.from({ length: MAX_MONTH_START_DAY - MIN_MONTH_START_DAY + 1 }, (_, i) => i + MIN_MONTH_START_DAY).map((d) => ({
+              value: d,
+              label: d === 1 ? 'Ngày 1 — tháng lịch thông thường' : `Ngày ${d} hàng tháng`,
+              group: d === 1 ? undefined : 'Theo ngày lương',
+            }))}
+            value={day}
+            onChange={(v) => v && setDay(v)}
+          />
+        </div>
 
         <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 flex flex-col gap-2 text-xs text-slate-600">
           <span className="fin-label">Xem trước</span>
@@ -107,25 +164,7 @@ function MonthStartCard({ initial }: { initial: number }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Effect icon={Target} title="Ngân sách">
-          Hạn mức và số đã chi của &ldquo;tháng&rdquo; tính từ ngày lương tới trước ngày lương kế tiếp. Nhịp chi so với thời gian cũng theo chu kỳ này.
-        </Effect>
-        <Effect icon={TrendingUp} title="Tổng quan & Thống kê">
-          Bộ lọc &ldquo;Tháng này / Tháng trước&rdquo; và cột tháng trong biểu đồ, ma trận danh mục gom theo chu kỳ lương.
-        </Effect>
-        <Effect icon={PiggyBank} title="Mục tiêu tiết kiệm">
-          Thặng dư tháng, kế hoạch nạp và kỷ luật nạp chấm theo chu kỳ lương; ngày nạp kế hoạch vẫn là ngày lịch bạn chọn.
-        </Effect>
-      </div>
 
-      <div className="flex items-start gap-2 text-xs text-slate-500">
-        <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
-        <span>
-          Hạn mức đã đặt được lưu theo nhãn tháng (VD &ldquo;T10/2026&rdquo;) nên không mất khi đổi ngày; chỉ khoảng ngày tính số liệu thay đổi. Giao dịch
-          và lịch sử theo ngày không bị ảnh hưởng.
-        </span>
-      </div>
 
       <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
         {!dirty && (
@@ -207,7 +246,7 @@ function EmailStartCard({ initial }: { initial: string | null }) {
   }
 
   return (
-    <section className="fin-card p-5 md:p-6 flex flex-col gap-5">
+    <section id="email-start" className="fin-card p-5 md:p-6 flex flex-col gap-5 scroll-mt-20">
       <div className="flex items-start gap-3">
         <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
           <MailSearch className="w-5 h-5" aria-hidden />
@@ -215,8 +254,7 @@ function EmailStartCard({ initial }: { initial: string | null }) {
         <div>
           <h2 className="text-[16px] font-semibold text-slate-900">Ngày bắt đầu lấy dữ liệu từ email</h2>
           <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
-            Nếu các tháng trước thiếu email thông báo (đổi máy, mới bật thông báo…), hãy chọn ngày bắt đầu có dữ liệu đầy đủ. Web chỉ ghi nhận giao dịch
-            từ email kể từ ngày này; thư cũ hơn bị bỏ qua khi đọc hộp thư.
+            Chỉ ghi nhận giao dịch từ email kể từ ngày này; thư cũ hơn bị bỏ qua.
           </p>
         </div>
       </div>
@@ -227,11 +265,11 @@ function EmailStartCard({ initial }: { initial: string | null }) {
         </p>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-4">
         <div className="flex flex-col gap-1.5">
           <span className="fin-label">Lấy giao dịch từ ngày</span>
           <DatePicker mode="date" value={date} onChange={setDate} max={today} clearable placeholder="Không giới hạn" ariaLabel="Ngày bắt đầu lấy dữ liệu email" />
-          <span className="text-[11px] text-slate-500">Để trống = không giới hạn (lần đọc đầu lấy 30 ngày gần nhất).</span>
+          <span className="text-[11px] text-slate-500">Để trống = không giới hạn.</span>
         </div>
 
         <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 flex flex-col gap-2 text-xs text-slate-600">
@@ -266,13 +304,6 @@ function EmailStartCard({ initial }: { initial: string | null }) {
         </div>
       )}
 
-      <div className="flex items-start gap-2 text-xs text-slate-500">
-        <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
-        <span>
-          Giao dịch nhập tay, nhập file và email bạn tự dán vào không bị giới hạn bởi ngày này. Việc xóa chỉ áp dụng cho giao dịch đọc từ email và không
-          hoàn tác được; khoản nạp quỹ gắn với chúng được giữ lại.
-        </span>
-      </div>
 
       <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
         {!dirty && (
@@ -299,16 +330,5 @@ function EmailStartCard({ initial }: { initial: string | null }) {
         confirmText={purging ? 'Đang xóa…' : 'Xóa'}
       />
     </section>
-  );
-}
-
-function Effect({ icon: Icon, title, children }: { icon: typeof Target; title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-slate-200 p-3 flex flex-col gap-1.5">
-      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-        <Icon className="w-4 h-4 text-teal-700" aria-hidden /> {title}
-      </span>
-      <p className="text-xs text-slate-600 leading-relaxed">{children}</p>
-    </div>
   );
 }

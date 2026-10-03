@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { ArrowDown, ArrowUp, Banknote, CalendarRange, Download, Lightbulb, Minus, PiggyBank, ShoppingBasket, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, Banknote, Download, Minus, PiggyBank, ShoppingBasket, TrendingDown, TrendingUp } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import CategoryIcon from '@/components/shared/CategoryIcon';
 import TreeSelect from '@/components/shared/TreeSelect';
@@ -37,7 +37,6 @@ const VIEWS: { key: ComboView; label: string }[] = [
 const nf = new Intl.NumberFormat('vi-VN');
 const pct = (v: number | null) => (v === null ? '—' : `${(v * 100).toFixed(1).replace('.', ',')}%`);
 const change = (cur: number, prev: number): number | null => (prev === 0 ? null : (cur - prev) / Math.abs(prev));
-const monthText = (m: string) => formatMonthLabel(m).replace('T', 'T');
 
 export default function ReportsPage() {
   // Tháng tài chính (ngày bắt đầu tháng trong cài đặt); mặc định 6 tháng gần nhất tới tháng hiện tại
@@ -133,7 +132,7 @@ export default function ReportsPage() {
         ) : (
           <>
             {/* 4 KPI */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Kpi label="Tổng thu nhập kỳ" icon={<Banknote className="w-[18px] h-[18px]" />} iconClass="bg-teal-50 text-teal-700" badge={<MoM value={insights.incomeMoM} upIsGood />}>
                 <Big value={data.summary.income} />
                 <Foot>
@@ -170,31 +169,6 @@ export default function ReportsPage() {
                   <span className={`fin-label ${data.summary.net >= 0 ? '!text-emerald-700' : '!text-rose-600'}`}>{data.summary.net >= 0 ? 'Thặng dư' : 'Thâm hụt'}</span>
                 </Foot>
               </Kpi>
-
-              <Kpi label="Cực trị chi tiêu" icon={<CalendarRange className="w-[18px] h-[18px]" />} iconClass="bg-slate-100 text-slate-700" badge={<span className="fin-label whitespace-nowrap">{formatMonthLabel(fromMonth)} – {formatMonthLabel(toMonth)}</span>}>
-                {insights.maxMonth && insights.minMonth ? (
-                  <div className="flex flex-col gap-1.5 mt-1">
-                    <div className="flex items-center justify-between gap-2 bg-rose-50 px-2.5 py-1.5 rounded-lg text-xs">
-                      <span className="inline-flex items-center gap-1.5 font-medium text-slate-800">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" aria-hidden /> Cao nhất: {monthText(insights.maxMonth.month)}
-                      </span>
-                      <span className="font-bold text-rose-600 fin-num whitespace-nowrap">{formatVND(insights.maxMonth.expense)}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 bg-emerald-50 px-2.5 py-1.5 rounded-lg text-xs">
-                      <span className="inline-flex items-center gap-1.5 font-medium text-slate-800">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden /> Thấp nhất: {monthText(insights.minMonth.month)}
-                      </span>
-                      <span className="font-bold text-emerald-700 fin-num whitespace-nowrap">{formatVND(insights.minMonth.expense)}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-500 mt-2">Chưa có tháng nào phát sinh chi</p>
-                )}
-                <Foot>
-                  <span>Chênh lệch đỉnh − đáy:</span>
-                  <b className="text-slate-900 fin-num">{insights.maxMonth && insights.minMonth ? formatVND(insights.maxMonth.expense - insights.minMonth.expense) : '—'}</b>
-                </Foot>
-              </Kpi>
             </section>
 
             {/* Biểu đồ kết hợp */}
@@ -205,11 +179,6 @@ export default function ReportsPage() {
                     <h2 className="text-[18px] font-semibold text-slate-900 tracking-[-0.01em]">Biểu đồ so sánh dòng tiền & tỷ lệ tiết kiệm</h2>
                     <span className="fin-label px-2 py-0.5 rounded bg-slate-100">{data.monthCount} tháng</span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {view === 'flow' && 'Tương quan giữa thu nhập, chi tiêu thực tế và tỷ lệ tích lũy ròng qua từng chu kỳ'}
-                    {view === 'savings' && 'Phần còn lại sau chi tiêu mỗi tháng và tỷ lệ tiết kiệm tương ứng'}
-                    {view === 'mix' && 'Tỷ trọng từng nhóm chi trong tổng chi của tháng (5 nhóm lớn nhất, còn lại gộp vào Khác)'}
-                  </p>
                 </div>
                 <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-100 border border-slate-200 self-start" role="tablist" aria-label="Chế độ xem">
                   {VIEWS.map((v) => (
@@ -227,34 +196,6 @@ export default function ReportsPage() {
                 mix={mix}
                 height={320}
               />
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 border border-slate-200 p-3 rounded-lg">
-                <Metric label="Tăng trưởng thu nhập" hint={`${monthText(data.months[data.months.length - 1])} so với ${monthText(data.months[0])}`}>
-                  <span className={insights.incomeGrowth === null ? 'text-slate-500' : insights.incomeGrowth >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
-                    {insights.incomeGrowth === null ? 'Chưa đủ dữ liệu' : `${insights.incomeGrowth >= 0 ? '+' : ''}${pct(insights.incomeGrowth)}`}
-                  </span>
-                </Metric>
-                <Metric label="Tỷ trọng chi tiêu trung bình" hint="Chi / thu toàn kỳ">
-                  <span className={insights.expenseShare !== null && insights.expenseShare > 1 ? 'text-rose-600' : 'text-slate-900'}>{insights.expenseShare !== null ? `${pct(insights.expenseShare)} thu nhập` : '—'}</span>
-                </Metric>
-                <Metric label="Biến động chi phí" hint="Độ lệch chuẩn giữa các tháng">
-                  <span className="text-slate-900">
-                    ± {formatCompactVND(insights.expenseStd)} ₫{' '}
-                    <span className={`text-[11px] font-semibold ${insights.volatility === 'stable' ? 'text-emerald-700' : insights.volatility === 'moderate' ? 'text-amber-700' : 'text-rose-600'}`}>
-                      ({insights.volatility === 'stable' ? 'Ổn định' : insights.volatility === 'moderate' ? 'Dao động vừa' : 'Biến động mạnh'})
-                    </span>
-                  </span>
-                </Metric>
-                <Metric label="Tháng thặng dư cao nhất" hint="Thu − chi lớn nhất">
-                  {insights.bestMonth && insights.bestMonth.net > 0 ? (
-                    <span className="text-teal-700">
-                      {monthText(insights.bestMonth.month)} (+{formatCompactVND(insights.bestMonth.net)} ₫)
-                    </span>
-                  ) : (
-                    <span className="text-slate-500">Chưa có tháng thặng dư</span>
-                  )}
-                </Metric>
-              </div>
             </section>
 
             {/* Ma trận danh mục × tháng */}
@@ -263,9 +204,7 @@ export default function ReportsPage() {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-[18px] font-semibold text-slate-900 tracking-[-0.01em]">Ma trận phân bổ {matrixKind === 'OUT' ? 'chi tiêu' : 'thu nhập'} theo danh mục</h2>
-                    <span className="fin-label px-2.5 py-0.5 rounded-full bg-emerald-50 !text-emerald-700">Đa chu kỳ</span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">So sánh từng danh mục qua {data.monthCount} tháng; ô nền đậm hơn là tháng chi nhiều hơn, cột cuối là tháng gần nhất. Danh mục cha đã gộp số của các con.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-100 border border-slate-200" role="tablist" aria-label="Loại dòng tiền">
@@ -370,10 +309,6 @@ export default function ReportsPage() {
                     </tbody>
                   </table>
                 </div>
-                <p className="flex items-start gap-2 text-xs text-slate-500 pt-1 border-t border-slate-100">
-                  <Lightbulb className="w-4 h-4 text-teal-700 shrink-0" aria-hidden />
-                  Tỷ lệ tiết kiệm = (thu − chi) / thu. Chuyển tiền nội bộ và giao dịch bạn loại khỏi thống kê không tính vào đây.
-                </p>
               </section>
             </section>
           </>
@@ -390,13 +325,7 @@ interface Insights {
   expenseMoM: number | null;
   expenseShare: number | null;
   positiveMonths: number;
-  maxMonth: ReportData['monthly'][number] | null;
-  minMonth: ReportData['monthly'][number] | null;
   avgExpense: number;
-  expenseStd: number;
-  volatility: 'stable' | 'moderate' | 'high';
-  incomeGrowth: number | null;
-  bestMonth: ReportData['monthly'][number] | null;
 }
 
 function deriveInsights(data: ReportData): Insights {
@@ -404,23 +333,12 @@ function deriveInsights(data: ReportData): Insights {
   const last = ms[ms.length - 1];
   const prev = ms[ms.length - 2];
   const withExpense = ms.filter((m) => m.expense > 0);
-  const avgExpense = withExpense.length ? withExpense.reduce((s, m) => s + m.expense, 0) / withExpense.length : 0;
-  const variance = withExpense.length ? withExpense.reduce((s, m) => s + (m.expense - avgExpense) ** 2, 0) / withExpense.length : 0;
-  const std = Math.sqrt(variance);
-  const cv = avgExpense > 0 ? std / avgExpense : 0;
-  const firstIncome = ms.find((m) => m.income > 0);
   return {
     incomeMoM: last && prev ? change(last.income, prev.income) : null,
     expenseMoM: last && prev ? change(last.expense, prev.expense) : null,
     expenseShare: data.summary.income > 0 ? data.summary.expense / data.summary.income : null,
     positiveMonths: ms.filter((m) => m.net > 0).length,
-    maxMonth: withExpense.length ? withExpense.reduce((a, b) => (b.expense > a.expense ? b : a)) : null,
-    minMonth: withExpense.length ? withExpense.reduce((a, b) => (b.expense < a.expense ? b : a)) : null,
-    avgExpense,
-    expenseStd: std,
-    volatility: cv < 0.15 ? 'stable' : cv < 0.35 ? 'moderate' : 'high',
-    incomeGrowth: firstIncome && last && firstIncome.month !== last.month ? change(last.income, firstIncome.income) : null,
-    bestMonth: ms.length ? ms.reduce((a, b) => (b.net > a.net ? b : a)) : null,
+    avgExpense: withExpense.length ? withExpense.reduce((acc, m) => acc + m.expense, 0) / withExpense.length : 0,
   };
 }
 
@@ -493,15 +411,6 @@ function MoM({ value, upIsGood }: { value: number | null; upIsGood: boolean }) {
   );
 }
 
-function Metric({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5 min-w-0">
-      <span className="fin-label truncate">{label}</span>
-      <span className="text-sm font-semibold fin-num truncate">{children}</span>
-      {hint && <span className="text-[11px] text-slate-500 truncate">{hint}</span>}
-    </div>
-  );
-}
 
 // Bảng danh mục × tháng. Dòng cha gộp con; dòng con thụt vào. Cột tháng gần nhất tô nền; cuối hàng là biến động MoM.
 function Matrix({ months, rows, color, mode, upIsGood }: { months: string[]; rows: Row[]; color: string; mode: 'value' | 'share'; upIsGood: boolean }) {

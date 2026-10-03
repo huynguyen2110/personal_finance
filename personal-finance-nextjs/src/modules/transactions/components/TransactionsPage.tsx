@@ -488,7 +488,6 @@ export default function TransactionsPage() {
 
   const baseTotal = allData?.total ?? 0;
   const noneCount = noneData?.total ?? 0;
-  const emailCount = emailData?.total ?? 0;
   const classifiedRatio = baseTotal > 0 ? (baseTotal - noneCount) / baseTotal : 1;
 
   return (
@@ -586,9 +585,6 @@ export default function TransactionsPage() {
                 ) : (
                   <span className="text-teal-700 font-semibold">Tất cả đã có danh mục</span>
                 )}
-                <span className="inline-flex items-center gap-1 text-slate-500 fin-num">
-                  <Mail className="w-3.5 h-3.5" aria-hidden /> {fmtNum(emailCount)} từ email
-                </span>
               </div>
             </Kpi>
           </div>
@@ -860,12 +856,10 @@ export default function TransactionsPage() {
                           <Search className="w-5 h-5 text-slate-400" aria-hidden />
                         </span>
                         <p className="text-sm font-semibold text-slate-700">Không có giao dịch nào khớp bộ lọc</p>
-                        {hasFilters ? (
+                        {hasFilters && (
                           <button type="button" className="text-xs font-semibold text-teal-700 hover:underline" onClick={resetAll}>
                             Đặt lại bộ lọc
                           </button>
-                        ) : (
-                          <p className="text-xs">Giao dịch sẽ xuất hiện khi đọc được email ngân hàng hoặc bạn nhập tay.</p>
                         )}
                       </div>
                     </td>
@@ -932,11 +926,11 @@ export default function TransactionsPage() {
                                 title={`Chuyển khoản nội bộ với ${t.transferPair.account.name} lúc ${formatVNDateTime(t.transferPair.transactionDate)}`}
                               >
                                 <Link2 className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                                {t.direction === 'OUT' ? 'Sang' : 'Từ'} {t.transferPair.account.name} · tự loại khỏi thu/chi
+                                {t.direction === 'OUT' ? 'Sang' : 'Từ'} {t.transferPair.account.name}
                               </span>
                             ) : uncategorized ? (
                               <span className="inline-flex items-center gap-1 text-amber-700 font-medium whitespace-nowrap shrink-0">
-                                <TriangleAlert className="w-3.5 h-3.5 shrink-0" aria-hidden /> Chưa khớp quy tắc tự động nào
+                                <TriangleAlert className="w-3.5 h-3.5 shrink-0" aria-hidden /> Chưa phân loại
                               </span>
                             ) : t.excludeFromStats ? (
                               <span className="inline-flex items-center gap-1 text-slate-500 whitespace-nowrap shrink-0">

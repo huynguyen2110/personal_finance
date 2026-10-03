@@ -274,12 +274,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.core-sidebar-logo-text small {
-  font-size: 11px;
-  color: var(--core-text-muted);
-  white-space: nowrap;
-}
-
 .core-sidebar-close-mobile {
   display: none;
   align-items: center;

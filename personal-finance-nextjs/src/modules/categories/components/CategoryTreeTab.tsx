@@ -10,7 +10,6 @@ import {
   ChevronsUpDown,
   CornerDownRight,
   FolderPlus,
-  Lightbulb,
   Pencil,
   Plus,
   Search,
@@ -499,9 +498,7 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
               </span>
               <div>
                 <h2 className="font-jakarta text-[15px] font-semibold text-slate-900">Chi tiết danh mục</h2>
-                <p className="text-xs text-slate-500 mt-1">
-                  Bấm vào một danh mục cha hoặc con bên trái để sửa tên, nhóm cha, biểu tượng, màu và xem từ khóa nhận diện.
-                </p>
+                <p className="text-xs text-slate-500 mt-1">Chọn một danh mục bên trái để sửa.</p>
               </div>
               <div className="flex gap-2">
                 <button type="button" className="fin-btn fin-btn-outline fin-btn-sm" onClick={() => createUnder('INCOME', null)}>
@@ -542,8 +539,7 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
             {uncovered.length > 0 ? (
               <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex flex-col gap-2">
                 <p className="text-xs text-slate-700">
-                  <strong className="text-amber-800">{uncovered.length} danh mục</strong> chưa có từ khóa nhận diện từ nội dung chuyển khoản. Giao dịch của
-                  chúng sẽ phải gán tay.
+                  <strong className="text-amber-800">{uncovered.length} danh mục</strong> chưa có từ khóa nhận diện.
                 </p>
                 <ul className="flex flex-col gap-1">
                   {uncovered.slice(0, 4).map((c) => (
@@ -564,15 +560,6 @@ export default function CategoryTreeTab({ categories, rules }: Props) {
             )}
           </section>
 
-          <section className="rounded-2xl bg-gradient-to-br from-teal-50 via-slate-50 to-white border border-slate-200 p-4 flex items-start gap-3">
-            <span className="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-200 flex items-center justify-center text-teal-700 shrink-0">
-              <Lightbulb className="w-5 h-5" aria-hidden />
-            </span>
-            <div className="min-w-0 text-xs text-slate-600 leading-relaxed">
-              <p className="font-jakarta text-sm font-semibold text-slate-900">Mẹo phân tầng</p>
-              Danh mục cha gom nhóm, danh mục con nhận giao dịch và quy tắc. Đổi nhóm cha của một danh mục trong bảng chi tiết. Hạn mức đặt ở trang Ngân sách.
-            </div>
-          </section>
         </div>
       </section>
 

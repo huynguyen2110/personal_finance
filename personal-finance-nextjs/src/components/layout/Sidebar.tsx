@@ -80,7 +80,6 @@ export default function Sidebar() {
           </span>
           <span className="core-sidebar-logo-text">
             <strong>Chi tiêu cá nhân</strong>
-            <small>Đọc email ngân hàng</small>
           </span>
         </Link>
         <button

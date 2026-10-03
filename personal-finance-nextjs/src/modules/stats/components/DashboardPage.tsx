@@ -9,16 +9,13 @@ import {
   ArrowRight,
   ArrowUpRight,
   ChevronRight,
-  CircleCheck,
   CircleHelp,
   Flag,
-  Info,
   MailCheck,
   MailWarning,
   PieChart,
   PiggyBank,
   Plus,
-  RefreshCw,
   Sparkles,
   TrendingDown,
   TrendingUp,
@@ -121,9 +118,6 @@ export default function DashboardPage() {
   const budgetPct = data && data.budget.totalBudget > 0 ? data.budget.totalSpent / data.budget.totalBudget : null;
   const last6 = data?.monthly.slice(-6) ?? [];
   const avgExpense6 = last6.length ? last6.reduce((t, m) => t + m.expense, 0) / last6.length : 0;
-  const curM = last6[last6.length - 1];
-  const prevM = last6[last6.length - 2];
-  const monthChange = curM && prevM ? change(curM.expense, prevM.expense) : null;
   // Nhịp chi của tháng ngân sách so với thời gian đã trôi qua
   const clock = data ? monthClock(data.budget.month, sd) : null;
   const paceDiff = data && clock && budgetPct !== null && clock.phase === 'current' ? budgetPct - clock.timePct : null;
@@ -230,51 +224,16 @@ export default function DashboardPage() {
                 <ChartCard
                   className="!bg-white !border-slate-200 !rounded-2xl !shadow-none fin-card"
                   title="So sánh Thu nhập & Chi tiêu 6 tháng"
-                  subtitle={last6.length ? `Từ ${formatMonthLabel(last6[0].month)} đến ${formatMonthLabel(last6[last6.length - 1].month)}${sd > 1 ? ` · tháng tính từ ngày ${sd}` : ''}` : undefined}
                   actions={avgExpense6 > 0 ? <span className="hidden sm:inline text-[11px] font-semibold text-slate-500 fin-num">TB chi: {formatCompactVND(avgExpense6)} ₫/tháng</span> : undefined}
                   table={<MonthlyTable data={last6} />}
                 >
                   <MonthlyBars data={last6} height={240} />
-                  {curM && prevM && (
-                    <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2.5 text-xs text-slate-700">
-                      <span className="inline-flex items-start gap-2">
-                        {monthChange !== null && monthChange <= 0 ? <CircleCheck className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden /> : <TrendingUp className="w-4 h-4 text-rose-500 shrink-0" aria-hidden />}
-                        <span>
-                          Chi tiêu {formatMonthLabel(curM.month)}{' '}
-                          {monthChange === null ? (
-                            <>là <b className="fin-num">{formatVND(curM.expense)}</b> (tháng trước không phát sinh chi)</>
-                          ) : monthChange <= 0 ? (
-                            <>
-                              đang <b className="text-emerald-700">giảm {pct(-monthChange)}</b> so với {formatMonthLabel(prevM.month)}
-                            </>
-                          ) : (
-                            <>
-                              đang <b className="text-rose-600">tăng {pct(monthChange)}</b> so với {formatMonthLabel(prevM.month)}
-                            </>
-                          )}
-                          {avgExpense6 > 0 && (
-                            <>
-                              {' '}
-                              và {curM.expense <= avgExpense6 ? 'thấp' : 'cao'} hơn trung bình 6 tháng <b className="fin-num">{formatCompactVND(Math.abs(curM.expense - avgExpense6))} ₫</b>.
-                            </>
-                          )}
-                        </span>
-                      </span>
-                      <Link href="/reports" className="hidden sm:inline-flex items-center gap-1 text-teal-700 font-semibold hover:underline whitespace-nowrap">
-                        Phân tích chi tiết <ArrowRight className="w-3.5 h-3.5" aria-hidden />
-                      </Link>
-                    </div>
-                  )}
                 </ChartCard>
 
                 <ChartCard
                   className="fin-card !bg-white !border-slate-200 !rounded-2xl !shadow-none flex-1"
                   title="Chi tiêu tích lũy trong kỳ"
-                  subtitle={
-                    data.budget.showOnDailyChart
-                      ? `Đường chi thực tế so với kỳ trước và trần ngân sách ${formatMonthLabel(data.budget.month)} (${formatVND(data.budget.totalBudget)})`
-                      : `So với kỳ trước (${formatVNDate(data.prevPeriod.from)} – ${formatVNDate(data.prevPeriod.to)})`
-                  }
+                  subtitle={data.budget.showOnDailyChart ? `Trần ngân sách ${formatVND(data.budget.totalBudget)}` : 'So với kỳ trước'}
                   actions={
                     paceDiff !== null ? (
                       <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold fin-num whitespace-nowrap ${paceDiff > 0.02 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'}`}>
@@ -366,12 +325,7 @@ export default function DashboardPage() {
             <section className="grid grid-cols-1 xl:grid-cols-12 gap-4 md:gap-6">
               <section className="xl:col-span-8 fin-card p-4 md:p-5 flex flex-col gap-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <h2 className="text-[16px] font-semibold text-slate-900">Giao dịch gần đây</h2>
-                    <p className="text-xs text-slate-500">
-                      {email?.configured ? `Tự động nhận diện từ email biến động số dư ${email.providers.map((x) => x.bankName).join(', ')}` : 'Các giao dịch mới nhất ở mọi tài khoản'}
-                    </p>
-                  </div>
+                  <h2 className="text-[16px] font-semibold text-slate-900">Giao dịch gần đây</h2>
                   <Link href="/transactions" className="inline-flex items-center gap-1 text-sm font-semibold text-teal-700 hover:underline self-start sm:self-auto">
                     Xem tất cả <ChevronRight className="w-4 h-4" aria-hidden />
                   </Link>
@@ -410,10 +364,6 @@ export default function DashboardPage() {
                     ))}
                   </ul>
                 )}
-                <p className="flex items-center gap-2 pt-1 text-xs text-slate-500">
-                  <Info className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden />
-                  Chuyển tiền giữa các tài khoản của bạn được tự nhận diện và loại khỏi thu chi để không làm sai lệch báo cáo.
-                </p>
               </section>
 
               <div className="xl:col-span-4 flex flex-col gap-4">
@@ -462,7 +412,6 @@ export default function DashboardPage() {
                         {!email.configured ? (
                           <>
                             <p className="font-semibold text-amber-800">Chưa kết nối hộp thư ngân hàng</p>
-                            <p className="text-slate-600">Cấu hình email để web tự đọc biến động số dư.</p>
                           </>
                         ) : email.lastRun?.error ? (
                           <>
@@ -471,11 +420,9 @@ export default function DashboardPage() {
                           </>
                         ) : (
                           <>
-                            <p className="font-semibold text-emerald-700">Hộp thư liên kết hoạt động tốt</p>
+                            <p className="font-semibold text-emerald-700">Hộp thư hoạt động tốt</p>
                             <p className="text-slate-600 fin-num">
-                              {email.lastRun
-                                ? `Lần đọc gần nhất ${formatVNDateTime(email.lastRun.at)}: quét ${email.lastRun.scanned} email, thêm ${email.lastRun.created} giao dịch. Tự động mỗi ${email.pollMinutes} phút.`
-                                : `Tự động đọc mỗi ${email.pollMinutes} phút.`}
+                              {email.lastRun ? `Đọc lúc ${formatVNDateTime(email.lastRun.at)} · ${email.lastRun.created} giao dịch mới` : `Tự đọc mỗi ${email.pollMinutes} phút`}
                             </p>
                           </>
                         )}
@@ -484,17 +431,6 @@ export default function DashboardPage() {
                   )}
                 </section>
 
-                {email?.configured && (
-                  <section className="p-4 rounded-2xl bg-gradient-to-br from-teal-700 to-teal-900 text-white flex items-center justify-between gap-3 shadow-sm">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold">Quét biến động số dư mới?</p>
-                      <p className="text-xs text-teal-100">Đọc hộp thư ngân hàng ngay thay vì chờ chu kỳ tự động</p>
-                    </div>
-                    <button type="button" className="fin-btn fin-btn-sm !bg-white !text-teal-800 hover:!bg-teal-50 shrink-0" onClick={readEmails} disabled={polling}>
-                      <RefreshCw className={`w-4 h-4 ${polling ? 'animate-spin' : ''}`} aria-hidden /> {polling ? 'Đang quét…' : 'Quét ngay'}
-                    </button>
-                  </section>
-                )}
               </div>
             </section>
 
@@ -508,10 +444,10 @@ export default function DashboardPage() {
               >
                 <CategoryBreakdown data={data.incomeByCategory} barColor={CHART.income} limit={6} onSelect={(id) => (window.location.href = txnLink({ direction: 'IN', categoryId: id ?? 'none' }))} />
               </ChartCard>
-              <ChartCard className="fin-card !bg-white !border-slate-200 !rounded-2xl !shadow-none" title="Chi trung bình theo thứ" subtitle="Trong kỳ đang xem" table={<WeekdayTable data={weekdayData} />}>
+              <ChartCard className="fin-card !bg-white !border-slate-200 !rounded-2xl !shadow-none" title="Chi trung bình theo thứ" table={<WeekdayTable data={weekdayData} />}>
                 <WeekdayChart data={weekdayData} />
               </ChartCard>
-              <ChartCard className="fin-card !bg-white !border-slate-200 !rounded-2xl !shadow-none" title="10 khoản chi lớn nhất" subtitle="Trong kỳ đang xem">
+              <ChartCard className="fin-card !bg-white !border-slate-200 !rounded-2xl !shadow-none" title="10 khoản chi lớn nhất">
                 <TxnMiniList items={data.topExpenses} empty="Không có khoản chi nào" />
               </ChartCard>
             </section>

@@ -58,7 +58,6 @@ export default function RuleTester({ rules = [], initial }: Props) {
         </span>
         <div className="min-w-0">
           <h2 className="font-jakarta text-[15px] font-semibold text-slate-900 leading-tight">Kiểm tra thử quy tắc</h2>
-          <p className="text-xs text-slate-500">Dán nội dung chuyển khoản bất kỳ để xem bộ lọc gán vào đâu</p>
         </div>
       </div>
 

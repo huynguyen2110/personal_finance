@@ -136,7 +136,6 @@ export default function MatchLogTab({ categories, rules, initialStatus = 'ALL' }
           <p className="text-[28px] leading-9 font-bold tracking-[-0.02em] text-slate-900 fin-num">
             {totalMonth ?? '—'} <span className="text-sm font-semibold text-slate-500">giao dịch</span>
           </p>
-          <p className="text-xs text-slate-500">Mọi nguồn: email ngân hàng, nhập tay, nhập file</p>
         </Kpi>
         <Kpi label="Khớp tự động" icon={<CircleCheck className="w-4 h-4" />} iconClass="bg-emerald-50 text-emerald-700">
           <p className="text-[28px] leading-9 font-bold tracking-[-0.02em] text-slate-900 fin-num">

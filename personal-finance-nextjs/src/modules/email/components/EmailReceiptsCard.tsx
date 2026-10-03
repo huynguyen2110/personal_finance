@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { CircleAlert, CircleCheck, ClipboardPaste, HelpCircle, MailCheck, ShieldCheck } from 'lucide-react';
+import { CircleAlert, CircleCheck, ClipboardPaste, HelpCircle, MailCheck } from 'lucide-react';
 import { errorMessage } from '@/lib/api-client';
 import { formatVND } from '@/lib/money';
 import { formatVNDateTime } from '@/lib/dates';
@@ -73,16 +73,7 @@ export default function EmailReceiptsCard({ onImported }: { onImported: () => vo
     <section className="fin-card p-4 md:p-6 flex flex-col gap-5">
       {/* Tiêu đề + nút đọc */}
       <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-        <div className="flex flex-col gap-1 max-w-2xl">
-          <span className="inline-flex items-center gap-1.5 fin-label text-teal-700">
-            <ShieldCheck className="w-4 h-4" aria-hidden /> Không qua bên thứ ba
-          </span>
-          <h2 className="text-[16px] leading-6 font-semibold text-slate-900">Đọc email thông báo tự động từ ngân hàng</h2>
-          <p className="text-xs text-slate-600">
-            Web đọc thẳng hộp thư của bạn qua IMAP để bóc tách thông báo giao dịch. Không lưu thông tin đăng nhập ngân hàng, mỗi ngân
-            hàng có một mẫu email riêng bên dưới.
-          </p>
-        </div>
+        <h2 className="text-[16px] leading-6 font-semibold text-slate-900">Đọc email ngân hàng</h2>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button type="button" className="fin-btn fin-btn-primary" disabled={!canPoll} onClick={() => poll()}>
             <MailCheck className={`w-4 h-4 ${polling ? 'animate-pulse' : ''}`} aria-hidden /> Đọc email ngay
@@ -166,7 +157,7 @@ export default function EmailReceiptsCard({ onImported }: { onImported: () => vo
           <span className="inline-flex items-center gap-2 text-[15px] font-semibold text-slate-900">
             <ClipboardPaste className="w-5 h-5 text-slate-400" aria-hidden /> Thử nghiệm hoặc dán thủ công nội dung email
           </span>
-          <span className="text-xs text-slate-500">Hỗ trợ Ctrl+A rồi dán toàn văn email thông báo, hoặc mã HTML gốc của thư</span>
+          <span className="text-xs text-slate-500">Dán toàn văn hoặc HTML của email</span>
         </div>
         <textarea
           className="input-field font-mono !text-xs !rounded-lg resize-y"

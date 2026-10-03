@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { ArrowRight, ChartColumn, CircleCheck, Info, Scale } from 'lucide-react';
+import { ArrowRight, ChartColumn, CircleCheck, Scale } from 'lucide-react';
 import { errorMessage } from '@/lib/api-client';
 import { saveBudgets } from '../lib';
 import { formatCompactVND, formatVND } from '@/lib/money';
@@ -173,24 +173,3 @@ export function HistoryCard({ history, month }: { history: BudgetMonthTotals[]; 
   );
 }
 
-// ─── Giải thích cách hạn mức hoạt động ───
-
-export function HowItWorksCard() {
-  return (
-    <section className="fin-card p-4 flex flex-col gap-2">
-      <h2 className="font-jakarta text-[16px] font-semibold text-slate-900 flex items-center gap-2">
-        <Info className="w-4 h-4 text-slate-400" aria-hidden /> Cách hạn mức hoạt động
-      </h2>
-      <ul className="text-xs text-slate-600 space-y-1.5 list-disc pl-4">
-        <li>
-          <b className="text-slate-800">Mặc định hàng tháng</b>: tự áp dụng cho mọi tháng, không cần sao chép.
-        </li>
-        <li>
-          <b className="text-slate-800">Riêng tháng</b>: ghi đè cho đúng một tháng (VD tháng có khoản chi lớn).
-        </li>
-        <li>Từ 80% hạn mức là “sắp chạm”, quá 100% là “vượt”. Tổng quan cũng hiện cảnh báo này.</li>
-        <li>Giao dịch loại khỏi thống kê (chuyển nội bộ) không tính vào hạn mức.</li>
-      </ul>
-    </section>
-  );
-}

@@ -131,7 +131,7 @@ export default function GoalsOverview({ data }: { data: GoalsOverviewData }) {
             </div>
           </>
         ) : (
-          <p className="text-xs text-slate-500">Chưa có quỹ duy trì. Quỹ khẩn cấp nên là quỹ duy trì.</p>
+          <p className="text-xs text-slate-500">Chưa có quỹ duy trì.</p>
         )}
       </Kpi>
 
@@ -170,7 +170,7 @@ export default function GoalsOverview({ data }: { data: GoalsOverviewData }) {
       {/* Sức khỏe tài chính */}
       <Kpi label="Sức khỏe tài chính" icon={HeartPulse} iconClass="text-rose-500">
         {health.score === null || !level ? (
-          <p className="text-xs text-slate-500">Chưa đủ dữ liệu để chấm điểm. Hãy tạo quỹ khẩn cấp và ghi nhận thu chi vài tháng.</p>
+          <p className="text-xs text-slate-500">Chưa đủ dữ liệu để chấm điểm.</p>
         ) : (
           <>
             <div className="flex items-center gap-3">
@@ -186,7 +186,6 @@ export default function GoalsOverview({ data }: { data: GoalsOverviewData }) {
               </div>
               <div className="min-w-0">
                 <span className={`inline-flex px-2 py-0.5 rounded-full border text-xs font-semibold ${level.badge}`}>{level.label}</span>
-                <p className="text-[11px] text-slate-500 mt-1">Điểm /100, tính từ 4 yếu tố bên dưới</p>
               </div>
             </div>
             <ul className="flex flex-col gap-1.5 mt-1">

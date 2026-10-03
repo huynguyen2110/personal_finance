@@ -230,12 +230,7 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
         {!transaction?.transferPair && (
           <label className="flex items-start gap-2 text-sm text-text-secondary cursor-pointer">
             <input type="checkbox" className="mt-0.5" checked={exclude} onChange={(e) => setExclude(e.target.checked)} />
-            <span>
-              Loại khỏi thống kê
-              <span className="block text-xs text-text-muted">
-                Chuyển khoản nội bộ được tự nhận diện. Đánh dấu tay cho các trường hợp khác không muốn tính.
-              </span>
-            </span>
+            <span>Loại khỏi thống kê</span>
           </label>
         )}
 

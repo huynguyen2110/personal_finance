@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Info, Landmark, Layers, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, TriangleAlert, Wand2, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Landmark, Layers, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, TriangleAlert, Wand2, X } from 'lucide-react';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import TreeSelect from '@/components/shared/TreeSelect';
 import CategoryIcon, { CATEGORY_COLORS, CATEGORY_ICONS } from '@/components/shared/CategoryIcon';
@@ -225,22 +225,8 @@ export default function CategoryGroupsTab({ categories, groups, accounts }: Prop
               </span>
               <div>
                 <h2 className="font-jakarta text-[15px] font-semibold text-slate-900">Nhóm chi tiêu theo tài khoản</h2>
-                <p className="text-xs text-slate-500 mt-1">
-                  Mỗi ngân hàng của bạn thường chi cho vài loại việc nhất định. Gom danh mục cha thành nhóm, gán nhóm cho tài khoản, hệ thống sẽ dựa vào đó
-                  để đoán mục đích giao dịch.
-                </p>
+                <p className="text-xs text-slate-500 mt-1">Gom danh mục cha thành nhóm và gán cho tài khoản để gợi ý phân loại.</p>
               </div>
-              <ul className="text-left text-xs text-slate-600 flex flex-col gap-1.5 w-full">
-                <li className="flex items-start gap-2">
-                  <Sparkles className="w-3.5 h-3.5 text-teal-700 mt-0.5 shrink-0" aria-hidden /> Khi chọn danh mục cho giao dịch, nhóm của tài khoản đó hiện lên đầu.
-                </li>
-                <li className="flex items-start gap-2">
-                  <Landmark className="w-3.5 h-3.5 text-teal-700 mt-0.5 shrink-0" aria-hidden /> Quy tắc từ khóa có thể giới hạn &ldquo;chỉ áp dụng cho tài khoản X&rdquo;.
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-teal-700 mt-0.5 shrink-0" aria-hidden /> Tài khoản chỉ có một nhóm: giao dịch không khớp quy tắc được gán vào danh mục mặc định của nhóm, đánh dấu &ldquo;Theo tài khoản&rdquo;.
-                </li>
-              </ul>
               <button type="button" className="fin-btn fin-btn-primary fin-btn-sm" onClick={() => setInspect({ mode: 'create', kind: 'EXPENSE' })}>
                 <Plus className="w-4 h-4" aria-hidden /> Tạo nhóm chi tiêu
               </button>
@@ -278,10 +264,6 @@ export default function CategoryGroupsTab({ categories, groups, accounts }: Prop
               <RefreshCw className={`w-3.5 h-3.5 text-slate-400 ${reapplying ? 'animate-spin' : ''}`} aria-hidden />
               {reapplying ? 'Đang áp dụng…' : 'Áp dụng cho giao dịch chưa phân loại'}
             </button>
-            <p className="text-[11px] text-slate-500 flex items-start gap-1.5">
-              <Info className="w-3.5 h-3.5 mt-px shrink-0" aria-hidden />
-              Chỉ đụng tới giao dịch chưa phân loại hoặc đã gán theo tài khoản. Giao dịch bạn tự chọn danh mục không bị ghi đè.
-            </p>
           </section>
         </div>
       </section>
@@ -519,9 +501,7 @@ function GroupInspector({
             onChange={(v) => setDefaultCategoryId(v ? v : null)}
             disabled={!defaultOptions.length}
           />
-          <span className="text-[11px] text-slate-500">
-            Chỉ dùng khi tài khoản gán đúng một nhóm {KIND_LABEL[kind]}. Giao dịch gán kiểu này được đánh dấu &ldquo;Theo tài khoản&rdquo; để bạn kiểm tra lại.
-          </span>
+          <span className="text-[11px] text-slate-500">Chỉ dùng khi tài khoản gán đúng một nhóm {KIND_LABEL[kind]}.</span>
         </label>
 
         <div className="flex flex-col gap-1.5">
