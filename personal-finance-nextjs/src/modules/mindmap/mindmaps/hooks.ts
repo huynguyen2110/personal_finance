@@ -137,6 +137,9 @@ export function useDeleteNode(mindmapId: number) {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['nodes', mindmapId] });
+      // Xóa nhánh → liên kết của nhánh bị xóa theo (cascade)
+      qc.invalidateQueries({ queryKey: ['links', mindmapId] });
+      qc.invalidateQueries({ queryKey: ['plan', mindmapId] });
     },
   });
 }

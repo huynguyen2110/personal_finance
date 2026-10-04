@@ -16,9 +16,12 @@ export type MindNodeData = {
   todoDone: number;
   todoTotal: number;
   editing: boolean;
+  /** Nhánh này đang là nguồn của liên kết sắp tạo. */
+  linkSource: boolean;
   onCommitTitle: (nodeId: number, title: string) => void;
   onCancelEdit: () => void;
   onToggleCollapse: (nodeId: number, collapsed: boolean) => void;
+  onStartLink: (nodeId: number) => void;
 };
 
 export type MindFlowNode = Node<MindNodeData, 'mindNode'>;

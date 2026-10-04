@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { Spinner } from '@/modules/mindmap/components/ui/Spinner';
+import { LinksSection } from '@/modules/mindmap/node-page/components/LinksSection';
 import { LinkedTodosSection } from '@/modules/mindmap/node-page/components/LinkedTodosSection';
 import { NodePageEditor } from '@/modules/mindmap/node-page/components/NodePageEditor';
 import { NodePageHeader } from '@/modules/mindmap/node-page/components/NodePageHeader';
@@ -31,6 +32,7 @@ export default function NodePage() {
         status={node.status}
         isRoot={node.parentId === null}
       />
+      <LinksSection mindmapId={mindmapId} nodeId={nodeId} />
       <LinkedTodosSection nodeId={nodeId} />
       <div className="rounded-xl border border-gray-200 bg-white p-6 pt-10">
         <NodePageEditor

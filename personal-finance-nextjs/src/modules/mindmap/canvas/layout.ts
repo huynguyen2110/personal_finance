@@ -18,7 +18,8 @@ export function estimateNodeSize(
 ) {
   // Same numbers feed dagre and the CSS pill so layout matches rendering.
   const badges = (node.todoTotal > 0 ? 52 : 0) + (node.status ? 18 : 0);
-  const titleWidth = 56 + node.title.length * 7.5 + badges;
+  // 56 = padding + icon trang; +18 cho nút nối liên kết
+  const titleWidth = 74 + node.title.length * 7.5 + badges;
   const chipsRow =
     chips.length > 0
       ? 24 + chips.reduce((sum, c) => sum + chipWidth(c) + 4, 0)

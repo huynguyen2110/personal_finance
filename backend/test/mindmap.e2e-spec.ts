@@ -193,6 +193,38 @@ describe('Mindmap API (e2e)', () => {
       expect(cleared.body.data).toMatchObject({ durationMinutes: null, effectiveness: 4 });
       await authed('delete', `/api/mindmap/todos/${t.id}`).expect(200);
     });
+
+    it('liên kết: tạo 3 loại, chặn tự nối / trùng / khác mindmap / vòng điều kiện; sửa, xóa; xóa node → mất liên kết', async () => {
+      const mk = async (title: string) => (await authed('post', `${gbase()}/nodes`).send({ parentId: groot, title }).expect(201)).body.data.id as number;
+      const a = await mk('SQL cơ bản');
+      const b = await mk('Tối ưu query');
+      const c = await mk('Thiết kế DB');
+      const link = (k: string, s: number, t: number) => authed('post', `${gbase()}/links`).send({ sourceNodeId: s, targetNodeId: t, kind: k });
+
+      const pre = (await link('prerequisite', a, b).expect(201)).body.data;
+      expect(pre).toMatchObject({ sourceNodeId: a, targetNodeId: b, kind: 'prerequisite', note: null });
+      await link('prerequisite', b, c).expect(201);
+      const cyc = await link('prerequisite', c, a).expect(400);
+      expect(cyc.body.message).toContain('vòng');
+      await link('prerequisite', a, b).expect(400);
+      await link('supports', a, a).expect(400);
+      await link('supports', a, leaf).expect(400); // leaf thuộc mindmap khác (đã xóa) / không thuộc mindmap này
+      const sup = (await link('supports', c, a).expect(201)).body.data; // bổ trợ được phép ngược chiều
+      const rel = (await authed('post', `${gbase()}/links`).send({ sourceNodeId: a, targetNodeId: c, kind: 'related', note: '  cùng chủ đề  ' }).expect(201)).body.data;
+      expect(rel.note).toBe('cùng chủ đề');
+
+      // Đổi bổ trợ c→a thành điều kiện trước sẽ tạo vòng a→b→c→a
+      await authed('patch', `${gbase()}/links/${sup.id}`).send({ kind: 'prerequisite' }).expect(400);
+      const edited = await authed('patch', `${gbase()}/links/${rel.id}`).send({ note: null }).expect(200);
+      expect(edited.body.data.note).toBeNull();
+
+      expect((await authed('get', `${gbase()}/links`).expect(200)).body.data).toHaveLength(4);
+      await authed('delete', `${gbase()}/links/${rel.id}`).expect(200);
+      await authed('delete', `${gbase()}/nodes/${b}`).expect(200);
+      const left = (await authed('get', `${gbase()}/links`).expect(200)).body.data;
+      expect(left.map((l: { id: number }) => l.id)).toEqual([sup.id]);
+      await authed('delete', `${gbase()}/links/${pre.id}`).expect(404);
+    });
   });
 
   it('đổi mật khẩu: sai mật khẩu cũ → 400; đúng → token mới, đăng nhập bằng mật khẩu mới', async () => {

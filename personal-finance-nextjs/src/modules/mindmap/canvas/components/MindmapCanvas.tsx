@@ -5,7 +5,9 @@ import {
   BackgroundVariant,
   Controls,
   Edge,
+  MarkerType,
   Node,
+  Panel,
   ReactFlow,
   ReactFlowProvider,
   useNodesState,
@@ -13,6 +15,12 @@ import {
 } from '@xyflow/react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Spinner } from '@/modules/mindmap/components/ui/Spinner';
+import { LINK_KINDS, NodeLink } from '@/modules/mindmap/links/api';
+import {
+  LinkDialog,
+  LinkDialogTarget,
+} from '@/modules/mindmap/links/components/LinkDialog';
+import { useLinks } from '@/modules/mindmap/links/hooks';
 import {
   useCreateNode,
   useDeleteNode,
@@ -35,6 +43,7 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
   const { data: mindmap } = useMindmap(mindmapId);
   const { data: treeData, isLoading } = useNodes(mindmapId);
   const { data: definitions } = useProperties(mindmapId);
+  const { data: links } = useLinks(mindmapId);
   const tree = useMindmapTree(treeData);
 
   // React Query's .mutate is referentially stable — safe as a dependency.
@@ -45,14 +54,20 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const [showLinks, setShowLinks] = useState(true);
+  // Đang chọn nhánh đích cho liên kết bắt đầu từ nhánh này
+  const [linkingFrom, setLinkingFrom] = useState<number | null>(null);
+  const [linkDialog, setLinkDialog] = useState<LinkDialogTarget | null>(null);
 
   // Giá trị mới nhất cho trình xử lý phím (gắn một lần), cập nhật sau mỗi lần render
   const selectedIdRef = useRef(selectedId);
   const editingIdRef = useRef(editingId);
+  const linkingFromRef = useRef(linkingFrom);
   useLayoutEffect(() => {
     selectedIdRef.current = selectedId;
     editingIdRef.current = editingId;
-  }, [selectedId, editingId]);
+    linkingFromRef.current = linkingFrom;
+  }, [selectedId, editingId, linkingFrom]);
 
   const { getIntersectingNodes } = useReactFlow();
 
@@ -70,6 +85,11 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
     },
     [mutateUpdate],
   );
+
+  const startLink = useCallback((nodeId: number) => {
+    setEditingId(null);
+    setLinkingFrom(nodeId);
+  }, []);
 
   // Layout-owned positions: xyflow nodes + edges derived from the tree.
   const { layoutedNodes, edges } = useMemo(() => {
@@ -103,9 +123,11 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
           todoTotal: rollup.total,
           chips: chipsOf.get(n.id) ?? [],
           editing: editingId === n.id,
+          linkSource: linkingFrom === n.id,
           onCommitTitle: commitTitle,
           onCancelEdit: cancelEdit,
           onToggleCollapse: toggleCollapse,
+          onStartLink: startLink,
         },
       };
     });
@@ -123,8 +145,63 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
         },
       }));
 
-    return { layoutedNodes: nodes, edges: flowEdges };
-  }, [tree, definitions, selectedId, editingId, mindmapId, commitTitle, cancelEdit, toggleCollapse]);
+    // Liên kết ngang: chỉ vẽ khi cả hai đầu đang hiện (không bị thu gọn)
+    const linkEdges: Edge[] = showLinks
+      ? (links ?? [])
+          .filter(
+            (l) =>
+              visibleIds.has(l.sourceNodeId) && visibleIds.has(l.targetNodeId),
+          )
+          .map((l) => {
+            const meta = LINK_KINDS[l.kind];
+            const edge: Edge = {
+              id: `link-${l.id}`,
+              source: String(l.sourceNodeId),
+              target: String(l.targetNodeId),
+              sourceHandle: 'link-out',
+              targetHandle: 'link-in',
+              type: 'default',
+              zIndex: 1,
+              data: { link: l },
+              label: l.note ?? undefined,
+              labelStyle: { fontSize: 10, fill: meta.color },
+              labelBgStyle: { fill: 'white', fillOpacity: 0.9 },
+              labelBgPadding: [4, 2],
+              labelBgBorderRadius: 4,
+              markerEnd: meta.arrow
+                ? {
+                    type: MarkerType.ArrowClosed,
+                    color: meta.color,
+                    width: 16,
+                    height: 16,
+                  }
+                : undefined,
+              style: {
+                stroke: meta.color,
+                strokeWidth: 1.75,
+                strokeDasharray: meta.dash,
+                cursor: 'pointer',
+              },
+            };
+            return edge;
+          })
+      : [];
+
+    return { layoutedNodes: nodes, edges: [...flowEdges, ...linkEdges] };
+  }, [
+    tree,
+    definitions,
+    links,
+    showLinks,
+    selectedId,
+    editingId,
+    linkingFrom,
+    mindmapId,
+    commitTitle,
+    cancelEdit,
+    toggleCollapse,
+    startLink,
+  ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<MindFlowNode>([]);
   const layoutedRef = useRef(layoutedNodes);
@@ -182,6 +259,10 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
         return;
       }
       if (editingIdRef.current !== null) return;
+      if (linkingFromRef.current !== null && e.key === 'Escape') {
+        setLinkingFrom(null);
+        return;
+      }
       const selected = selectedIdRef.current
         ? tree.byId.get(selectedIdRef.current)
         : null;
@@ -198,6 +279,9 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
       } else if (key === 'F2') {
         e.preventDefault();
         setEditingId(selected.id);
+      } else if (key === 'l' || key === 'L' || key === 'KeyL') {
+        e.preventDefault();
+        setLinkingFrom(selected.id);
       } else if (key === 'Delete' || key === 'Backspace') {
         e.preventDefault();
         removeNode(selected.id);
@@ -251,7 +335,22 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
         edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
-        onNodeClick={(_, n) => setSelectedId(Number(n.id))}
+        onNodeClick={(_, n) => {
+          const id = Number(n.id);
+          if (linkingFrom !== null && linkingFrom !== id) {
+            setLinkDialog({
+              mode: 'create',
+              sourceId: linkingFrom,
+              targetId: id,
+            });
+            setLinkingFrom(null);
+          }
+          setSelectedId(id);
+        }}
+        onEdgeClick={(_, edge) => {
+          const link = (edge.data as { link?: NodeLink } | undefined)?.link;
+          if (link) setLinkDialog({ mode: 'edit', link });
+        }}
         onNodeDoubleClick={(_, n) => {
           setSelectedId(Number(n.id));
           setEditingId(Number(n.id));
@@ -259,6 +358,7 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
         onPaneClick={() => {
           setSelectedId(null);
           setEditingId(null);
+          setLinkingFrom(null);
         }}
         onNodeDragStop={onNodeDragStop}
         fitView
@@ -276,8 +376,32 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
         <CanvasToolbar
           title={mindmap?.title ?? ''}
           onOpenProperties={() => setPropertiesOpen(true)}
+          showLinks={showLinks}
+          linkCount={links?.length ?? 0}
+          onToggleLinks={() => setShowLinks((v) => !v)}
         />
+        {linkingFrom !== null && (
+          <Panel position="top-center">
+            <div className="mt-14 flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800 shadow-lg">
+              Chọn nhánh đích để nối với{' '}
+              <b>&quot;{tree.byId.get(linkingFrom)?.title}&quot;</b>
+              <button
+                onClick={() => setLinkingFrom(null)}
+                className="rounded px-1.5 py-0.5 font-medium hover:bg-orange-100"
+              >
+                Hủy (Esc)
+              </button>
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
+
+      <LinkDialog
+        mindmapId={mindmapId}
+        target={linkDialog}
+        titleOf={(id) => tree.byId.get(id)?.title ?? `#${id}`}
+        onClose={() => setLinkDialog(null)}
+      />
 
       <PropertyDefinitionManager
         mindmapId={mindmapId}

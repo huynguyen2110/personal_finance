@@ -1,7 +1,7 @@
 'use client';
 
 import { Handle, NodeProps, Position } from '@xyflow/react';
-import { CheckCircle2, Circle, CircleDot, FileText } from 'lucide-react';
+import { CheckCircle2, Circle, CircleDot, FileText, Link2 } from 'lucide-react';
 import Link from 'next/link';
 import { memo, useEffect, useRef, useState } from 'react';
 import { cn } from '@/modules/mindmap/lib/utils';
@@ -23,6 +23,7 @@ function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
     todoTotal,
     editing,
     chips,
+    linkSource,
   } = data;
 
   const [value, setValue] = useState(title);
@@ -79,6 +80,7 @@ function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
           isRoot ? 'px-5 py-2.5' : 'px-4 py-1.5',
           isRoot || chips.length > 0 ? 'rounded-xl' : 'rounded-full',
           selected && 'shadow-md ring-2 ring-violet-300 ring-offset-1',
+          linkSource && 'shadow-md ring-2 ring-orange-400 ring-offset-2',
           status === 'done' && !selected && 'opacity-60',
         )}
         style={{ borderColor: color }}
@@ -158,6 +160,19 @@ function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
             <FileText size={13} />
           </Link>
         )}
+
+        {!editing && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onStartLink(nodeId);
+            }}
+            title="Nối với nhánh khác (phím L)"
+            className="nodrag rounded p-0.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-orange-500 group-hover:opacity-100"
+          >
+            <Link2 size={13} />
+          </button>
+        )}
         </div>
 
         {chips.length > 0 && !editing && (
@@ -199,6 +214,21 @@ function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
       <Handle
         type="source"
         position={Position.Right}
+        className="mind-handle"
+        isConnectable={false}
+      />
+      {/* Điểm neo cho cạnh liên kết ngang (không dùng để kéo nối) */}
+      <Handle
+        id="link-out"
+        type="source"
+        position={Position.Bottom}
+        className="mind-handle"
+        isConnectable={false}
+      />
+      <Handle
+        id="link-in"
+        type="target"
+        position={Position.Top}
         className="mind-handle"
         isConnectable={false}
       />
