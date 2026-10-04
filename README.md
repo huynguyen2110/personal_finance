@@ -64,6 +64,7 @@ npm run prisma:deploy       # tạo bảng
 npm run seed                # tài khoản đăng nhập, danh mục mặc định, quy tắc mẫu, ví tiền mặt
 npm run seed:demo           # (tùy chọn) ~6 tháng giao dịch giả để xem thống kê
 npm run seed:goals          # (tùy chọn) mục tiêu tiết kiệm mẫu; xóa: npm run seed:goals -- --clear
+npm run seed:growth         # (tùy chọn) dữ liệu mẫu Phát triển bản thân (lĩnh vực, hành động, liên kết, ~5 tuần todo); xóa: npm run seed:growth -- --clear
 npm run build && npm run start:prod   # API ở http://localhost:4000
 ```
 
