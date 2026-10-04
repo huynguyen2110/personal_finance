@@ -1,24 +1,43 @@
 'use client';
 
 import { Panel } from '@xyflow/react';
-import { Link2, ListChecks, Settings2 } from 'lucide-react';
+import { Focus, Link2, ListChecks, Settings2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/modules/mindmap/components/ui/Button';
 import { growthRoutes } from '@/modules/mindmap/lib/routes';
 import { cn } from '@/modules/mindmap/lib/utils';
 
+export type LinkMode = 'selected' | 'all' | 'none';
+
+const LINK_MODE_LABELS: Record<LinkMode, string> = {
+  selected: 'khi chọn',
+  all: 'tất cả',
+  none: 'ẩn',
+};
+const NEXT_LINK_MODE: Record<LinkMode, LinkMode> = {
+  selected: 'all',
+  all: 'none',
+  none: 'selected',
+};
+
 export function CanvasToolbar({
   title,
   onOpenProperties,
-  showLinks,
+  linkMode,
   linkCount,
-  onToggleLinks,
+  onLinkModeChange,
+  areas,
+  focusAreaId,
+  onFocusChange,
 }: {
   title: string;
   onOpenProperties: () => void;
-  showLinks: boolean;
+  linkMode: LinkMode;
   linkCount: number;
-  onToggleLinks: () => void;
+  onLinkModeChange: (mode: LinkMode) => void;
+  areas: { id: number; title: string }[];
+  focusAreaId: number | null;
+  onFocusChange: (areaId: number | null) => void;
 }) {
   return (
     <>
@@ -30,14 +49,42 @@ export function CanvasToolbar({
           <Button variant="ghost" size="sm" onClick={onOpenProperties}>
             <Settings2 size={14} /> Thuộc tính
           </Button>
+          <label
+            className={cn(
+              'flex items-center gap-1 rounded-lg px-1.5 py-1 text-xs',
+              focusAreaId !== null
+                ? 'bg-violet-50 text-violet-700'
+                : 'text-gray-600',
+            )}
+            title="Chỉ hiện một lĩnh vực"
+          >
+            <Focus size={14} />
+            <select
+              value={focusAreaId ?? ''}
+              onChange={(e) =>
+                onFocusChange(
+                  e.target.value === '' ? null : Number(e.target.value),
+                )
+              }
+              className="max-w-40 cursor-pointer bg-transparent font-medium outline-none"
+            >
+              <option value="">Tất cả lĩnh vực</option>
+              {areas.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.title}
+                </option>
+              ))}
+            </select>
+          </label>
           <Button
             variant="ghost"
             size="sm"
-            onClick={onToggleLinks}
-            title={showLinks ? 'Ẩn liên kết' : 'Hiện liên kết'}
-            className={cn(!showLinks && 'text-gray-400 line-through')}
+            onClick={() => onLinkModeChange(NEXT_LINK_MODE[linkMode])}
+            title="Bấm để đổi: hiện liên kết khi chọn nhánh → tất cả → ẩn"
+            className={cn(linkMode === 'none' && 'text-gray-400')}
           >
-            <Link2 size={14} /> Liên kết{linkCount > 0 && ` (${linkCount})`}
+            <Link2 size={14} /> Liên kết{linkCount > 0 && ` (${linkCount})`}:{' '}
+            {LINK_MODE_LABELS[linkMode]}
           </Button>
           <Link
             href={growthRoutes.plan}

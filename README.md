@@ -149,7 +149,7 @@ Kiểm tra bộ đọc email: `npm test -- providers` trong `backend`.
 
 Một bản đồ duy nhất cho mỗi người dùng (`GET /api/mindmap/mindmaps/primary`: lấy mindmap cũ nhất, chưa có thì tự tạo theo mẫu). Trang đầu là **Kế hoạch** (`/growth`); sidebar có Sơ đồ (`/growth/map`), Todo hằng ngày, Thống kê. Link cũ `/mindmap/...` tự chuyển sang `/growth/...`. Tên code, route API và bảng DB (`mm_*`) vẫn giữ "mindmap".
 
-- **Sơ đồ**: canvas tự xếp từ trái sang phải. Phím tắt: `Tab` thêm nhánh con, `Enter` thêm nhánh ngang, `F2`/nhấp đúp đổi tên, `Delete` xóa (xóa cả nhánh con), `L` nối liên kết. Kéo một nhánh thả vào nhánh khác để đổi cha; tô màu theo nhánh; thu gọn/mở rộng.
+- **Sơ đồ**: canvas tự xếp 2 bên nút gốc (lĩnh vực chia đều trái/phải); ô *tập trung* chỉ hiện một lĩnh vực và phóng to vừa màn hình; liên kết mặc định chỉ hiện cho nhánh đang chọn/rê chuột (đổi sang tất cả/ẩn trên thanh công cụ). Phím tắt: `Tab` thêm nhánh con, `Enter` thêm nhánh ngang, `F2`/nhấp đúp đổi tên, `Delete` xóa (xóa cả nhánh con), `L` nối liên kết. Kéo một nhánh thả vào nhánh khác để đổi cha; tô màu theo nhánh; thu gọn/mở rộng.
 - **Thuộc tính có sẵn**: Ưu tiên, Độ khó, Thời gian (giờ), Chi phí (₫) — tạo cùng bản đồ. Quy ước: nhánh cấp 1 = lĩnh vực cần phát triển, nhánh cấp ≥2 = hành động.
 - **Trang của nhánh**: trình soạn kiểu Notion (TipTap, tự lưu sau 1 giây), trạng thái (Chưa làm/Đang làm/Xong), thuộc tính tùy chỉnh (văn bản, số có đơn vị tiền/giờ, đúng/sai, ngày, lựa chọn có mức), liên kết, danh sách todo gắn với nhánh.
 - **Liên kết giữa nhánh**: *bổ trợ* (A giúp B), *điều kiện trước* (A phải xong trước B, chặn vòng lặp), *liên quan* (kèm ghi chú). Vẽ thành cung cong trên canvas; bấm vào cung để sửa/xóa.

@@ -24,6 +24,7 @@ function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
     editing,
     chips,
     linkSource,
+    side,
   } = data;
 
   const [value, setValue] = useState(title);
@@ -68,12 +69,6 @@ function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
 
   return (
     <div className="group relative">
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="mind-handle"
-        isConnectable={false}
-      />
       <div
         className={cn(
           'flex flex-col border-2 bg-white shadow-sm shadow-gray-950/5 transition-shadow hover:shadow-md hover:shadow-gray-950/10',
@@ -205,33 +200,38 @@ function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
             'nodrag absolute top-1/2 z-10 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full border bg-white px-0.5 text-[10px] font-bold shadow-sm transition-opacity',
             collapsed ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
           )}
-          style={{ right: -12, borderColor: color, color }}
+          style={{
+            ...(side === 'left' ? { left: -12 } : { right: -12 }),
+            borderColor: color,
+            color,
+          }}
         >
           {collapsed ? descendants : '−'}
         </button>
       )}
 
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="mind-handle"
-        isConnectable={false}
-      />
-      {/* Điểm neo cho cạnh liên kết ngang (không dùng để kéo nối) */}
-      <Handle
-        id="link-out"
-        type="source"
-        position={Position.Right}
-        className="mind-handle"
-        isConnectable={false}
-      />
-      <Handle
-        id="link-in"
-        type="target"
-        position={Position.Right}
-        className="mind-handle"
-        isConnectable={false}
-      />
+      {/* Điểm nối cạnh cây (in/out) và cạnh liên kết (link-*) ở cả hai phía; cạnh chọn phía theo bố cục */}
+      {(
+        [
+          ['in-l', 'target', Position.Left],
+          ['in-r', 'target', Position.Right],
+          ['out-l', 'source', Position.Left],
+          ['out-r', 'source', Position.Right],
+          ['link-in-l', 'target', Position.Left],
+          ['link-in-r', 'target', Position.Right],
+          ['link-out-l', 'source', Position.Left],
+          ['link-out-r', 'source', Position.Right],
+        ] as const
+      ).map(([id, type, position]) => (
+        <Handle
+          key={id}
+          id={id}
+          type={type}
+          position={position}
+          className="mind-handle"
+          isConnectable={false}
+        />
+      ))}
     </div>
   );
 }

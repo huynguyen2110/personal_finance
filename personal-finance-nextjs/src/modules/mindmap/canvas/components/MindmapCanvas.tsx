@@ -10,6 +10,7 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  useNodesInitialized,
   useNodesState,
   useReactFlow,
 } from '@xyflow/react';
@@ -34,7 +35,7 @@ import { buildChips, NodeChip } from '../chips';
 import { layoutTree } from '../layout';
 import { MindFlowNode } from '../types';
 import { collectSubtreeIds, useMindmapTree } from '../useMindmapTree';
-import { CanvasToolbar } from './CanvasToolbar';
+import { CanvasToolbar, LinkMode } from './CanvasToolbar';
 import { LinkEdge } from './LinkEdge';
 import { MindNode } from './MindNode';
 
@@ -56,7 +57,11 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
-  const [showLinks, setShowLinks] = useState(true);
+  // Liên kết: chỉ của nhánh đang chọn / rê chuột (mặc định, đỡ rối), tất cả, hoặc ẩn
+  const [linkMode, setLinkMode] = useState<LinkMode>('selected');
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  // Chỉ hiện một lĩnh vực (nhánh cấp 1); null = tất cả
+  const [focusAreaId, setFocusAreaId] = useState<number | null>(null);
   // Đang chọn nhánh đích cho liên kết bắt đầu từ nhánh này
   const [linkingFrom, setLinkingFrom] = useState<number | null>(null);
   const [linkDialog, setLinkDialog] = useState<LinkDialogTarget | null>(null);
@@ -71,7 +76,44 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
     linkingFromRef.current = linkingFrom;
   }, [selectedId, editingId, linkingFrom]);
 
-  const { getIntersectingNodes } = useReactFlow();
+  const { getIntersectingNodes, fitView } = useReactFlow();
+
+  // Lĩnh vực (nhánh cấp 1) chứa mỗi node
+  const areaOf = useMemo(() => {
+    const map = new Map<number, number>();
+    const rootId = tree.root?.id;
+    for (const n of tree.byId.values()) {
+      let cursor: typeof n | undefined = n;
+      while (cursor && cursor.parentId !== null && cursor.parentId !== rootId) {
+        cursor = tree.byId.get(cursor.parentId);
+      }
+      if (cursor && cursor.parentId === rootId) map.set(n.id, cursor.id);
+    }
+    return map;
+  }, [tree]);
+  const areas = useMemo(
+    () => (tree.root ? (tree.childrenOf.get(tree.root.id) ?? []) : []),
+    [tree],
+  );
+  // Lĩnh vực đang tập trung đã bị xóa → về xem tất cả
+  const focusId =
+    focusAreaId !== null && tree.byId.has(focusAreaId) ? focusAreaId : null;
+  const displayed = useMemo(
+    () =>
+      focusId === null
+        ? tree.visible
+        : tree.visible.filter(
+            (n) => n.parentId === null || areaOf.get(n.id) === focusId,
+          ),
+    [tree, focusId, areaOf],
+  );
+
+  // Đổi lĩnh vực tập trung → vừa khung nhìn với phần đang hiện (chờ React Flow đo xong các node mới)
+  const nodesInitialized = useNodesInitialized();
+  const pendingFitRef = useRef(false);
+  useEffect(() => {
+    pendingFitRef.current = true;
+  }, [focusId]);
 
   const commitTitle = useCallback(
     (nodeId: number, title: string) => {
@@ -93,15 +135,15 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
     setLinkingFrom(nodeId);
   }, []);
 
-  // Layout-owned positions: xyflow nodes + edges derived from the tree.
-  const { layoutedNodes, edges } = useMemo(() => {
+  // Layout-owned positions: xyflow nodes + tree edges (bố cục 2 bên quanh nút gốc).
+  const { layoutedNodes, treeEdges, side, displayedIds } = useMemo(() => {
     const chipsOf = new Map<number, NodeChip[]>(
-      tree.visible.map((n) => [n.id, buildChips(n.propertyValues, definitions)]),
+      displayed.map((n) => [n.id, buildChips(n.propertyValues, definitions)]),
     );
-    const rects = layoutTree(tree.visible, tree.root?.id ?? null, chipsOf);
-    const visibleIds = new Set(tree.visible.map((n) => n.id));
+    const { rects, side } = layoutTree(displayed, tree.root?.id ?? null, chipsOf);
+    const displayedIds = new Set(displayed.map((n) => n.id));
 
-    const nodes: MindFlowNode[] = tree.visible.map((n) => {
+    const nodes: MindFlowNode[] = displayed.map((n) => {
       const rect = rects.get(n.id)!;
       const rollup = tree.rollup.get(n.id) ?? { done: 0, total: 0 };
       const isRoot = n.parentId === null;
@@ -125,6 +167,7 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
           todoTotal: rollup.total,
           chips: chipsOf.get(n.id) ?? [],
           editing: editingId === n.id,
+          side: side.get(n.id) ?? 'right',
           linkSource: linkingFrom === n.id,
           onCommitTitle: commitTitle,
           onCancelEdit: cancelEdit,
@@ -134,63 +177,29 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
       };
     });
 
-    const flowEdges: Edge[] = tree.visible
-      .filter((n) => n.parentId !== null && visibleIds.has(n.parentId))
-      .map((n) => ({
-        id: `e${n.parentId}-${n.id}`,
-        source: String(n.parentId),
-        target: String(n.id),
-        type: 'default',
-        style: {
-          stroke: tree.colorOf.get(n.id) ?? '#9ca3af',
-          strokeWidth: 2,
-        },
-      }));
+    const treeEdges: Edge[] = displayed
+      .filter((n) => n.parentId !== null && displayedIds.has(n.parentId))
+      .map((n) => {
+        const left = side.get(n.id) === 'left';
+        return {
+          id: `e${n.parentId}-${n.id}`,
+          source: String(n.parentId),
+          target: String(n.id),
+          sourceHandle: left ? 'out-l' : 'out-r',
+          targetHandle: left ? 'in-r' : 'in-l',
+          type: 'default',
+          style: {
+            stroke: tree.colorOf.get(n.id) ?? '#9ca3af',
+            strokeWidth: 2,
+          },
+        };
+      });
 
-    // Liên kết ngang: chỉ vẽ khi cả hai đầu đang hiện (không bị thu gọn)
-    const linkEdges: Edge[] = showLinks
-      ? (links ?? [])
-          .filter(
-            (l) =>
-              visibleIds.has(l.sourceNodeId) && visibleIds.has(l.targetNodeId),
-          )
-          .map((l) => {
-            const meta = LINK_KINDS[l.kind];
-            const edge: Edge = {
-              id: `link-${l.id}`,
-              source: String(l.sourceNodeId),
-              target: String(l.targetNodeId),
-              sourceHandle: 'link-out',
-              targetHandle: 'link-in',
-              type: 'link',
-              zIndex: 1,
-              data: { link: l },
-              label: l.note ?? undefined,
-              markerEnd: meta.arrow
-                ? {
-                    type: MarkerType.ArrowClosed,
-                    color: meta.color,
-                    width: 16,
-                    height: 16,
-                  }
-                : undefined,
-              style: {
-                stroke: meta.color,
-                strokeWidth: 1.75,
-                strokeDasharray: meta.dash,
-                cursor: 'pointer',
-              },
-            };
-            return edge;
-          })
-      : [];
-
-    return { layoutedNodes: nodes, edges: [...flowEdges, ...linkEdges] };
+    return { layoutedNodes: nodes, treeEdges, side, displayedIds };
   }, [
     tree,
+    displayed,
     definitions,
-    links,
-    showLinks,
     selectedId,
     editingId,
     linkingFrom,
@@ -201,12 +210,70 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
     startLink,
   ]);
 
+  // Liên kết ngang (tách khỏi bố cục để rê chuột không phải xếp lại cây).
+  // Chỉ vẽ khi cả hai đầu đang hiện; chế độ "khi chọn" chỉ vẽ liên kết của nhánh đang chọn / rê chuột.
+  const edges = useMemo(() => {
+    const active = new Set(
+      [selectedId, hoveredId].filter((id): id is number => id !== null),
+    );
+    const handle = (nodeId: number) =>
+      side.get(nodeId) === 'left' ? 'l' : 'r';
+    const linkEdges: Edge[] =
+      linkMode === 'none'
+        ? []
+        : (links ?? [])
+            .filter(
+              (l) =>
+                displayedIds.has(l.sourceNodeId) &&
+                displayedIds.has(l.targetNodeId) &&
+                (linkMode === 'all' ||
+                  active.has(l.sourceNodeId) ||
+                  active.has(l.targetNodeId)),
+            )
+            .map((l) => {
+              const meta = LINK_KINDS[l.kind];
+              const edge: Edge = {
+                id: `link-${l.id}`,
+                source: String(l.sourceNodeId),
+                target: String(l.targetNodeId),
+                sourceHandle: `link-out-${handle(l.sourceNodeId)}`,
+                targetHandle: `link-in-${handle(l.targetNodeId)}`,
+                type: 'link',
+                zIndex: 1,
+                data: { link: l },
+                label: l.note ?? undefined,
+                markerEnd: meta.arrow
+                  ? {
+                      type: MarkerType.ArrowClosed,
+                      color: meta.color,
+                      width: 16,
+                      height: 16,
+                    }
+                  : undefined,
+                style: {
+                  stroke: meta.color,
+                  strokeWidth: 1.75,
+                  strokeDasharray: meta.dash,
+                  cursor: 'pointer',
+                },
+              };
+              return edge;
+            });
+    return [...treeEdges, ...linkEdges];
+  }, [treeEdges, links, linkMode, selectedId, hoveredId, side, displayedIds]);
+
   const [nodes, setNodes, onNodesChange] = useNodesState<MindFlowNode>([]);
   const layoutedRef = useRef(layoutedNodes);
   useEffect(() => {
     layoutedRef.current = layoutedNodes;
     setNodes(layoutedNodes);
   }, [layoutedNodes, setNodes]);
+
+  useEffect(() => {
+    if (!pendingFitRef.current || !nodesInitialized) return;
+    pendingFitRef.current = false;
+    fitView({ padding: 0.2, maxZoom: 1 });
+  }, [nodesInitialized, nodes, fitView]);
 
   // ----- create helpers -----
   const spawnNode = useCallback(
@@ -219,13 +286,16 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
         { parentId, title: 'Nhánh mới' },
         {
           onSuccess: (created) => {
+            if (focusId !== null && parentId === tree.root?.id) {
+              setFocusAreaId(created.id);
+            }
             setSelectedId(created.id);
             setEditingId(created.id);
           },
         },
       );
     },
-    [mutateCreate, tree, mutateUpdate],
+    [mutateCreate, tree, mutateUpdate, focusId],
   );
 
   const removeNode = useCallback(
@@ -350,6 +420,8 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
           const link = (edge.data as { link?: NodeLink } | undefined)?.link;
           if (link) setLinkDialog({ mode: 'edit', link });
         }}
+        onNodeMouseEnter={(_, n) => setHoveredId(Number(n.id))}
+        onNodeMouseLeave={() => setHoveredId(null)}
         onNodeDoubleClick={(_, n) => {
           setSelectedId(Number(n.id));
           setEditingId(Number(n.id));
@@ -375,9 +447,12 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
         <CanvasToolbar
           title={mindmap?.title ?? ''}
           onOpenProperties={() => setPropertiesOpen(true)}
-          showLinks={showLinks}
+          linkMode={linkMode}
           linkCount={links?.length ?? 0}
-          onToggleLinks={() => setShowLinks((v) => !v)}
+          onLinkModeChange={setLinkMode}
+          areas={areas.map((a) => ({ id: a.id, title: a.title }))}
+          focusAreaId={focusId}
+          onFocusChange={setFocusAreaId}
         />
         {linkingFrom !== null && (
           <Panel position="top-center">
