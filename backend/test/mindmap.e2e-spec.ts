@@ -144,6 +144,57 @@ describe('Mindmap API (e2e)', () => {
     expect(todo.nodes).toEqual([]);
   });
 
+  describe('mẫu "Phát triển bản thân"', () => {
+    let gid = 0;
+    let groot = 0;
+    const gbase = () => `/api/mindmap/mindmaps/${gid}`;
+    const props: Record<string, { id: number; type: string; unit: string | null }> = {};
+
+    it('tạo từ mẫu → có sẵn 4 thuộc tính có vai trò; mẫu lạ → 400', async () => {
+      await authed('post', '/api/mindmap/mindmaps').send({ title: 'X', template: 'khong-co' }).expect(400);
+      gid = (await authed('post', '/api/mindmap/mindmaps').send({ title: 'Phát triển', template: 'growth' }).expect(201)).body.data.id;
+      groot = (await authed('get', `${gbase()}/nodes`).expect(200)).body.data[0].id;
+      const defs = (await authed('get', `${gbase()}/properties`).expect(200)).body.data;
+      expect(defs.map((d: { role: string }) => d.role)).toEqual(['priority', 'difficulty', 'time', 'cost']);
+      for (const d of defs) props[d.role] = d;
+      expect(props.time.unit).toBe('hours');
+      expect(props.cost.unit).toBe('money');
+      expect(defs[0].options[0]).toMatchObject({ id: 'high', weight: 3 });
+    });
+
+    it('vai trò: trùng hoặc sai kiểu → 400; bỏ vai trò rồi gán lại được; đơn vị chỉ cho number', async () => {
+      const dup = await authed('post', `${gbase()}/properties`).send({ name: 'Ưu tiên 2', type: 'select', role: 'priority', options: [{ id: 'a', label: 'A', color: '#000' }] }).expect(400);
+      expect(dup.body.message).toContain('Ưu tiên');
+      await authed('post', `${gbase()}/properties`).send({ name: 'Giờ', type: 'text', role: 'time' }).expect(400);
+      await authed('post', `${gbase()}/properties`).send({ name: 'Ghi chú', type: 'text', unit: 'money' }).expect(400);
+      await authed('patch', `${gbase()}/properties/${props.time.id}`).send({ role: null }).expect(200);
+      const back = await authed('patch', `${gbase()}/properties/${props.time.id}`).send({ role: 'time', unit: null }).expect(200);
+      expect(back.body.data).toMatchObject({ role: 'time', unit: null });
+      await authed('patch', `${gbase()}/properties/${props.priority.id}`).send({ unit: 'hours' }).expect(400);
+    });
+
+    it('trạng thái node: đặt, trả về trong cây, giá trị lạ → 400, null = bỏ theo dõi', async () => {
+      const area = (await authed('post', `${gbase()}/nodes`).send({ parentId: groot, title: 'Tiếng Anh' }).expect(201)).body.data.id;
+      await authed('patch', `${gbase()}/nodes/${area}`).send({ status: 'doing' }).expect(200);
+      await authed('patch', `${gbase()}/nodes/${area}`).send({ status: 'xong' }).expect(400);
+      let tree = (await authed('get', `${gbase()}/nodes`).expect(200)).body.data;
+      expect(tree.find((n: { id: number }) => n.id === area).status).toBe('doing');
+      await authed('patch', `${gbase()}/nodes/${area}`).send({ status: null }).expect(200);
+      tree = (await authed('get', `${gbase()}/nodes`).expect(200)).body.data;
+      expect(tree.find((n: { id: number }) => n.id === area).status).toBeNull();
+    });
+
+    it('todo: số phút + hiệu quả, kiểm tra giới hạn, null để xóa', async () => {
+      const t = (await authed('post', '/api/mindmap/todos').send({ title: 'Học 30 từ', date: today, durationMinutes: 30, effectiveness: 4 }).expect(201)).body.data;
+      expect(t).toMatchObject({ durationMinutes: 30, effectiveness: 4 });
+      await authed('patch', `/api/mindmap/todos/${t.id}`).send({ effectiveness: 6 }).expect(400);
+      await authed('patch', `/api/mindmap/todos/${t.id}`).send({ durationMinutes: 2000 }).expect(400);
+      const cleared = await authed('patch', `/api/mindmap/todos/${t.id}`).send({ durationMinutes: null }).expect(200);
+      expect(cleared.body.data).toMatchObject({ durationMinutes: null, effectiveness: 4 });
+      await authed('delete', `/api/mindmap/todos/${t.id}`).expect(200);
+    });
+  });
+
   it('đổi mật khẩu: sai mật khẩu cũ → 400; đúng → token mới, đăng nhập bằng mật khẩu mới', async () => {
     await authed('post', '/api/auth/change-password').send({ currentPassword: 'sai', newPassword: 'mat-khau-moi-123' }).expect(400);
     const next = randomBytes(18).toString('base64url');

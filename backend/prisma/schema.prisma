@@ -334,6 +334,7 @@ model Mindmap {
   user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   nodes      MindmapNode[]
   properties PropertyDefinition[]
+  links      NodeLink[]
 
   @@index([userId])
   @@map("mm_mindmaps")
@@ -351,6 +352,8 @@ model MindmapNode {
   color       String?  @db.VarChar(20)
   // Nội dung trang (TipTap JSON); null = nhánh chưa có trang
   pageContent Json?
+  // Trạng thái hành động: todo | doing | done; null = không theo dõi
+  status      String?  @db.VarChar(10)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -360,6 +363,8 @@ model MindmapNode {
   children       MindmapNode[]       @relation("NodeTree")
   propertyValues NodePropertyValue[]
   todos          TodoNode[]
+  linksOut       NodeLink[]          @relation("LinkSource")
+  linksIn        NodeLink[]          @relation("LinkTarget")
 
   @@index([mindmapId, parentId])
   @@map("mm_nodes")
@@ -379,8 +384,12 @@ model PropertyDefinition {
   mindmapId  Int
   name       String       @db.VarChar(100)
   type       PropertyType
-  // Kiểu select: [{ id, label, color }]
+  // Kiểu select: [{ id, label, color, weight? }] — weight dùng để chấm điểm kế hoạch
   options    Json?
+  // Ý nghĩa trong view kế hoạch: priority | difficulty | time | cost (mỗi role tối đa 1 thuộc tính/mindmap)
+  role       String?      @db.VarChar(20)
+  // Đơn vị của kiểu number: money | hours
+  unit       String?      @db.VarChar(20)
   orderIndex Int          @default(0)
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
@@ -408,16 +417,19 @@ model NodePropertyValue {
 }
 
 model Todo {
-  id          Int       @id @default(autoincrement())
-  userId      Int
-  title       String    @db.VarChar(500)
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  title           String    @db.VarChar(500)
   // Ngày của todo "YYYY-MM-DD" (giờ VN)
-  date        String    @db.VarChar(10)
-  completed   Boolean   @default(false)
-  completedAt DateTime?
-  orderIndex  Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  date            String    @db.VarChar(10)
+  completed       Boolean   @default(false)
+  completedAt     DateTime?
+  // Thời gian đã bỏ ra (phút) và mức hiệu quả tự chấm 1–5
+  durationMinutes Int?
+  effectiveness   Int?
+  orderIndex      Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   nodes TodoNode[]
@@ -437,4 +449,30 @@ model TodoNode {
   @@id([todoId, nodeId])
   @@index([nodeId])
   @@map("mm_todo_nodes")
+}
+
+enum NodeLinkKind {
+  supports // nguồn bổ trợ cho đích
+  prerequisite // nguồn phải xong trước đích
+  related // liên kết tự do (kèm ghi chú)
+}
+
+// Liên kết ngang giữa hai nhánh cùng mindmap (ngoài quan hệ cha–con)
+model NodeLink {
+  id           Int          @id @default(autoincrement())
+  mindmapId    Int
+  sourceNodeId Int
+  targetNodeId Int
+  kind         NodeLinkKind
+  note         String?      @db.VarChar(500)
+  createdAt    DateTime     @default(now())
+
+  mindmap Mindmap     @relation(fields: [mindmapId], references: [id], onDelete: Cascade)
+  source  MindmapNode @relation("LinkSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  target  MindmapNode @relation("LinkTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceNodeId, targetNodeId, kind])
+  @@index([mindmapId])
+  @@index([targetNodeId])
+  @@map("mm_node_links")
 }

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { cn } from '@/modules/mindmap/lib/utils';
 import { Todo } from '../api';
 import { useDeleteTodo, useUpdateTodo } from '../hooks';
+import { TodoEffort } from './TodoEffort';
 
 export function TodoItem({ todo }: { todo: Todo }) {
   const updateTodo = useUpdateTodo();
@@ -43,6 +44,17 @@ export function TodoItem({ todo }: { todo: Todo }) {
             ))}
           </div>
         )}
+        <TodoEffort
+          todo={todo}
+          className={cn(
+            'mt-1.5 transition-opacity',
+            todo.completed ||
+              todo.durationMinutes !== null ||
+              todo.effectiveness !== null
+              ? 'opacity-100'
+              : 'opacity-0 focus-within:opacity-100 group-hover:opacity-100',
+          )}
+        />
       </div>
       <button
         onClick={() => deleteTodo.mutate(todo.id)}

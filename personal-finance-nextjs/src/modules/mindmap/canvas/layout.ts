@@ -17,7 +17,7 @@ export function estimateNodeSize(
   chips: NodeChip[],
 ) {
   // Same numbers feed dagre and the CSS pill so layout matches rendering.
-  const badges = node.todoTotal > 0 ? 52 : 0;
+  const badges = (node.todoTotal > 0 ? 52 : 0) + (node.status ? 18 : 0);
   const titleWidth = 56 + node.title.length * 7.5 + badges;
   const chipsRow =
     chips.length > 0

@@ -1,9 +1,16 @@
 import { api } from '@/modules/mindmap/lib/api';
-import { Mindmap, NodeDetail, TreeNode } from './types';
+import { Mindmap, NodeDetail, NodeStatus, TreeNode } from './types';
+
+/** Mẫu tạo sẵn thuộc tính khi tạo mindmap (khớp backend utils/templates.ts). */
+export type MindmapTemplateId = 'growth';
 
 export const mindmapsApi = {
   list: () => api.get<Mindmap[]>('/mindmaps'),
-  create: (body: { title: string; description?: string }) =>
+  create: (body: {
+    title: string;
+    description?: string;
+    template?: MindmapTemplateId;
+  }) =>
     api.post<Mindmap>('/mindmaps', body),
   get: (id: number) => api.get<Mindmap>(`/mindmaps/${id}`),
   update: (id: number, body: { title?: string; description?: string }) =>
@@ -17,6 +24,7 @@ export interface UpdateNodeBody {
   orderIndex?: number;
   collapsed?: boolean;
   color?: string | null;
+  status?: NodeStatus | null;
   pageContent?: object;
 }
 

@@ -97,6 +97,7 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
           isRoot,
           collapsed: n.collapsed,
           hasPage: n.hasPage,
+          status: n.status,
           descendants: tree.descendants.get(n.id) ?? 0,
           todoDone: rollup.done,
           todoTotal: rollup.total,

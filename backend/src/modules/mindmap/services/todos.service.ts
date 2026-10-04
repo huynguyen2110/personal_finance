@@ -91,6 +91,8 @@ export class TodosService {
         userId,
         title: dto.title,
         date: dto.date,
+        durationMinutes: dto.durationMinutes ?? null,
+        effectiveness: dto.effectiveness ?? null,
         orderIndex: _max.orderIndex === null ? 0 : _max.orderIndex + 1,
         nodes: { create: nodeIds.map((nodeId) => ({ nodeId })) },
       },
@@ -105,6 +107,8 @@ export class TodosService {
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.date !== undefined) data.date = dto.date;
     if (dto.orderIndex !== undefined) data.orderIndex = dto.orderIndex;
+    if (dto.durationMinutes !== undefined) data.durationMinutes = dto.durationMinutes;
+    if (dto.effectiveness !== undefined) data.effectiveness = dto.effectiveness;
     if (dto.completed !== undefined) {
       data.completed = dto.completed;
       data.completedAt = dto.completed ? new Date() : null;
@@ -146,6 +150,8 @@ export class TodosService {
       date: todo.date,
       completed: todo.completed,
       completedAt: todo.completedAt,
+      durationMinutes: todo.durationMinutes,
+      effectiveness: todo.effectiveness,
       orderIndex: todo.orderIndex,
       nodes: todo.nodes.map(({ node }) => ({ id: node.id, title: node.title, mindmapId: node.mindmapId, mindmapTitle: node.mindmap.title })),
     };

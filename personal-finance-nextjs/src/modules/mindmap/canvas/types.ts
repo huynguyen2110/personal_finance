@@ -1,4 +1,5 @@
 import type { Node } from '@xyflow/react';
+import type { NodeStatus } from '@/modules/mindmap/mindmaps/types';
 import type { NodeChip } from './chips';
 
 export type MindNodeData = {
@@ -10,6 +11,7 @@ export type MindNodeData = {
   isRoot: boolean;
   collapsed: boolean;
   hasPage: boolean;
+  status: NodeStatus | null;
   descendants: number;
   todoDone: number;
   todoTotal: number;

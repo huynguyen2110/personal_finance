@@ -51,6 +51,7 @@ export class NodesService {
       orderIndex: n.orderIndex,
       collapsed: n.collapsed,
       color: n.color,
+      status: n.status,
       hasPage: n.pageContent !== null,
       todoTotal: counts.get(n.id)?.total ?? 0,
       todoDone: counts.get(n.id)?.done ?? 0,
@@ -104,6 +105,7 @@ export class NodesService {
     if (dto.orderIndex !== undefined) data.orderIndex = dto.orderIndex;
     if (dto.collapsed !== undefined) data.collapsed = dto.collapsed;
     if (dto.color !== undefined) data.color = dto.color;
+    if (dto.status !== undefined) data.status = dto.status;
     if (dto.pageContent !== undefined) data.pageContent = dto.pageContent as Prisma.InputJsonValue;
 
     return this.prisma.mindmapNode.update({ where: { id: nodeId }, data });

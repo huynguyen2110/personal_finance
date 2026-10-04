@@ -5,7 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { todosApi } from './api';
+import { todosApi, UpdateTodoBody } from './api';
 
 /** Todos touch node badges: refresh every canvas + node-todo cache too. */
 function useInvalidateTodoRelated() {
@@ -14,6 +14,8 @@ function useInvalidateTodoRelated() {
     qc.invalidateQueries({ queryKey: ['todos'] });
     qc.invalidateQueries({ queryKey: ['node-todos'] });
     qc.invalidateQueries({ queryKey: ['nodes'] });
+    qc.invalidateQueries({ queryKey: ['weekly-stats'] });
+    qc.invalidateQueries({ queryKey: ['plan'] });
   };
 }
 
@@ -51,16 +53,8 @@ export function useCreateTodo() {
 export function useUpdateTodo() {
   const invalidate = useInvalidateTodoRelated();
   return useMutation({
-    mutationFn: ({
-      id,
-      ...body
-    }: {
-      id: number;
-      title?: string;
-      date?: string;
-      completed?: boolean;
-      nodeIds?: number[];
-    }) => todosApi.update(id, body),
+    mutationFn: ({ id, ...body }: UpdateTodoBody & { id: number }) =>
+      todosApi.update(id, body),
     onSuccess: invalidate,
   });
 }

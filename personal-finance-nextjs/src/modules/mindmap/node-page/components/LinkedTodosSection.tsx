@@ -62,6 +62,15 @@ export function LinkedTodosSection({ nodeId }: { nodeId: number }) {
               >
                 {todo.title}
               </span>
+              {(todo.durationMinutes !== null || todo.effectiveness !== null) && (
+                <span className="text-xs text-gray-400">
+                  {todo.durationMinutes !== null && `${todo.durationMinutes}p`}
+                  {todo.durationMinutes !== null &&
+                    todo.effectiveness !== null &&
+                    ' · '}
+                  {todo.effectiveness !== null && `★${todo.effectiveness}`}
+                </span>
+              )}
               <span className="text-xs text-gray-400">{todo.date}</span>
               <button
                 onClick={() => deleteTodo.mutate(todo.id)}

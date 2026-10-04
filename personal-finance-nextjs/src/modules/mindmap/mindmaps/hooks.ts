@@ -91,8 +91,10 @@ export function useUpdateNode(mindmapId: number) {
         qc.setQueryData(['nodes', mindmapId], context.previous);
       }
     },
-    onSettled: () => {
+    onSettled: (_data, _err, { nodeId }) => {
       qc.invalidateQueries({ queryKey: ['nodes', mindmapId] });
+      qc.invalidateQueries({ queryKey: ['node', nodeId] });
+      qc.invalidateQueries({ queryKey: ['plan', mindmapId] });
     },
   });
 }

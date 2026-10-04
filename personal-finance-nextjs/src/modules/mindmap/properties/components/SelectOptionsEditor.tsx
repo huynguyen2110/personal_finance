@@ -16,9 +16,12 @@ const OPTION_COLORS = [
 export function SelectOptionsEditor({
   options,
   onChange,
+  showWeight = false,
 }: {
   options: SelectOption[];
   onChange: (options: SelectOption[]) => void;
+  /** Hiện ô "mức" (weight) khi thuộc tính có vai trò trong kế hoạch. */
+  showWeight?: boolean;
 }) {
   const add = () => {
     onChange([
@@ -33,7 +36,15 @@ export function SelectOptionsEditor({
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium text-gray-500">Các lựa chọn</p>
+      <p className="text-xs font-medium text-gray-500">
+        Các lựa chọn
+        {showWeight && (
+          <span className="font-normal text-gray-400">
+            {' '}
+            · Mức: số càng lớn càng ưu tiên / càng khó
+          </span>
+        )}
+      </p>
       {options.map((opt, i) => (
         <div key={opt.id} className="flex items-center gap-2">
           <input
@@ -56,6 +67,28 @@ export function SelectOptionsEditor({
             }}
             className="flex-1 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm outline-none focus:border-violet-500"
           />
+          {showWeight && (
+            <input
+              type="number"
+              min={0}
+              max={10}
+              value={opt.weight ?? ''}
+              placeholder="Mức"
+              title="Mức (0–10)"
+              onChange={(e) => {
+                const next = [...options];
+                next[i] = {
+                  ...opt,
+                  weight:
+                    e.target.value === ''
+                      ? undefined
+                      : Math.min(10, Math.max(0, Number(e.target.value))),
+                };
+                onChange(next);
+              }}
+              className="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-violet-500"
+            />
+          )}
           <button
             onClick={() => onChange(options.filter((_, j) => j !== i))}
             className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"

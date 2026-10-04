@@ -1,10 +1,11 @@
 'use client';
 
 import { Handle, NodeProps, Position } from '@xyflow/react';
-import { CheckCircle2, FileText } from 'lucide-react';
+import { CheckCircle2, Circle, CircleDot, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { memo, useEffect, useRef, useState } from 'react';
 import { cn } from '@/modules/mindmap/lib/utils';
+import { STATUS_LABELS } from '@/modules/mindmap/mindmaps/types';
 import { MindFlowNode } from '../types';
 
 function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
@@ -16,6 +17,7 @@ function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
     isRoot,
     collapsed,
     hasPage,
+    status,
     descendants,
     todoDone,
     todoTotal,
@@ -77,6 +79,7 @@ function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
           isRoot ? 'px-5 py-2.5' : 'px-4 py-1.5',
           isRoot || chips.length > 0 ? 'rounded-xl' : 'rounded-full',
           selected && 'shadow-md ring-2 ring-violet-300 ring-offset-1',
+          status === 'done' && !selected && 'opacity-60',
         )}
         style={{ borderColor: color }}
       >
@@ -86,6 +89,17 @@ function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
             isRoot ? 'text-base font-semibold' : 'text-sm',
           )}
         >
+        {status && !editing && (
+          <span title={STATUS_LABELS[status]} className="shrink-0">
+            {status === 'done' ? (
+              <CheckCircle2 size={14} className="text-green-600" />
+            ) : status === 'doing' ? (
+              <CircleDot size={14} className="text-amber-500" />
+            ) : (
+              <Circle size={14} className="text-gray-300" />
+            )}
+          </span>
+        )}
         {editing ? (
           <input
             ref={inputRef}
@@ -106,7 +120,14 @@ function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
             style={{ width: `${Math.max(value.length, 4)}ch` }}
           />
         ) : (
-          <span className="whitespace-nowrap">{title}</span>
+          <span
+            className={cn(
+              'whitespace-nowrap',
+              status === 'done' && 'text-gray-500 line-through',
+            )}
+          >
+            {title}
+          </span>
         )}
 
         {todoTotal > 0 && !editing && (

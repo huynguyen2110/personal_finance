@@ -28,6 +28,8 @@ export default function NodePage() {
         mindmapId={mindmapId}
         nodeId={nodeId}
         values={node.propertyValues}
+        status={node.status}
+        isRoot={node.parentId === null}
       />
       <LinkedTodosSection nodeId={nodeId} />
       <div className="rounded-xl border border-gray-200 bg-white p-6 pt-10">
