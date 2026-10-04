@@ -4,6 +4,8 @@ import { PrismaService } from '../../../database/prisma.service';
 import {
   addMonths,
   currentMonthVN,
+  daysBetween,
+  monthOfDate,
   monthOfDateVN,
   monthRange,
   todayVN,
@@ -236,8 +238,11 @@ export class GoalsService {
     const monthlyRate = monthlyPlan && monthlyPlan > 0 ? monthlyPlan : pace;
     const sim = simulateGoal(current, target, monthlyRate, interestRate);
     const projectedMonth = remaining === 0 ? null : projectMonth(month, sim.months);
-    const status = goalStatus({ saved: current, target, deadline: g.deadline, currentMonth: month, projectedMonth, monthlyRate });
-    const monthsLeft = g.deadline && g.deadline >= month ? monthsLeftUntil(month, g.deadline) : null;
+    // Hạn là một ngày; số tháng còn lại/dự báo tính theo tháng (tài chính) chứa ngày đó
+    const deadlineMonth = g.deadline ? monthOfDate(g.deadline, sd) : null;
+    const status = goalStatus({ saved: current, target, deadline: g.deadline, deadlineMonth, today, projectedMonth, monthlyRate });
+    const notPassed = !!g.deadline && g.deadline >= today;
+    const monthsLeft = notPassed && deadlineMonth ? monthsLeftUntil(month, deadlineMonth) : null;
 
     // Kế hoạch tháng này: đã nạp bao nhiêu, còn thiếu bao nhiêu, đã tới ngày nạp chưa
     const depositedThisMonth = g.contributions.filter((c) => monthOfDateVN(c.date, sd) === month).reduce((s, c) => s + netDeposit(c), 0);
@@ -260,6 +265,9 @@ export class GoalsService {
       ongoing: g.ongoing,
       targetAmount: target,
       deadline: g.deadline,
+      deadlineMonth,
+      // Số ngày tới hạn (0 = hôm nay); null = không đặt hạn hoặc đã qua
+      daysLeft: notPassed ? daysBetween(today, g.deadline!) - 1 : null,
       monthlyPlan,
       planDay: g.planDay,
       sourceAccount: g.sourceAccount,
@@ -290,7 +298,7 @@ export class GoalsService {
       // Cần nạp mỗi tháng (không tính lãi) để kịp hạn
       requiredMonthly: monthsLeft ? Math.ceil(remaining / monthsLeft) : null,
       status,
-      horizon: status === 'done' ? null : goalHorizon(month, g.deadline, sim.months),
+      horizon: status === 'done' ? null : goalHorizon(month, deadlineMonth, sim.months),
 
       // Lãi tính trên số tiền thực còn trong quỹ
       monthlyInterest: interestRate ? Math.round((balance * interestRate) / 100 / 12) : 0,

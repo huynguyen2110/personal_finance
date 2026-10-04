@@ -48,25 +48,27 @@ export function monthsLeftUntil(currentMonth: string, deadline: string): number 
   return monthDiff(currentMonth, deadline) + 1;
 }
 
+// deadline: ngày hạn "YYYY-MM-DD"; deadlineMonth: tháng (tài chính) chứa ngày hạn — dự báo tính theo tháng
 export function goalStatus(p: {
   saved: number;
   target: number;
   deadline: string | null;
-  currentMonth: string;
+  deadlineMonth: string | null;
+  today: string;
   projectedMonth: string | null;
   monthlyRate: number;
 }): GoalStatus {
   if (p.saved >= p.target) return 'done';
-  if (p.deadline) {
-    if (p.deadline < p.currentMonth) return 'overdue';
-    return p.projectedMonth !== null && p.projectedMonth <= p.deadline ? 'on_track' : 'behind';
+  if (p.deadline && p.deadlineMonth) {
+    if (p.deadline < p.today) return 'overdue';
+    return p.projectedMonth !== null && p.projectedMonth <= p.deadlineMonth ? 'on_track' : 'behind';
   }
   return p.monthlyRate > 0 ? 'no_deadline' : 'no_plan';
 }
 
-// Ngắn hạn/dài hạn theo hạn đặt ra, không có hạn thì theo ngày dự kiến đạt
-export function goalHorizon(currentMonth: string, deadline: string | null, projectedMonths: number | null): GoalHorizon {
-  const months = deadline ? monthDiff(currentMonth, deadline) : projectedMonths;
+// Ngắn hạn/dài hạn theo tháng hạn đặt ra, không có hạn thì theo ngày dự kiến đạt
+export function goalHorizon(currentMonth: string, deadlineMonth: string | null, projectedMonths: number | null): GoalHorizon {
+  const months = deadlineMonth ? monthDiff(currentMonth, deadlineMonth) : projectedMonths;
   if (months === null) return null;
   return months > 12 ? 'long' : 'short';
 }

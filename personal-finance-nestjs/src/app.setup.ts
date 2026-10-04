@@ -21,10 +21,14 @@ export function setupApp(app: INestApplication) {
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  // Kiểm tra sống (không qua guard / envelope)
-  app.getHttpAdapter().get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-  });
+  // Kiểm tra sống (không qua guard / envelope). Cron ngoài gọi định kỳ (< 15 phút) để Render không cho server ngủ.
+  // Cố ý không truy vấn DB: Neon tự ngủ sau 5 phút, giữ nó thức 24/7 sẽ đốt hết giờ compute miễn phí.
+  const health = (_req: Request, res: Response) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ status: 'ok', uptime: Math.round(process.uptime()), timestamp: new Date().toISOString() });
+  };
+  app.getHttpAdapter().get('/health', health);
+  app.getHttpAdapter().get('/api/health', health);
 
   const config = new DocumentBuilder()
     .setTitle('Personal Finance API')

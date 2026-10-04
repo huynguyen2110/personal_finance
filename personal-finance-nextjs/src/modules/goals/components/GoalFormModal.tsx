@@ -11,6 +11,8 @@ import ConfirmModal from '@/components/shared/ConfirmModal';
 import { errorMessage } from '@/lib/api-client';
 import { formatVND } from '@/lib/money';
 import { useAccounts } from '@/modules/accounts/lib';
+import { useMonthStartDay } from '@/modules/settings/lib';
+import { monthOfDate, todayVN } from '@/lib/dates';
 import { createGoal, deleteGoal, updateGoal } from '../lib';
 import type { GoalDTO, GoalInput, GoalJar, GoalPriority } from '../types';
 import { GOAL_ICONS, JARS, PRIORITIES, monthText, nf } from '../utils/goal-meta';
@@ -72,7 +74,10 @@ export default function GoalFormModal({ goal, month, avgMonthlyExpense, onClose,
   const remaining = Math.max(0, (target ?? 0) - saved);
 
   // Tính ngay khi nhập: cần nạp bao nhiêu/tháng, dự kiến đạt khi nào, lãi đến khi đạt
-  const monthsLeft = deadline && deadline >= month ? monthsLeftUntil(month, deadline) : null;
+  // Hạn là một ngày; số lần nạp còn lại tính theo tháng (tài chính) chứa ngày đó
+  const sd = useMonthStartDay();
+  const today = todayVN();
+  const monthsLeft = deadline && deadline >= today ? monthsLeftUntil(month, monthOfDate(deadline, sd)) : null;
   const required = monthsLeft && remaining > 0 ? Math.ceil(remaining / monthsLeft) : null;
   const rateForSim = monthlyPlan ?? required ?? 0;
   const sim = target ? simulateGoal(saved, target, rateForSim, rateValid ? rateNum : null) : null;
@@ -302,7 +307,7 @@ export default function GoalFormModal({ goal, month, avgMonthlyExpense, onClose,
               <Label htmlFor="goal-deadline" hint={deadline ? <button type="button" className="text-teal-700 hover:underline" onClick={() => setDeadline('')}>Bỏ hạn</button> : 'Không bắt buộc'}>
                 Thời hạn hoàn thành
               </Label>
-              <DatePicker id="goal-deadline" mode="month" min={month} value={deadline} onChange={setDeadline} clearable placeholder="Không đặt hạn" className="w-full" />
+              <DatePicker id="goal-deadline" min={today} value={deadline} onChange={setDeadline} clearable placeholder="Không đặt hạn" className="w-full" />
             </div>
             <div>
               <Label htmlFor="goal-priority">Mức độ ưu tiên</Label>

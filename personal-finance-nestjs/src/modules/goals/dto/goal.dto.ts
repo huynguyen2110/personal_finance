@@ -2,6 +2,7 @@ import { OmitType, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
+  IsDateString,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -16,7 +17,6 @@ import {
 } from 'class-validator';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
-const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const GOAL_JARS = ['SAFETY', 'PURCHASE', 'EXPERIENCE', 'INVESTMENT', 'SELF', 'OTHER'] as const;
@@ -56,9 +56,10 @@ export class CreateGoalDto {
   @Max(1e13)
   targetAmount: number;
 
-  // "YYYY-MM"; null = không đặt hạn
+  // "YYYY-MM-DD" (giờ VN); null = không đặt hạn
   @IsOptional()
-  @Matches(MONTH, { message: 'Thời hạn không hợp lệ' })
+  @Matches(DATE, { message: 'Thời hạn không hợp lệ' })
+  @IsDateString({ strict: true }, { message: 'Thời hạn không hợp lệ' })
   deadline?: string | null;
 
   @IsOptional()

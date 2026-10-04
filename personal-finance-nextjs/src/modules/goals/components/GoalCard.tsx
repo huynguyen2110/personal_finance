@@ -163,10 +163,11 @@ export default function GoalCard({ goal, month, suggestion, onDeposit, onSpend, 
   }
 
   // ── Thẻ đang tích lũy ──
+  // Hạn gần (≤ 31 ngày) thì đếm theo ngày, xa hơn thì theo số tháng còn nạp
   const deadlineText = goal.deadline
-    ? goal.monthsLeft
-      ? `Thời hạn: ${monthText(goal.deadline)} (còn ${goal.monthsLeft} tháng)`
-      : `Hạn ${monthText(goal.deadline)} đã qua`
+    ? goal.daysLeft !== null
+      ? `Thời hạn: ${formatVNDate(goal.deadline)} (${goal.daysLeft === 0 ? 'hôm nay' : goal.daysLeft <= 31 ? `còn ${goal.daysLeft} ngày` : `còn ${goal.monthsLeft} tháng`})`
+      : `Hạn ${formatVNDate(goal.deadline)} đã qua`
     : null;
   const urgent = goal.thisMonth.dueNow || goal.status === 'behind' || goal.status === 'overdue';
   const showPriority = goal.priority === 'HIGH' && goal.status !== 'behind' && goal.status !== 'overdue';
@@ -180,7 +181,7 @@ export default function GoalCard({ goal, month, suggestion, onDeposit, onSpend, 
       ? `Với ${nf.format(goal.monthlyRate)} ₫/tháng, dự kiến đạt ${monthText(goal.projectedMonth)} — trễ hạn.${need}`
       : `Chưa có kế hoạch nạp nên chưa dự báo được ngày đạt.${need}`;
   } else if (goal.status === 'overdue') {
-    warning = `Đã quá hạn ${monthText(goal.deadline!)}, còn thiếu ${formatVND(goal.remaining)}. Gia hạn hoặc nạp thêm để hoàn thành.`;
+    warning = `Đã quá hạn ${formatVNDate(goal.deadline!)}, còn thiếu ${formatVND(goal.remaining)}. Gia hạn hoặc nạp thêm để hoàn thành.`;
   }
 
   // Một dòng quan trọng nhất cho bản tóm tắt
@@ -190,17 +191,17 @@ export default function GoalCard({ goal, month, suggestion, onDeposit, onSpend, 
   } else if (suggestion) {
     keyLine = { text: `Có thể về đích ngay bằng thặng dư tháng này (${formatVND(suggestion.amount)})`, cls: 'text-emerald-700 font-semibold', Icon: Lightbulb };
   } else if (goal.status === 'overdue') {
-    keyLine = { text: `Quá hạn ${monthText(goal.deadline!)} · còn thiếu ${formatVND(goal.remaining)}`, cls: 'text-rose-600 font-semibold', Icon: TriangleAlert };
+    keyLine = { text: `Quá hạn ${formatVNDate(goal.deadline!)} · còn thiếu ${formatVND(goal.remaining)}`, cls: 'text-rose-600 font-semibold', Icon: TriangleAlert };
   } else if (goal.status === 'behind') {
     keyLine = {
-      text: goal.projectedMonth ? `Dự kiến ${monthText(goal.projectedMonth)} — trễ hạn ${monthText(goal.deadline!)}` : `Chưa kịp hạn ${monthText(goal.deadline!)}`,
+      text: goal.projectedMonth ? `Dự kiến ${monthText(goal.projectedMonth)} — trễ hạn ${formatVNDate(goal.deadline!)}` : `Chưa kịp hạn ${formatVNDate(goal.deadline!)}`,
       cls: 'text-amber-700 font-semibold',
       Icon: TriangleAlert,
     };
   } else if (goal.ongoing && goal.spent > 0 && goal.remaining > 0) {
     keyLine = { text: `Quỹ duy trì · cần nạp bù ${formatVND(goal.remaining)}`, cls: 'text-sky-700 font-semibold', Icon: InfinityIcon };
   } else if (goal.projectedMonth) {
-    keyLine = { text: `Dự kiến đạt ${monthText(goal.projectedMonth)}${goal.deadline ? ` · hạn ${monthText(goal.deadline)}` : ''}`, cls: 'text-slate-500' };
+    keyLine = { text: `Dự kiến đạt ${monthText(goal.projectedMonth)}${goal.deadline ? ` · hạn ${formatVNDate(goal.deadline)}` : ''}`, cls: 'text-slate-500' };
   } else {
     keyLine = { text: deadlineText ?? `Hũ: ${jar.label}`, cls: 'text-slate-500' };
   }
@@ -294,7 +295,7 @@ export default function GoalCard({ goal, month, suggestion, onDeposit, onSpend, 
                   <span>{deadlineText}</span>
                 </>
               )}
-              {goal.projectedMonth && goal.projectedMonth !== goal.deadline && (
+              {goal.projectedMonth && goal.projectedMonth !== goal.deadlineMonth && (
                 <>
                   <span aria-hidden>•</span>
                   <span>

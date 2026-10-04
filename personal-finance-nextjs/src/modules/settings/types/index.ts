@@ -4,6 +4,8 @@ export interface AppSettings {
   monthStartDay: number;
   // Chỉ lấy giao dịch từ email ngân hàng kể từ ngày này ("YYYY-MM-DD"); null = không giới hạn
   emailStartDate: string | null;
+  // Có ghi nhận email báo tiền đến không; false = chỉ lấy email tiền đi (chi tiêu)
+  emailIncoming: boolean;
   // Do server tính kèm để hiển thị: hôm nay, tháng tài chính hiện tại và khoảng ngày của nó
   today: string;
   currentMonth: string;
@@ -13,4 +15,5 @@ export interface AppSettings {
 export interface SettingsInput {
   monthStartDay?: number;
   emailStartDate?: string | null;
+  emailIncoming?: boolean;
 }

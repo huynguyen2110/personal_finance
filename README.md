@@ -62,6 +62,8 @@ Kiểm tra BE: `npm test` (unit, gồm bộ đọc email) và `npm run test:e2e`
 
 Đọc email theo lịch từ Task Scheduler (tùy chọn): gọi `http://localhost:4000/api/cron/sync?secret=<CRON_SECRET>`.
 
+Giữ API trên Render không ngủ (gói free ngủ sau 15 phút không có request): đặt cron ngoài (VD cron-job.org, UptimeRobot) gọi `GET https://<api>.onrender.com/api/health` mỗi 10–14 phút. Route không cần đăng nhập, không truy vấn DB (để Neon vẫn tự ngủ, không tốn giờ compute).
+
 ## Mỗi ngân hàng một cách ghi nhận
 
 | Ngân hàng | Cách ghi nhận | Ghi nhận được |

@@ -8,10 +8,12 @@ export interface AppSettings {
   monthStartDay: number;
   // Chỉ lấy giao dịch từ email ngân hàng kể từ ngày này ("YYYY-MM-DD"); null = không giới hạn (30 ngày gần nhất ở lần đầu)
   emailStartDate: string | null;
+  // Có ghi nhận email báo tiền ĐẾN không; false = chỉ lấy email tiền đi (chi tiêu)
+  emailIncoming: boolean;
 }
 
 const KEY = 'settings';
-export const DEFAULT_SETTINGS: AppSettings = { monthStartDay: DEFAULT_MONTH_START_DAY, emailStartDate: null };
+export const DEFAULT_SETTINGS: AppSettings = { monthStartDay: DEFAULT_MONTH_START_DAY, emailStartDate: null, emailIncoming: true };
 
 @Injectable()
 export class SettingsService {
@@ -34,6 +36,10 @@ export class SettingsService {
 
   async emailStartDate(): Promise<string | null> {
     return (await this.get()).emailStartDate;
+  }
+
+  async emailIncoming(): Promise<boolean> {
+    return (await this.get()).emailIncoming;
   }
 
   async update(patch: Partial<AppSettings>): Promise<AppSettings> {
@@ -59,6 +65,10 @@ export class SettingsService {
       out.emailStartDate = null;
     } else {
       out.emailStartDate = s.emailStartDate ?? null;
+    }
+    if (typeof s.emailIncoming !== 'boolean') {
+      if (strict) throw new BadRequestException('Tùy chọn lấy email tiền đến không hợp lệ');
+      out.emailIncoming = DEFAULT_SETTINGS.emailIncoming;
     }
     return out;
   }

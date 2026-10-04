@@ -10,7 +10,7 @@ import { AppModule } from '../src/app.module';
 import { setupApp } from '../src/app.setup';
 import { PrismaService } from '../src/database/prisma.service';
 import { hashPassword } from '../src/modules/auth/utils/password.util';
-import { addMonths, currentMonthVN } from '../src/common/utils/dates.util';
+import { addMonths, currentMonthVN, monthRange } from '../src/common/utils/dates.util';
 
 process.env.EMAIL_POLL_MINUTES = '0'; // không tự đọc email trong test
 
@@ -139,7 +139,7 @@ describe('Personal Finance API (e2e)', () => {
 
     it('tạo mục tiêu có số tiền ban đầu → dự báo theo kế hoạch nạp', async () => {
       const r = await authed('post', '/api/goals')
-        .send({ name: `${username} quỹ`, targetAmount: 10_000_000, initialAmount: 2_000_000, monthlyPlan: 1_000_000, deadline: addMonths(month, 11), interestRate: 0 })
+        .send({ name: `${username} quỹ`, targetAmount: 10_000_000, initialAmount: 2_000_000, monthlyPlan: 1_000_000, deadline: monthRange(addMonths(month, 11)).to, interestRate: 0 })
         .expect(201);
       goalId = r.body.data.id;
       const page = (await authed('get', '/api/goals').expect(200)).body.data;

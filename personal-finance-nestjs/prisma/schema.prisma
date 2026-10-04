@@ -261,8 +261,8 @@ model SavingsGoal {
   // false = quỹ một lần (VD mua điện thoại): đạt là xong, tiêu không làm giảm tiến độ.
   ongoing          Boolean      @default(false)
   targetAmount     BigInt
-  // Tháng cần đạt "YYYY-MM" (null = không đặt hạn)
-  deadline         String?      @db.VarChar(7)
+  // Ngày cần đạt "YYYY-MM-DD" (null = không đặt hạn)
+  deadline         String?      @db.VarChar(10)
   // Kế hoạch nạp định kỳ: số tiền/tháng + ngày trong tháng (để nhắc, web không tự chuyển tiền)
   monthlyPlan      BigInt?
   planDay          Int?

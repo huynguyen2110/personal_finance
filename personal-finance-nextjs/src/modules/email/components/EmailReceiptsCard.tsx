@@ -34,7 +34,7 @@ export default function EmailReceiptsCard({ onImported }: { onImported: () => vo
     try {
       const s = await pollEmails(sinceDays);
       toast.success(
-        `Đọc ${s.scanned} thư: ${s.created} giao dịch mới, ${s.merged} gộp, ${s.duplicates} đã có, ${s.skipped} không phải thông báo giao dịch`,
+        `Đọc ${s.scanned} thư: ${s.created} giao dịch mới, ${s.merged} gộp, ${s.duplicates} đã có, ${s.skipped} không phải thông báo giao dịch${s.ignoredIncoming ? `, bỏ qua ${s.ignoredIncoming} tiền đến` : ''}`,
         { duration: 6000 }
       );
       loadStatus();
@@ -99,6 +99,7 @@ export default function EmailReceiptsCard({ onImported }: { onImported: () => vo
               <span className="font-semibold">Hộp thư đã kết nối</span>
               <span className="text-slate-500">
                 {status.pollMinutes > 0 ? `• tự đọc mỗi ${status.pollMinutes} phút` : '• đang tắt tự đọc (EMAIL_POLL_MINUTES=0)'}
+                {!status.incoming && ' • chỉ lấy tiền đi'}
               </span>
             </span>
           ) : (
@@ -109,7 +110,7 @@ export default function EmailReceiptsCard({ onImported }: { onImported: () => vo
           {last && (
             <span className={`fin-num ${last.error ? 'text-rose-600' : 'text-slate-500'}`}>
               Lần đọc gần nhất {formatVNDateTime(last.at)}:{' '}
-              {last.error ? last.error : `${last.scanned} thư, ${last.created} mới, ${last.merged} gộp, ${last.skipped} bỏ qua`}
+              {last.error ? last.error : `${last.scanned} thư, ${last.created} mới, ${last.merged} gộp, ${last.skipped + (last.ignoredIncoming ?? 0)} bỏ qua`}
             </span>
           )}
         </div>
