@@ -64,8 +64,3 @@ export function buildChips(
   }
   return chips;
 }
-
-/** Rough pixel width of one chip, kept in sync with MindNode's chip CSS. */
-export function chipWidth(chip: NodeChip): number {
-  return 14 + chip.label.length * 5.6;
-}

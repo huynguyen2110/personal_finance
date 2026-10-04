@@ -1,6 +1,6 @@
 import dagre from '@dagrejs/dagre';
 import { TreeNode } from '@/modules/mindmap/mindmaps/types';
-import { chipWidth, NodeChip } from './chips';
+import type { NodeKind } from './types';
 
 export interface NodeRect {
   x: number;
@@ -9,26 +9,34 @@ export interface NodeRect {
   height: number;
 }
 
-const EMPTY_CHIPS: NodeChip[] = [];
+export interface NodeSize {
+  width: number;
+  height: number;
+}
+
+/** Vừa màn hình nhưng không thu nhỏ dưới 60% (chữ vẫn đọc được); phần tràn thì kéo / cuộn để xem. */
+export const FIT_VIEW = { padding: 0.15, minZoom: 0.6, maxZoom: 1 };
+
+/** Kích thước thẻ node — các con số khớp với CSS trong MindNode để bố cục khớp hiển thị. */
+export const ACTION_WIDTH = 256;
+export const ROOT_WIDTH = 224;
 
 export function estimateNodeSize(
-  node: TreeNode,
-  isRoot: boolean,
-  chips: NodeChip[],
-) {
-  // Same numbers feed dagre and the CSS pill so layout matches rendering.
-  const badges = (node.todoTotal > 0 ? 52 : 0) + (node.status ? 18 : 0);
-  // 56 = padding + icon trang; +18 cho nút nối liên kết
-  const titleWidth = 74 + node.title.length * 7.5 + badges;
-  const chipsRow =
-    chips.length > 0
-      ? 24 + chips.reduce((sum, c) => sum + chipWidth(c) + 4, 0)
-      : 0;
-  const width = Math.round(
-    Math.min(340, Math.max(isRoot ? 150 : 120, titleWidth, chipsRow)),
-  );
-  const height = (isRoot ? 52 : 40) + (chips.length > 0 ? 22 : 0);
-  return { width, height };
+  kind: NodeKind,
+  title: string,
+  opts: { hasBadge?: boolean; hasChips?: boolean; hasProgress?: boolean } = {},
+): NodeSize {
+  if (kind === 'root') return { width: ROOT_WIDTH, height: 132 };
+  if (kind === 'area') {
+    // padding 24 + chấm màu 18 + chữ 15px semibold (~8.6px/ký tự) + huy hiệu ưu tiên
+    const width = 42 + title.length * 8.6 + (opts.hasBadge ? 54 : 0);
+    return { width: Math.round(Math.min(300, Math.max(130, width))), height: 42 };
+  }
+  // Thẻ hành động: 2 dòng cố định (+ chip thuộc tính khác, + thanh tiến độ)
+  return {
+    width: ACTION_WIDTH,
+    height: 66 + (opts.hasChips ? 22 : 0) + (opts.hasProgress ? 10 : 0),
+  };
 }
 
 export type NodeSide = 'root' | 'left' | 'right';
@@ -47,7 +55,7 @@ export interface TreeLayout {
 export function layoutTree(
   visible: TreeNode[],
   rootId: number | null,
-  chipsOf?: Map<number, NodeChip[]>,
+  sizeOf: (node: TreeNode) => NodeSize,
 ): TreeLayout {
   const rects = new Map<number, NodeRect>();
   const side = new Map<number, NodeSide>();
@@ -82,13 +90,10 @@ export function layoutTree(
     }
   });
 
-  const sizeOf = (n: TreeNode) =>
-    estimateNodeSize(n, n.id === rootId, chipsOf?.get(n.id) ?? EMPTY_CHIPS);
-
   // Xếp một bên (gồm cả nút gốc) bằng dagre; trả về rect của các node, lệch sao cho tâm gốc ở (0, 0)
   const layoutSide = (groups: TreeNode[][], rankdir: 'LR' | 'RL') => {
     const g = new dagre.graphlib.Graph();
-    g.setGraph({ rankdir, nodesep: 16, ranksep: 60 });
+    g.setGraph({ rankdir, nodesep: 14, ranksep: 64 });
     g.setDefaultEdgeLabel(() => ({}));
     const nodes = [root, ...groups.flat()];
     for (const n of nodes) g.setNode(String(n.id), sizeOf(n));

@@ -1,21 +1,28 @@
 import type { Node } from '@xyflow/react';
 import type { NodeStatus } from '@/modules/mindmap/mindmaps/types';
-import type { NodeChip } from './chips';
 import type { NodeSide } from './layout';
+import type { NodeRoleMeta } from './nodeMeta';
+
+/** root = nút gốc, area = lĩnh vực (cấp 1), action = hành động (cấp ≥ 2). */
+export type NodeKind = 'root' | 'area' | 'action';
 
 export type MindNodeData = {
-  chips: NodeChip[];
   nodeId: number;
   mindmapId: number;
+  kind: NodeKind;
   title: string;
   color: string;
-  isRoot: boolean;
   collapsed: boolean;
   hasPage: boolean;
   status: NodeStatus | null;
   descendants: number;
   todoDone: number;
   todoTotal: number;
+  meta: NodeRoleMeta;
+  /** Tên các điều kiện trước chưa xong. */
+  blockedBy: string[];
+  /** Số việc chưa xong mà node này là điều kiện trước. */
+  unlocks: number;
   editing: boolean;
   /** Phía so với nút gốc (bố cục 2 bên): quyết định điểm nối cạnh và vị trí nút thu gọn. */
   side: NodeSide;
