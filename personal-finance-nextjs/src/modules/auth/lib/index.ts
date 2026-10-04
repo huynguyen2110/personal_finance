@@ -21,3 +21,9 @@ export async function logout(): Promise<void> {
   clearTokens();
   window.location.href = '/login';
 }
+
+// Đổi mật khẩu: server thu hồi mọi phiên khác và trả cặp token mới cho thiết bị này
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const tokens = await apiClient<AuthTokens>({ method: 'post', url: '/api/auth/change-password', payload: { currentPassword, newPassword } });
+  saveTokens(tokens);
+}

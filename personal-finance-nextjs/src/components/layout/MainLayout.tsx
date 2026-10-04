@@ -3,9 +3,10 @@
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import { SidebarProvider, useSidebar } from './SidebarContext';
+import type { AppModuleId } from '@/config/modules';
 
-// Khung trang: header sticky + sidebar cố định + nội dung (class core-* trong app/layout.css)
-function LayoutShell({ children }: { children: React.ReactNode }) {
+// Khung trang của một module: header sticky + sidebar cố định + nội dung (class core-* trong app/layout.css)
+function LayoutShell({ moduleId, children }: { moduleId: AppModuleId; children: React.ReactNode }) {
   const { collapsed, ready, mobileOpen, setMobileOpen } = useSidebar();
 
   const className = [
@@ -18,7 +19,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={className}>
-      <TopBar />
+      <TopBar moduleId={moduleId} />
       <div className="core-body">
         {/* Lớp phủ mờ khi mở drawer trên màn nhỏ */}
         <div
@@ -26,17 +27,17 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
           onClick={() => setMobileOpen(false)}
           aria-hidden
         />
-        <Sidebar />
+        <Sidebar moduleId={moduleId} />
         <main className="core-main">{children}</main>
       </div>
     </div>
   );
 }
 
-export default function MainLayout({ children }: { children: React.ReactNode }) {
+export default function MainLayout({ moduleId, children }: { moduleId: AppModuleId; children: React.ReactNode }) {
   return (
     <SidebarProvider>
-      <LayoutShell>{children}</LayoutShell>
+      <LayoutShell moduleId={moduleId}>{children}</LayoutShell>
     </SidebarProvider>
   );
 }

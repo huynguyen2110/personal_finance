@@ -3,8 +3,8 @@
 import { useMemo } from 'react';
 import { Tag } from 'lucide-react';
 import type { CategoryKind, Direction } from '@/types/common';
-import type { CategoryDTO } from '@/modules/categories/types';
-import { buildCategoryTree } from '@/modules/categories/utils/tree';
+import type { CategoryDTO } from '@/modules/finance/categories/types';
+import { buildCategoryTree } from '@/modules/finance/categories/utils/tree';
 import CategoryIcon from './CategoryIcon';
 import TreeSelect, { type TreeOption } from './TreeSelect';
 

@@ -1,7 +1,7 @@
 import CategoryIcon from './CategoryIcon';
 import { formatVND } from '@/lib/money';
 import { formatVNDateTime } from '@/lib/dates';
-import type { TransactionDTO } from '@/modules/transactions/types';
+import type { TransactionDTO } from '@/modules/finance/transactions/types';
 
 // Danh sách giao dịch gọn (dùng ở Tổng quan)
 export default function TxnMiniList({ items, empty = 'Chưa có giao dịch' }: { items: TransactionDTO[]; empty?: string }) {

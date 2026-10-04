@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { resolvePeriod, type Period, type PeriodPreset } from '@/lib/period';
-import { useMonthStartDay } from '@/modules/settings/lib';
+import { useMonthStartDay } from '@/modules/finance/settings/lib';
 
 const KEY = 'pf.period';
 

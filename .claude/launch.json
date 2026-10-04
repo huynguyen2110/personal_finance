@@ -4,7 +4,7 @@
     {
       "name": "pf-api",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "personal-finance-nestjs", "run", "start:dev"],
+      "runtimeArgs": ["--prefix", "backend", "run", "start:dev"],
       "port": 4000
     },
     {
@@ -16,7 +16,7 @@
     {
       "name": "pf-api-prod",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "personal-finance-nestjs", "run", "start:prod"],
+      "runtimeArgs": ["--prefix", "backend", "run", "start:prod"],
       "port": 4000
     },
     {
