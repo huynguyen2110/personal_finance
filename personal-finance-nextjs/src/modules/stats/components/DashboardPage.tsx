@@ -300,7 +300,7 @@ export default function DashboardPage() {
                             <span>
                               Còn thiếu: <b className="text-slate-900">{formatVND(g.remaining)}</b>
                             </span>
-                            <span>{g.projectedMonth ? `Dự kiến: ${formatMonthLabel(g.projectedMonth)}` : g.deadline ? `Hạn: ${formatMonthLabel(g.deadline)}` : 'Chưa có kế hoạch nạp'}</span>
+                            <span>{g.projectedMonth ? `Dự kiến: ${formatMonthLabel(g.projectedMonth)}` : g.deadline ? `Hạn: ${formatVNDate(g.deadline)}` : 'Chưa có kế hoạch nạp'}</span>
                           </div>
                         </Link>
                       );

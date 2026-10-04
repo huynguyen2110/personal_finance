@@ -180,9 +180,10 @@ export default function ReportsPage() {
                     <span className="fin-label px-2 py-0.5 rounded bg-slate-100">{data.monthCount} tháng</span>
                   </div>
                 </div>
-                <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-100 border border-slate-200 self-start" role="tablist" aria-label="Chế độ xem">
+                {/* Màn hẹp: 3 cột đều, nhãn được xuống dòng thay vì tràn khỏi thẻ */}
+                <div className="grid grid-cols-3 w-full lg:inline-flex lg:w-auto lg:shrink-0 items-stretch p-0.5 rounded-lg bg-slate-100 border border-slate-200 self-start" role="tablist" aria-label="Chế độ xem">
                   {VIEWS.map((v) => (
-                    <button key={v.key} type="button" role="tab" aria-selected={view === v.key} onClick={() => setView(v.key)} className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${view === v.key ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
+                    <button key={v.key} type="button" role="tab" aria-selected={view === v.key} onClick={() => setView(v.key)} className={`min-w-0 px-2 sm:px-3 py-1 rounded-md text-xs leading-tight font-semibold text-center transition-colors lg:whitespace-nowrap ${view === v.key ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
                       {v.label}
                     </button>
                   ))}
@@ -432,7 +433,7 @@ function Matrix({ months, rows, color, mode, upIsGood }: { months: string[]; row
       <table className="w-full min-w-[900px] text-sm border-collapse">
         <thead>
           <tr className="bg-slate-50 border-y border-slate-200 text-left">
-            <th className="fin-label py-3 px-4 md:px-6 min-w-[220px] sticky left-0 bg-slate-50 font-bold">Danh mục</th>
+            <th className="fin-label py-3 px-3 sm:px-4 md:px-6 w-px sm:w-auto sm:min-w-[220px] sticky left-0 z-10 bg-slate-50 font-bold">Danh mục</th>
             {months.map((m, i) => (
               <th key={m} className={`fin-label py-3 px-3 text-right whitespace-nowrap font-bold ${i === lastIdx ? 'bg-teal-50 !text-teal-800' : ''}`}>
                 {formatMonthLabel(m)}
@@ -448,10 +449,13 @@ function Matrix({ months, rows, color, mode, upIsGood }: { months: string[]; row
             const mom = momOf(r.values);
             return (
               <tr key={String(r.categoryId)} className={`hover:bg-slate-50/70 transition-colors ${child ? 'bg-slate-50/40' : ''}`}>
-                <td className={`py-3 px-4 md:px-6 sticky left-0 ${child ? 'bg-[#FAFBFD] pl-10 md:pl-12' : 'bg-white'}`}>
-                  <span className="flex items-center gap-3 min-w-0">
-                    {child && <span className="text-slate-300 -ml-4" aria-hidden>└</span>}
-                    <CategoryIcon icon={r.icon} color={r.color} size={child ? 'sm' : 'md'} />
+                {/* Cột cố định: màn hẹp thu gọn (ẩn icon, giới hạn bề rộng, cắt tên) để còn chỗ cho số liệu */}
+                <td className={`py-3 px-3 sm:px-4 md:px-6 sticky left-0 z-10 ${child ? 'bg-[#FAFBFD] pl-6 sm:pl-10 md:pl-12' : 'bg-white'}`} title={r.name}>
+                  <span className="flex items-center gap-2 sm:gap-3 min-w-0 w-28 sm:w-auto">
+                    {child && <span className="text-slate-300 -ml-4 hidden sm:inline" aria-hidden>└</span>}
+                    <span className="hidden sm:contents">
+                      <CategoryIcon icon={r.icon} color={r.color} size={child ? 'sm' : 'md'} />
+                    </span>
                     <span className="min-w-0">
                       <span className={`block truncate ${child ? 'text-slate-700 text-[13px]' : 'text-slate-900 font-semibold'}`}>{r.name}</span>
                       <span className="block text-[11px] text-slate-500 truncate">
@@ -477,7 +481,7 @@ function Matrix({ months, rows, color, mode, upIsGood }: { months: string[]; row
         </tbody>
         <tfoot>
           <tr className="bg-slate-50 border-t border-slate-200 font-bold text-slate-900">
-            <th scope="row" className="py-3.5 px-4 md:px-6 text-left sticky left-0 bg-slate-50 whitespace-nowrap text-xs uppercase tracking-wider">Tổng {upIsGood ? 'thu' : 'chi'} hàng tháng</th>
+            <th scope="row" className="py-3.5 px-3 sm:px-4 md:px-6 text-left sticky left-0 z-10 bg-slate-50 sm:whitespace-nowrap text-xs uppercase tracking-wider">Tổng {upIsGood ? 'thu' : 'chi'} hàng tháng</th>
             {colTotals.map((v, i) => (
               <td key={months[i]} className={`py-3.5 px-3 text-right fin-num whitespace-nowrap ${i === lastIdx ? 'bg-teal-100/60 text-teal-900' : ''}`}>
                 {mode === 'value' ? formatCompactVND(v) : v ? '100%' : '·'}

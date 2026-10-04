@@ -24,6 +24,7 @@ export class EmailController {
       configured: this.imap.isConfigured(),
       pollMinutes: this.imap.pollMinutes(),
       startDate: await this.settings.emailStartDate(),
+      incoming: await this.settings.emailIncoming(),
       lastRun: await this.imap.getLastRun(),
       providers: EMAIL_PROVIDERS.map((p) => ({
         id: p.id,

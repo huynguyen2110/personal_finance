@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, Matches, Max, Min, ValidateIf } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, Matches, Max, Min, ValidateIf } from 'class-validator';
 import { MAX_MONTH_START_DAY, MIN_MONTH_START_DAY } from '../../../common/utils/dates.util';
 
 export class UpdateSettingsDto {
@@ -14,4 +14,9 @@ export class UpdateSettingsDto {
   @ValidateIf((o) => o.emailStartDate !== null)
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Ngày bắt đầu lấy email không hợp lệ' })
   emailStartDate?: string | null;
+
+  // false = chỉ lấy email tiền đi, bỏ qua email báo tiền đến
+  @IsOptional()
+  @IsBoolean()
+  emailIncoming?: boolean;
 }

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { CalendarRange, ChevronRight, CircleCheck, Info, MailSearch, RefreshCw, Save, Trash2 } from 'lucide-react';
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CalendarRange, ChevronRight, CircleCheck, Info, MailSearch, RefreshCw, Save, Trash2 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import DatePicker from '@/components/shared/DatePicker';
 import TreeSelect from '@/components/shared/TreeSelect';
@@ -36,6 +36,13 @@ export default function SettingsPage() {
               title: 'Dữ liệu từ email',
               status: data ? (data.emailStartDate ? `Từ ${formatVNDate(data.emailStartDate)}` : 'Không giới hạn') : '…',
             },
+            {
+              href: '#email-direction',
+              icon: ArrowLeftRight,
+              tone: 'bg-sky-50 text-sky-700',
+              title: 'Loại email giao dịch',
+              status: data ? (data.emailIncoming ? 'Cả tiền đến và tiền đi' : 'Chỉ tiền đi') : '…',
+            },
           ]}
         />
         <div className="flex flex-col gap-4 md:gap-6 max-w-5xl min-w-0">
@@ -45,6 +52,7 @@ export default function SettingsPage() {
             <>
               <MonthStartCard key={`m-${data.monthStartDay}`} initial={data.monthStartDay} />
               <EmailStartCard key={`e-${data.emailStartDate ?? ''}`} initial={data.emailStartDate} />
+              <EmailDirectionCard key={`d-${data.emailIncoming}`} initial={data.emailIncoming} />
             </>
           )}
         </div>
@@ -329,6 +337,109 @@ function EmailStartCard({ initial }: { initial: string | null }) {
         message={`Xóa ${before?.count ?? 0} giao dịch đọc từ email có ngày trước ${initial ? formatVNDate(initial) : ''}? Thao tác này không hoàn tác được. Giao dịch nhập tay/nhập file được giữ nguyên.`}
         confirmText={purging ? 'Đang xóa…' : 'Xóa'}
       />
+    </section>
+  );
+}
+
+// Loại email giao dịch: lấy cả email tiền đến, hay chỉ email tiền đi (chi tiêu)
+function EmailDirectionCard({ initial }: { initial: boolean }) {
+  const qc = useQueryClient();
+  const { data: email } = useEmailStatus();
+  const [incoming, setIncoming] = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const dirty = incoming !== initial;
+  // Ngân hàng có gửi email báo tiền đến (chỉ những ngân hàng này chịu ảnh hưởng)
+  const inBanks = email?.providers.filter((p) => p.covers.in).map((p) => p.bankName) ?? [];
+
+  async function save() {
+    setSaving(true);
+    try {
+      await updateSettings({ emailIncoming: incoming });
+      toast.success(incoming ? 'Sẽ lấy cả email tiền đến và tiền đi' : 'Từ giờ chỉ lấy email tiền đi');
+      qc.invalidateQueries({ queryKey: EMAIL_QUERY_KEYS.STATUS });
+      invalidateFinanceData(qc);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const options = [
+    { value: true, title: 'Cả tiền đến và tiền đi', desc: 'Ghi nhận mọi giao dịch có email báo: lương, tiền được chuyển đến, chi tiêu…', Icon: ArrowLeftRight },
+    { value: false, title: 'Chỉ tiền đi', desc: 'Bỏ qua email báo tiền đến; khoản thu bạn tự nhập tay.', Icon: ArrowUpRight },
+  ] as const;
+
+  return (
+    <section id="email-direction" className="fin-card p-5 md:p-6 flex flex-col gap-5 scroll-mt-20">
+      <div className="flex items-start gap-3">
+        <span className="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center shrink-0">
+          <ArrowLeftRight className="w-5 h-5" aria-hidden />
+        </span>
+        <div>
+          <h2 className="text-[16px] font-semibold text-slate-900">Loại email giao dịch</h2>
+          <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">Chọn có ghi nhận email báo tiền đến hay chỉ lấy email tiền đi.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Loại email giao dịch">
+        {options.map((o) => {
+          const active = incoming === o.value;
+          return (
+            <button
+              key={String(o.value)}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => setIncoming(o.value)}
+              className={`flex items-start gap-2.5 p-3 rounded-xl text-left transition-colors ${active ? 'border-2 border-teal-700 bg-teal-50' : 'border border-slate-200 hover:bg-slate-50'}`}
+            >
+              <o.Icon className={`w-5 h-5 shrink-0 mt-0.5 ${active ? 'text-teal-700' : 'text-slate-400'}`} aria-hidden />
+              <span>
+                <span className={`block text-[13px] font-semibold ${active ? 'text-teal-800' : 'text-slate-800'}`}>{o.title}</span>
+                <span className="block text-xs text-slate-500 mt-0.5 leading-snug">{o.desc}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 flex flex-col gap-1.5 text-xs text-slate-600">
+        <p className="flex items-start gap-2">
+          <ArrowDownLeft className="w-4 h-4 shrink-0 text-slate-400" aria-hidden />
+          <span>
+            {inBanks.length ? (
+              <>
+                Ngân hàng có email báo tiền đến: <b className="text-slate-900">{inBanks.join(', ')}</b>.
+              </>
+            ) : (
+              'Chưa có ngân hàng nào gửi email báo tiền đến.'
+            )}{' '}
+            Thay đổi chỉ áp dụng cho các lần đọc email sau; giao dịch đã ghi nhận được giữ nguyên.
+          </span>
+        </p>
+        {email?.lastRun?.ignoredIncoming ? (
+          <p className="fin-num pl-6">
+            Lần đọc gần nhất {formatVNDateTime(email.lastRun.at)} đã bỏ qua <b className="text-slate-900">{email.lastRun.ignoredIncoming}</b> email tiền đến.
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+        {!dirty && (
+          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700">
+            <CircleCheck className="w-4 h-4" aria-hidden /> Đang áp dụng: {initial ? 'cả tiền đến và tiền đi' : 'chỉ tiền đi'}
+          </span>
+        )}
+        <div className="ml-auto flex gap-2">
+          <button type="button" className="fin-btn fin-btn-outline" disabled={!dirty || saving} onClick={() => setIncoming(initial)}>
+            Hoàn tác
+          </button>
+          <button type="button" className="fin-btn fin-btn-primary" disabled={!dirty || saving} onClick={save}>
+            <Save className="w-4 h-4" aria-hidden /> {saving ? 'Đang lưu…' : 'Lưu cài đặt'}
+          </button>
+        </div>
+      </div>
     </section>
   );
 }

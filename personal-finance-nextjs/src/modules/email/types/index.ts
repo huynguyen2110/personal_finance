@@ -7,7 +7,10 @@ export interface EmailPollSummary {
   skipped: number;
   // Giao dịch trước "ngày bắt đầu lấy dữ liệu" → bỏ qua (có từ bản sau, bản ghi cũ có thể thiếu)
   beforeStart?: number;
+  // Email tiền đến bị bỏ qua do cài đặt chỉ lấy tiền đi
+  ignoredIncoming?: number;
   startDate?: string | null;
+  incoming?: boolean;
   error?: string;
 }
 
@@ -25,6 +28,8 @@ export interface EmailStatus {
   pollMinutes: number;
   // Ngày bắt đầu lấy dữ liệu từ email (Cài đặt); null = không giới hạn
   startDate: string | null;
+  // Có lấy email tiền đến không (Cài đặt)
+  incoming: boolean;
   lastRun: EmailPollSummary | null;
   providers: EmailProviderInfo[];
 }

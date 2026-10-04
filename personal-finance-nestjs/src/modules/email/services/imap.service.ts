@@ -12,6 +12,7 @@ import { IngestEmailService } from './ingest-email.service';
 // (VD Gmail + mật khẩu ứng dụng). Mỗi lần chỉ lấy thư mới hơn UID đã đọc.
 // Lần đầu: lấy từ "ngày bắt đầu lấy dữ liệu" trong cài đặt, chưa đặt thì 30 ngày gần nhất.
 // Giao dịch có ngày trước ngày bắt đầu luôn bị bỏ qua (kể cả khi đọc lại N ngày).
+// Cài đặt "chỉ lấy tiền đi" → bỏ qua email báo tiền đến.
 
 const CURSOR_KEY = 'email.cursor';
 const LAST_RUN_KEY = 'email.lastRun';
@@ -30,7 +31,9 @@ export interface EmailPollSummary {
   duplicates: number;
   skipped: number; // thư không phải thông báo giao dịch (OTP, khuyến mãi…)
   beforeStart: number; // giao dịch trước ngày bắt đầu lấy dữ liệu → bỏ qua
+  ignoredIncoming: number; // email tiền đến bị bỏ qua do cài đặt chỉ lấy tiền đi
   startDate: string | null; // ngày bắt đầu đang áp dụng lúc đọc
+  incoming: boolean; // cài đặt lấy email tiền đến lúc đọc
   error?: string;
 }
 
@@ -89,6 +92,7 @@ export class ImapService {
     const c = config();
     const startDate = await this.settings.emailStartDate();
     const startAt = startDate ? startOfVNDay(startDate) : null;
+    const incoming = await this.settings.emailIncoming();
     const summary: EmailPollSummary = {
       at: new Date().toISOString(),
       scanned: 0,
@@ -97,7 +101,9 @@ export class ImapService {
       duplicates: 0,
       skipped: 0,
       beforeStart: 0,
+      ignoredIncoming: 0,
       startDate,
+      incoming,
     };
     if (!this.isConfigured()) {
       summary.error = 'Chưa cấu hình IMAP_USER / IMAP_PASSWORD trong .env';
@@ -161,6 +167,11 @@ export class ImapService {
             // Giao dịch xảy ra trước ngày bắt đầu lấy dữ liệu → không ghi nhận
             if (startAt && parsed.data.transactionDate < startAt) {
               summary.beforeStart++;
+              continue;
+            }
+            // Cài đặt chỉ lấy tiền đi → bỏ qua email báo tiền đến
+            if (!incoming && parsed.data.direction === 'IN') {
+              summary.ignoredIncoming++;
               continue;
             }
             const r = await this.ingestEmail.ingest(parsed.data, { messageId: mail.messageId ?? null }, ctx);

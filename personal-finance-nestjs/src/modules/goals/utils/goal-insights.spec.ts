@@ -41,14 +41,18 @@ describe('goal-insights', () => {
   });
 
   it('goalStatus', () => {
-    const base = { saved: 50, target: 100, currentMonth: '2026-10', monthlyRate: 10 };
-    expect(goalStatus({ ...base, saved: 100, deadline: null, projectedMonth: null })).toBe('done');
-    expect(goalStatus({ ...base, deadline: '2026-09', projectedMonth: '2026-12' })).toBe('overdue');
-    expect(goalStatus({ ...base, deadline: '2026-12', projectedMonth: '2026-12' })).toBe('on_track');
-    expect(goalStatus({ ...base, deadline: '2026-12', projectedMonth: '2027-01' })).toBe('behind');
-    expect(goalStatus({ ...base, deadline: '2026-12', projectedMonth: null })).toBe('behind');
-    expect(goalStatus({ ...base, deadline: null, projectedMonth: '2027-01' })).toBe('no_deadline');
-    expect(goalStatus({ ...base, monthlyRate: 0, deadline: null, projectedMonth: null })).toBe('no_plan');
+    const base = { saved: 50, target: 100, today: '2026-10-15', monthlyRate: 10 };
+    const dl = (deadline: string) => ({ deadline, deadlineMonth: deadline.slice(0, 7) });
+    const none = { deadline: null, deadlineMonth: null };
+    expect(goalStatus({ ...base, saved: 100, ...none, projectedMonth: null })).toBe('done');
+    expect(goalStatus({ ...base, ...dl('2026-09-30'), projectedMonth: '2026-12' })).toBe('overdue');
+    expect(goalStatus({ ...base, ...dl('2026-10-14'), projectedMonth: '2026-10' })).toBe('overdue'); // quá ngày dù cùng tháng
+    expect(goalStatus({ ...base, ...dl('2026-10-15'), projectedMonth: '2026-10' })).toBe('on_track'); // hạn hôm nay chưa quá
+    expect(goalStatus({ ...base, ...dl('2026-12-05'), projectedMonth: '2026-12' })).toBe('on_track');
+    expect(goalStatus({ ...base, ...dl('2026-12-31'), projectedMonth: '2027-01' })).toBe('behind');
+    expect(goalStatus({ ...base, ...dl('2026-12-31'), projectedMonth: null })).toBe('behind');
+    expect(goalStatus({ ...base, ...none, projectedMonth: '2027-01' })).toBe('no_deadline');
+    expect(goalStatus({ ...base, monthlyRate: 0, ...none, projectedMonth: null })).toBe('no_plan');
   });
 
   it('goalHorizon / projectMonth', () => {

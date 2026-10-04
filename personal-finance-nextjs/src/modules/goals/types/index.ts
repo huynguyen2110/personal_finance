@@ -16,7 +16,9 @@ export interface GoalDTO {
   // Quỹ duy trì (VD quỹ khẩn cấp): tiến độ tính theo số còn trong quỹ → tiêu bớt thì quay lại tích lũy
   ongoing: boolean;
   targetAmount: number;
-  deadline: string | null; // "YYYY-MM"
+  deadline: string | null; // "YYYY-MM-DD"
+  deadlineMonth: string | null; // tháng (tài chính) chứa ngày hạn
+  daysLeft: number | null; // số ngày tới hạn (0 = hôm nay); null = không hạn hoặc đã qua
   monthlyPlan: number | null;
   planDay: number | null;
   sourceAccount: { id: number; name: string } | null;
