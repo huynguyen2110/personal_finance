@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import Providers from './providers';
+import { APP_DESCRIPTION, APP_NAME } from '@/config/app';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Chi tiêu cá nhân',
-  description: 'Theo dõi thu chi cá nhân tự động từ email thông báo của ngân hàng',
+  title: APP_NAME,
+  description: APP_DESCRIPTION,
 };
 
 export default function RootLayout({

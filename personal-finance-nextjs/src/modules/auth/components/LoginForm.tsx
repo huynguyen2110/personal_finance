@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Wallet, Lock, User, LogIn, CircleAlert } from 'lucide-react';
+import { Sparkles, Lock, User, LogIn, CircleAlert } from 'lucide-react';
+import { APP_NAME } from '@/config/app';
 import { errorMessage } from '@/lib/api-client';
 import { hasSession } from '@/lib/auth-storage';
 import { login } from '../lib';
 
 // Chỉ cho phép chuyển hướng nội bộ sau khi đăng nhập
 function safeRedirect(from: string | undefined): string {
-  return from && from.startsWith('/') && !from.startsWith('//') ? from : '/dashboard';
+  return from && from.startsWith('/') && !from.startsWith('//') ? from : '/';
 }
 
 export default function LoginForm({ from }: { from?: string }) {
@@ -42,10 +43,10 @@ export default function LoginForm({ from }: { from?: string }) {
     <div className="min-h-screen flex items-center justify-center bg-surface-dark px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center mb-4">
-            <Wallet className="w-7 h-7 text-white" />
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-700 to-violet-600 flex items-center justify-center mb-4">
+            <Sparkles className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-xl font-bold text-text font-heading">Chi tiêu cá nhân</h1>
+          <h1 className="text-xl font-bold text-text font-heading">{APP_NAME}</h1>
           <p className="text-sm text-text-secondary mt-1">Đăng nhập để tiếp tục</p>
         </div>
 

@@ -1,34 +1,52 @@
-# Chi tiêu cá nhân
+# Huy Workspace
 
-Web theo dõi thu chi cá nhân. Giao dịch ngân hàng được ghi nhận bằng cách **đọc email thông báo của ngân hàng** (không qua bên thứ ba), tự phân loại theo quy tắc, có ngân sách, thống kê và xuất Excel.
+Ứng dụng cá nhân gồm nhiều **module**. Sau khi đăng nhập, trang chủ (`/`) là launcher: lời chào, ô tìm kiếm (tìm cả module lẫn từng trang bên trong), lưới các module. Mỗi module có sidebar riêng; nút lưới trên header để về trang chủ hoặc chuyển module.
+
+| Module | Đường dẫn | Nội dung |
+|---|---|---|
+| **Tài chính cá nhân** | `/finance/*` | Thu chi đọc tự động từ email ngân hàng, phân loại theo quy tắc, ngân sách, mục tiêu tiết kiệm, thống kê, xuất Excel |
+| **Mindmap** | `/mindmap/*` | Sơ đồ tư duy (kéo thả, phím tắt), trang ghi chú kiểu Notion cho từng nhánh, thuộc tính tùy chỉnh, todo hằng ngày gắn với nhánh, thống kê tuần |
+
+Một đăng nhập dùng chung cho mọi module (một tài khoản, username/password). Link cũ dạng `/dashboard`, `/transactions?…` tự chuyển sang `/finance/...`.
 
 Gồm hai phần trong cùng repo:
 
 | Thư mục | Vai trò | Stack | Cổng |
 |---|---|---|---|
-| `personal-finance-nestjs/` | API (BE) | NestJS 11, Prisma 5, PostgreSQL (Laragon hoặc Neon), JWT, ExcelJS, imapflow + mailparser | 4000 |
-| `personal-finance-nextjs/` | Giao diện (FE) | Next.js 16, React Query, axios, Tailwind 4, Recharts | dev 3003, prod 3002 |
+| `backend/` | API | NestJS 11, Prisma 5, PostgreSQL (Laragon hoặc Neon), JWT, ExcelJS, imapflow + mailparser | 4000 |
+| `frontend/` | Giao diện | Next.js 16, React Query, axios, Tailwind 4, Recharts, React Flow + dagre, TipTap | dev 3003, prod 3002 |
 
 ## Cấu trúc
 
 ```
-personal-finance-nestjs/
-  prisma/                schema, migrations, seed.ts, seed-demo.ts
-  src/common/            guard JWT, @Public(), interceptor envelope, filter lỗi, pipe validate, utils
+backend/
+  prisma/                schema (bảng mindmap có tiền tố mm_), migrations, seed*.ts
+  src/common/            guard JWT, @Public(), @CurrentUser(), interceptor envelope, filter lỗi, pipe validate, utils
   src/database/          PrismaService
-  src/modules/<tên>/     <tên>.module.ts, controllers/, services/, dto/, utils/
-                         auth, accounts, categories, rules, transfers, transactions, stats, budgets, reports, email
-  test/                  e2e (supertest, dùng user tạm, không ghi dữ liệu tài chính)
-personal-finance-nextjs/
-  src/app/               route mỏng, chỉ render component của module
-  src/modules/<tên>/     components/, lib/ (query key + hook React Query + hàm gọi API), types/
-  src/lib/               api-client (Bearer + tự refresh token), auth-storage, download, query-client, dates, money…
-  src/components/        layout, shared, charts
+  src/modules/auth/      đăng nhập, refresh token, đổi mật khẩu (dùng chung mọi module)
+  src/modules/finance/   finance.module.ts + accounts, categories, rules, transfers, transactions, stats,
+                         budgets, goals, reports, email, settings…   → route api/<tính năng> (api/accounts…)
+  src/modules/mindmap/   mindmap.module.ts, controllers/, services/, dto/, utils/  → route api/mindmap/*
+  test/                  e2e (supertest, dùng user tạm rồi xóa)
+frontend/
+  src/config/modules.ts  danh sách module: tên, icon, màu, menu sidebar → launcher/sidebar/nút chuyển module đọc từ đây
+  src/app/               (app)/page.tsx = launcher; (app)/finance/*, (app)/mindmap/* (layout riêng mỗi module); login/
+  src/modules/launcher/  trang chủ chọn module
+  src/modules/finance/   các tính năng tài chính: components/, lib/ (query key + hook + API), types/
+  src/modules/mindmap/   canvas, mindmaps, node-page, properties, todos, stats; lib/api.ts; mindmap.css (chỉ nạp ở /mindmap)
+  src/modules/auth/      form đăng nhập, đổi mật khẩu
+  src/lib/               api-client (Bearer + tự refresh token), auth-storage, dates, money…
+  src/components/        layout (khung module dùng chung), shared, charts
 ```
 
 - API trả về `{ statusCode, timestamp, duration, data }`; lỗi trả `{ statusCode, message, error, path, timestamp }`.
-- Đăng nhập: `POST /api/auth/login` trả access token (15 phút) + refresh token (30 ngày, xoay vòng mỗi lần `POST /api/auth/refresh-token`). FE lưu token trong localStorage và tự refresh.
+- Đăng nhập: `POST /api/auth/login` trả access token (15 phút) + refresh token (30 ngày, xoay vòng mỗi lần `POST /api/auth/refresh-token`). FE lưu token trong localStorage và tự refresh. Đổi mật khẩu: `POST /api/auth/change-password` (thu hồi mọi phiên khác).
 - Tài liệu API (Swagger): http://localhost:4000/api-docs
+
+### Thêm một module mới
+
+1. **Backend:** tạo `backend/src/modules/<id>/<id>.module.ts` (controller đặt route `api/<id>/...`), thêm vào `imports` của `src/app.module.ts`. Bảng mới thêm vào `prisma/schema.prisma` (nên đặt tiền tố bằng `@@map`) rồi `npx prisma migrate dev --name <id>`.
+2. **Frontend:** thêm một mục vào `APP_MODULES` trong `src/config/modules.ts` (tên, icon, màu, `basePath`, `home`, `nav`). Tạo `src/app/(app)/<id>/layout.tsx` bọc `<MainLayout moduleId="<id>">` và các trang bên trong; code tính năng đặt ở `src/modules/<id>/`. Gọi API qua `apiClient` trong `src/lib/api-client.ts`.
 
 ## Chạy lần đầu
 
@@ -39,7 +57,7 @@ psql -U postgres -c "CREATE DATABASE personal_finance;"
 ```
 
 ```bash
-cd personal-finance-nestjs
+cd backend
 npm install
 cp .env.example .env        # điền JWT_SECRET, ADMIN_PASSWORD, IMAP_USER, IMAP_PASSWORD...
 npm run prisma:deploy       # tạo bảng
@@ -50,7 +68,7 @@ npm run build && npm run start:prod   # API ở http://localhost:4000
 ```
 
 ```bash
-cd personal-finance-nextjs
+cd frontend
 npm install
 cp .env.example .env.local  # NEXT_PUBLIC_API_URL=http://localhost:4000
 npm run build && npm start  # web ở http://localhost:3002
@@ -58,13 +76,13 @@ npm run build && npm start  # web ở http://localhost:3002
 
 Khi phát triển: `npm run start:dev` (BE) và `npm run dev` (FE, cổng 3003).
 
-Kiểm tra BE: `npm test` (unit, gồm bộ đọc email) và `npm run test:e2e` (cần PostgreSQL đang chạy).
+Kiểm tra BE: `npm test` (unit, gồm bộ đọc email) và `npm run test:e2e` (cần PostgreSQL đang chạy; chỉ chạy e2e mindmap: `npm run test:e2e -- mindmap`).
 
 Đọc email theo lịch từ Task Scheduler (tùy chọn): gọi `http://localhost:4000/api/cron/sync?secret=<CRON_SECRET>`.
 
 Giữ API trên Render không ngủ (gói free ngủ sau 15 phút không có request): đặt cron ngoài (VD cron-job.org, UptimeRobot) gọi `GET https://<api>.onrender.com/api/health` mỗi 10–14 phút. Route không cần đăng nhập, không truy vấn DB (để Neon vẫn tự ngủ, không tốn giờ compute).
 
-## Mỗi ngân hàng một cách ghi nhận
+## Tài chính: mỗi ngân hàng một cách ghi nhận
 
 | Ngân hàng | Cách ghi nhận | Ghi nhận được |
 |---|---|---|
@@ -73,12 +91,12 @@ Giữ API trên Render không ngủ (gói free ngủ sau 15 phút không có req
 | **ACB** | Email từ mailalert@acb.com.vn "… đã thay đổi số dư" | Tiền **ra và vào** (Ghi nợ/Ghi có), **kèm số dư mới** |
 | Ngân hàng khác, tiền mặt | Nhập tay | Mọi giao dịch |
 
-Mỗi ngân hàng có một bộ đọc trong `personal-finance-nestjs/src/modules/email/providers/`. Muốn thêm ngân hàng mới thì viết thêm một provider rồi đăng ký trong `providers/index.ts`.
+Mỗi ngân hàng có một bộ đọc trong `backend/src/modules/finance/email/providers/`. Muốn thêm ngân hàng mới thì viết thêm một provider rồi đăng ký trong `providers/index.ts`.
 
 ### Cấu hình đọc email (Gmail)
 
 1. Bật Xác minh 2 bước, rồi tạo **Mật khẩu ứng dụng** tại myaccount.google.com/apppasswords.
-2. Điền `IMAP_USER` và `IMAP_PASSWORD` vào `personal-finance-nestjs/.env`, rồi khởi động lại API.
+2. Điền `IMAP_USER` và `IMAP_PASSWORD` vào `backend/.env`, rồi khởi động lại API.
    - Web tự đọc thư mỗi `EMAIL_POLL_MINUTES` phút. Lần đầu đọc 30 ngày gần nhất.
    - Chỉ đọc thư từ người gửi có chứa `VCB_EMAIL_FROM`, `CAKE_EMAIL_FROM` hoặc `ACB_EMAIL_FROM`.
 3. Muốn thử trước khi cấu hình: vào trang **Tài khoản**, dán nội dung một email vào ô "Dán nội dung một email".
@@ -90,9 +108,9 @@ Cách xử lý:
 - Số dư ACB lấy theo email gần nhất, cộng các giao dịch phát sinh sau đó (ví dụ nhập tay). Email cũ đến muộn không ghi đè số dư mới hơn.
 - Tài khoản Vietcombank chỉ có tiền ra, nên số dư hiển thị không phải số dư thật. Web có đánh dấu "Chưa đủ tiền vào" ở những tài khoản này.
 
-Kiểm tra bộ đọc email: `npm test -- providers` trong `personal-finance-nestjs`.
+Kiểm tra bộ đọc email: `npm test -- providers` trong `backend`.
 
-## Tính năng
+## Module Tài chính cá nhân
 
 - **Tổng quan**
   - KPI thu, chi, chênh lệch, tỷ lệ tiết kiệm, mỗi số có so sánh với kỳ trước.
@@ -122,9 +140,16 @@ Kiểm tra bộ đọc email: `npm test -- providers` trong `personal-finance-ne
 - **Tự nhận diện chuyển khoản nội bộ**
   - Một khoản ra và một khoản vào cùng số tiền, ở hai tài khoản khác nhau, cách nhau tối đa 15 phút sẽ được ghép cặp và loại khỏi thống kê. Áp dụng cả với rút ATM rồi nhập tay khoản thu vào ví tiền mặt.
   - Gỡ cặp bằng nút "Không phải chuyển nội bộ" trong chi tiết giao dịch. Cặp đã gỡ sẽ không tự ghép lại.
-  - Có nút quét lại toàn bộ giao dịch ở trang Tài khoản. Muốn đổi khoảng thời gian thì sửa `TRANSFER_WINDOW_MINUTES` trong `personal-finance-nestjs/src/modules/transfers/services/transfers.service.ts`.
+  - Có nút quét lại toàn bộ giao dịch ở trang Tài khoản. Muốn đổi khoảng thời gian thì sửa `TRANSFER_WINDOW_MINUTES` trong `backend/src/modules/finance/transfers/services/transfers.service.ts`.
 - **Tài khoản**
   - Tài khoản ngân hàng được tạo tự động từ email đầu tiên. Có thể thêm tay tài khoản ngân hàng khác và ví tiền mặt.
+
+## Module Mindmap
+
+- **Mindmap**: canvas tự xếp từ trái sang phải. Phím tắt: `Tab` thêm nhánh con, `Enter` thêm nhánh ngang, `F2`/nhấp đúp đổi tên, `Delete` xóa (xóa cả nhánh con). Kéo một nhánh thả vào nhánh khác để đổi cha; tô màu theo nhánh; thu gọn/mở rộng.
+- **Trang của nhánh**: trình soạn kiểu Notion (TipTap, tự lưu sau 1 giây), thuộc tính tùy chỉnh theo từng mindmap (văn bản, số, đúng/sai, ngày, lựa chọn), danh sách todo gắn với nhánh.
+- **Todo hằng ngày**: mỗi todo gắn được với nhiều nhánh (ở nhiều mindmap); nhánh hiện số todo đã xong / tổng.
+- **Thống kê tuần**: số todo theo ngày và tiến độ theo nhánh.
 
 ## Ghi chú kỹ thuật
 

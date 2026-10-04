@@ -5,7 +5,7 @@ import DatePicker from '@/components/shared/DatePicker';
 import TreeSelect from '@/components/shared/TreeSelect';
 import AccountSelect from '@/components/shared/AccountSelect';
 import { PERIOD_OPTIONS, type Period, type PeriodPreset } from '@/lib/period';
-import type { AccountDTO } from '@/modules/accounts/types';
+import type { AccountDTO } from '@/modules/finance/accounts/types';
 
 interface Props {
   preset: PeriodPreset;

@@ -419,6 +419,9 @@
 /* ── Màn ≤1024px: sidebar trượt, header gọn ──
    Các rule hiện/ẩn nút đều có tiền tố .core-header để thắng .core-sidebar-toggle (cùng 1 class). */
 @media (max-width: 1024px) {
+  :root {
+    --core-header-height: 60px;
+  }
   .core-sidebar {
     left: calc(-1 * var(--core-sidebar-width) - 24px);
     z-index: 60;
@@ -437,7 +440,6 @@
   }
 
   .core-header {
-    height: 60px;
     padding-left: 0;
   }
   .core-header-inner {

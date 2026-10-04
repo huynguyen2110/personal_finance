@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { Landmark, Wallet, WalletCards } from 'lucide-react';
-import type { AccountDTO } from '@/modules/accounts/types';
+import type { AccountDTO } from '@/modules/finance/accounts/types';
 import TreeSelect, { type TreeOption } from './TreeSelect';
 
 // Chỉ cần vài trường để dựng lựa chọn, nên các DTO rút gọn cũng dùng được

@@ -1,0 +1,152 @@
+/* CSS riêng của module Mindmap — chỉ nạp khi vào /mindmap (import trong app/(app)/mindmap/layout.tsx).
+   Không đặt style toàn cục (body, ::selection, scrollbar…) để không ảnh hưởng module khác. */
+:root {
+  --canvas-bg: #faf8fe;
+}
+
+/* Dialog entrance */
+@keyframes dialog-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes dialog-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.dialog-overlay {
+  animation: dialog-overlay-in 0.15s ease-out;
+}
+.dialog-panel {
+  animation: dialog-panel-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Page fade-in for main content */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.page-in {
+  animation: page-in 0.25s ease-out;
+}
+
+/* TipTap editor */
+.tiptap {
+  outline: none;
+  min-height: 300px;
+}
+.tiptap p.is-editor-empty:first-child::before {
+  color: #9ca3af;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.tiptap h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 1rem 0 0.5rem;
+}
+.tiptap h2 {
+  font-size: 1.375rem;
+  font-weight: 700;
+  margin: 0.875rem 0 0.5rem;
+}
+.tiptap h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0.75rem 0 0.375rem;
+}
+.tiptap p {
+  margin: 0.375rem 0;
+  line-height: 1.7;
+}
+.tiptap ul,
+.tiptap ol {
+  padding-left: 1.5rem;
+  margin: 0.375rem 0;
+}
+.tiptap ul {
+  list-style: disc;
+}
+.tiptap ol {
+  list-style: decimal;
+}
+.tiptap blockquote {
+  border-left: 3px solid #d1d5db;
+  padding-left: 1rem;
+  color: #6b7280;
+  margin: 0.5rem 0;
+}
+.tiptap pre {
+  background: #1f2937;
+  color: #f9fafb;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0;
+  overflow-x: auto;
+  font-size: 0.875rem;
+}
+.tiptap code {
+  background: #f3f4f6;
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.875em;
+}
+.tiptap pre code {
+  background: transparent;
+  padding: 0;
+}
+.tiptap ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.25rem;
+}
+.tiptap ul[data-type='taskList'] li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+.tiptap ul[data-type='taskList'] li > label {
+  margin-top: 0.3rem;
+}
+.tiptap ul[data-type='taskList'] li[data-checked='true'] > div {
+  text-decoration: line-through;
+  color: #9ca3af;
+}
+.tiptap hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 1rem 0;
+}
+
+/* React Flow tweaks */
+.react-flow__node-mindNode {
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: auto;
+  height: auto;
+}
+.react-flow__handle.mind-handle {
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+}
