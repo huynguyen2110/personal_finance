@@ -4,6 +4,8 @@ import { PrismaService } from '../../../database/prisma.service';
 import type { CreateMindmapDto, UpdateMindmapDto } from '../dto/mindmap.dto';
 import { MINDMAP_TEMPLATES } from '../utils/templates';
 
+const PRIMARY_TITLE = 'Phát triển bản thân';
+
 @Injectable()
 export class MindmapsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -47,6 +49,13 @@ export class MindmapsService {
           : undefined,
       },
     });
+  }
+
+  // Bản đồ chính = mindmap cũ nhất của người dùng; chưa có thì tạo theo mẫu "Phát triển bản thân"
+  async getOrCreatePrimary(userId: number) {
+    const existing = await this.prisma.mindmap.findFirst({ where: { userId }, orderBy: { id: 'asc' } });
+    if (existing) return existing;
+    return this.create(userId, { title: PRIMARY_TITLE, template: 'growth' });
   }
 
   get(id: number, userId: number) {

@@ -1,20 +1,19 @@
 'use client';
 
 import { Panel } from '@xyflow/react';
-import { ArrowLeft, Link2, ListChecks, Settings2 } from 'lucide-react';
+import { Link2, ListChecks, Settings2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/modules/mindmap/components/ui/Button';
+import { growthRoutes } from '@/modules/mindmap/lib/routes';
 import { cn } from '@/modules/mindmap/lib/utils';
 
 export function CanvasToolbar({
-  mindmapId,
   title,
   onOpenProperties,
   showLinks,
   linkCount,
   onToggleLinks,
 }: {
-  mindmapId: number;
   title: string;
   onOpenProperties: () => void;
   showLinks: boolean;
@@ -25,13 +24,6 @@ export function CanvasToolbar({
     <>
       <Panel position="top-left">
         <div className="flex items-center gap-2 rounded-xl border border-gray-200/80 bg-white/90 px-3 py-2 shadow-lg shadow-gray-950/5 backdrop-blur-md">
-          <Link
-            href="/mindmap"
-            className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-            title="Về danh sách"
-          >
-            <ArrowLeft size={16} />
-          </Link>
           <span className="max-w-64 truncate text-sm font-semibold tracking-tight">
             {title}
           </span>
@@ -48,7 +40,7 @@ export function CanvasToolbar({
             <Link2 size={14} /> Liên kết{linkCount > 0 && ` (${linkCount})`}
           </Button>
           <Link
-            href={`/mindmap/${mindmapId}/plan`}
+            href={growthRoutes.plan}
             className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-violet-700"
           >
             <ListChecks size={14} /> Kế hoạch

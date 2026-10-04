@@ -4,6 +4,7 @@ import { Handle, NodeProps, Position } from '@xyflow/react';
 import { CheckCircle2, Circle, CircleDot, FileText, Link2 } from 'lucide-react';
 import Link from 'next/link';
 import { memo, useEffect, useRef, useState } from 'react';
+import { growthRoutes } from '@/modules/mindmap/lib/routes';
 import { cn } from '@/modules/mindmap/lib/utils';
 import { STATUS_LABELS } from '@/modules/mindmap/mindmaps/types';
 import { MindFlowNode } from '../types';
@@ -11,7 +12,6 @@ import { MindFlowNode } from '../types';
 function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
   const {
     nodeId,
-    mindmapId,
     title,
     color,
     isRoot,
@@ -147,7 +147,7 @@ function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
 
         {!editing && (
           <Link
-            href={`/mindmap/${mindmapId}/nodes/${nodeId}`}
+            href={growthRoutes.node(nodeId)}
             onClick={(e) => e.stopPropagation()}
             title="Mở trang chi tiết"
             className={cn(

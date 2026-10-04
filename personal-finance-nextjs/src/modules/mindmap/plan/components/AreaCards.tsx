@@ -3,25 +3,25 @@
 import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompactVND } from '@/lib/money';
+import { growthRoutes } from '@/modules/mindmap/lib/routes';
 import { formatMinutes, formatRating } from '@/modules/mindmap/lib/utils';
 import { PlanArea } from '../api';
 import { OptionBadge } from './parts';
 
 /** Mỗi lĩnh vực (nhánh cấp 1): ưu tiên, tiến độ hành động, phần việc còn lại, thời gian đã đầu tư. */
 export function AreaCards({
-  mindmapId,
   areas,
   windowDays,
 }: {
-  mindmapId: number;
   areas: PlanArea[];
   windowDays: number;
 }) {
   if (areas.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-400">
-        Chưa có lĩnh vực nào. Trên canvas, thêm nhánh cấp 1 cho mỗi thứ bạn
-        muốn phát triển (VD: Tiếng Anh, Sức khỏe), rồi thêm hành động bên dưới.
+        Chưa có lĩnh vực nào. Mở <b>Sơ đồ</b>, chọn nút gốc rồi bấm Tab để
+        thêm một nhánh cho mỗi thứ bạn muốn phát triển (VD: Tiếng Anh, Sức
+        khỏe), sau đó thêm hành động bên dưới.
       </p>
     );
   }
@@ -39,7 +39,7 @@ export function AreaCards({
           >
             <div className="flex items-start justify-between gap-2">
               <Link
-                href={`/mindmap/${mindmapId}/nodes/${area.nodeId}`}
+                href={growthRoutes.node(area.nodeId)}
                 className="font-semibold tracking-tight hover:text-violet-700"
               >
                 {area.title}

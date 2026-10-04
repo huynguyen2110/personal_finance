@@ -11,6 +11,7 @@ import {
   useLinks,
 } from '@/modules/mindmap/links/hooks';
 import { extractErrorMessage } from '@/modules/mindmap/lib/api';
+import { growthRoutes } from '@/modules/mindmap/lib/routes';
 import { useNodes } from '@/modules/mindmap/mindmaps/hooks';
 import { TreeNode } from '@/modules/mindmap/mindmaps/types';
 
@@ -126,7 +127,7 @@ export function LinksSection({
                   {outgoing ? meta.outPhrase : meta.inPhrase}
                 </span>
                 <Link
-                  href={`/mindmap/${mindmapId}/nodes/${otherNode}`}
+                  href={growthRoutes.node(otherNode)}
                   className="min-w-0 truncate font-medium hover:text-violet-700 hover:underline"
                 >
                   {titleOf(otherNode)}

@@ -20,7 +20,7 @@ export default function TodosPage() {
     <div className="page-in mx-auto max-w-2xl space-y-4 p-6 md:p-8">
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Todo hàng ngày</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Todo hằng ngày</h1>
           <p className="mt-0.5 text-sm text-gray-500">
             Theo dõi việc cần làm từng ngày
           </p>
@@ -48,7 +48,7 @@ export default function TodosPage() {
       ) : !todos || todos.length === 0 ? (
         <EmptyState
           title="Chưa có todo cho ngày này"
-          description="Thêm việc cần làm và gắn với các nhánh mindmap để theo dõi tiến độ."
+          description="Thêm việc cần làm và gắn với hành động / lĩnh vực để biết mỗi ngày bạn đầu tư vào đâu."
         />
       ) : (
         <ul className="space-y-2">

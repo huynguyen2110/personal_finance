@@ -6,15 +6,6 @@ export interface DayStat {
   done: number;
 }
 
-export interface BranchStat {
-  nodeId: number;
-  title: string;
-  mindmapId: number;
-  mindmapTitle: string;
-  total: number;
-  done: number;
-}
-
 export interface AreaStat {
   areaId: number;
   title: string;
@@ -33,7 +24,6 @@ export interface WeeklyStats {
   end: string;
   days: DayStat[];
   totals: { total: number; done: number; minutes: number };
-  byNode: BranchStat[];
   byArea: AreaStat[];
 }
 

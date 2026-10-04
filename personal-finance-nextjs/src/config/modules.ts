@@ -2,12 +2,14 @@ import {
   BarChart3,
   ChartColumn,
   CheckSquare,
+  ListChecks,
   Landmark,
   LayoutDashboard,
   ListOrdered,
   Network,
   PiggyBank,
   Settings,
+  Sprout,
   Tags,
   Target,
   Wallet,
@@ -29,7 +31,7 @@ export interface ModuleNavGroup {
   items: ModuleNavItem[];
 }
 
-export type AppModuleId = 'finance' | 'mindmap';
+export type AppModuleId = 'finance' | 'growth';
 
 export interface AppModule {
   id: AppModuleId;
@@ -84,22 +86,23 @@ export const APP_MODULES: AppModule[] = [
     ],
   },
   {
-    id: 'mindmap',
-    name: 'Mindmap',
-    description: 'Sơ đồ tư duy, trang ghi chú cho từng nhánh và todo hằng ngày',
-    icon: Network,
+    id: 'growth',
+    name: 'Phát triển bản thân',
+    description: 'Lĩnh vực cần phát triển, hành động, gợi ý nên làm gì tiếp và todo hằng ngày',
+    icon: Sprout,
     from: '#7c3aed',
     to: '#c026d3',
-    basePath: '/mindmap',
-    home: '/mindmap',
-    keywords: ['sơ đồ', 'tư duy', 'ghi chú'],
+    basePath: '/growth',
+    home: '/growth',
+    keywords: ['kế hoạch', 'mục tiêu', 'kỹ năng', 'sơ đồ', 'mindmap'],
     nav: [
       {
-        heading: 'Mindmap',
+        heading: 'Phát triển bản thân',
         items: [
-          { href: '/mindmap', icon: Network, label: 'Mindmap', keywords: ['sơ đồ'] },
-          { href: '/mindmap/todos', icon: CheckSquare, label: 'Todo hằng ngày', keywords: ['việc', 'todo'] },
-          { href: '/mindmap/stats', icon: BarChart3, label: 'Thống kê', keywords: ['tiến độ'] },
+          { href: '/growth', icon: ListChecks, label: 'Kế hoạch', keywords: ['gợi ý', 'ưu tiên'] },
+          { href: '/growth/map', icon: Network, label: 'Sơ đồ', keywords: ['mindmap', 'lĩnh vực', 'hành động'] },
+          { href: '/growth/todos', icon: CheckSquare, label: 'Todo hằng ngày', keywords: ['việc', 'todo'] },
+          { href: '/growth/stats', icon: BarChart3, label: 'Thống kê', keywords: ['tiến độ', 'thời gian'] },
         ],
       },
     ],
@@ -110,7 +113,7 @@ export function getModule(id: AppModuleId): AppModule {
   return APP_MODULES.find((m) => m.id === id)!;
 }
 
-// Mục menu đang mở: mục có href khớp dài nhất (để "/mindmap" không sáng khi đang ở "/mindmap/todos")
+// Mục menu đang mở: mục có href khớp dài nhất (để "/growth" không sáng khi đang ở "/growth/todos")
 export function activeNavHref(pathname: string, module: AppModule): string | null {
   let best: string | null = null;
   for (const it of module.nav.flatMap((g) => g.items)) {

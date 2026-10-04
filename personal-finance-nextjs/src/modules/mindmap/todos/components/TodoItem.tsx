@@ -2,6 +2,7 @@
 
 import { Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { growthRoutes } from '@/modules/mindmap/lib/routes';
 import { cn } from '@/modules/mindmap/lib/utils';
 import { Todo } from '../api';
 import { useDeleteTodo, useUpdateTodo } from '../hooks';
@@ -35,9 +36,8 @@ export function TodoItem({ todo }: { todo: Todo }) {
             {todo.nodes.map((n) => (
               <Link
                 key={n.id}
-                href={`/mindmap/${n.mindmapId}/nodes/${n.id}`}
+                href={growthRoutes.node(n.id)}
                 className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] text-violet-700 hover:bg-violet-100"
-                title={n.mindmapTitle}
               >
                 {n.title}
               </Link>

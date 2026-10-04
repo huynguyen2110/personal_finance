@@ -5,7 +5,7 @@
 | Module | Đường dẫn | Nội dung |
 |---|---|---|
 | **Tài chính cá nhân** | `/finance/*` | Thu chi đọc tự động từ email ngân hàng, phân loại theo quy tắc, ngân sách, mục tiêu tiết kiệm, thống kê, xuất Excel |
-| **Mindmap** | `/mindmap/*` | Sơ đồ tư duy (kéo thả, phím tắt), trang ghi chú kiểu Notion cho từng nhánh, thuộc tính tùy chỉnh, liên kết giữa nhánh, trang Kế hoạch gợi ý nên làm gì, todo hằng ngày (phút + hiệu quả) gắn với nhánh, thống kê tuần |
+| **Phát triển bản thân** | `/growth/*` | Một bản đồ lĩnh vực → hành động (sơ đồ tư duy, phím tắt), ưu tiên/độ khó/thời gian/chi phí, liên kết bổ trợ/điều kiện trước, trang Kế hoạch gợi ý nên làm gì, todo hằng ngày (phút + hiệu quả), thống kê theo lĩnh vực |
 
 Một đăng nhập dùng chung cho mọi module (một tài khoản, username/password). Link cũ dạng `/dashboard`, `/transactions?…` tự chuyển sang `/finance/...`.
 
@@ -26,14 +26,14 @@ backend/
   src/modules/auth/      đăng nhập, refresh token, đổi mật khẩu (dùng chung mọi module)
   src/modules/finance/   finance.module.ts + accounts, categories, rules, transfers, transactions, stats,
                          budgets, goals, reports, email, settings…   → route api/<tính năng> (api/accounts…)
-  src/modules/mindmap/   mindmap.module.ts, controllers/, services/, dto/, utils/  → route api/mindmap/*
+  src/modules/mindmap/   module Phát triển bản thân (tên code giữ "mindmap"): controllers/, services/, dto/, utils/ → route api/mindmap/*
   test/                  e2e (supertest, dùng user tạm rồi xóa)
 frontend/
   src/config/modules.ts  danh sách module: tên, icon, màu, menu sidebar → launcher/sidebar/nút chuyển module đọc từ đây
-  src/app/               (app)/page.tsx = launcher; (app)/finance/*, (app)/mindmap/* (layout riêng mỗi module); login/
+  src/app/               (app)/page.tsx = launcher; (app)/finance/*, (app)/growth/* (layout riêng mỗi module); login/
   src/modules/launcher/  trang chủ chọn module
   src/modules/finance/   các tính năng tài chính: components/, lib/ (query key + hook + API), types/
-  src/modules/mindmap/   canvas, mindmaps, node-page, properties, links, plan, todos, stats; lib/api.ts; mindmap.css (chỉ nạp ở /mindmap)
+  src/modules/mindmap/   UI module Phát triển bản thân: canvas, node-page, properties, links, plan, todos, stats; lib/routes.ts (URL /growth); mindmap.css (chỉ nạp ở /growth)
   src/modules/auth/      form đăng nhập, đổi mật khẩu
   src/lib/               api-client (Bearer + tự refresh token), auth-storage, dates, money…
   src/components/        layout (khung module dùng chung), shared, charts
@@ -144,15 +144,17 @@ Kiểm tra bộ đọc email: `npm test -- providers` trong `backend`.
 - **Tài khoản**
   - Tài khoản ngân hàng được tạo tự động từ email đầu tiên. Có thể thêm tay tài khoản ngân hàng khác và ví tiền mặt.
 
-## Module Mindmap
+## Module Phát triển bản thân
 
-- **Mindmap**: canvas tự xếp từ trái sang phải. Phím tắt: `Tab` thêm nhánh con, `Enter` thêm nhánh ngang, `F2`/nhấp đúp đổi tên, `Delete` xóa (xóa cả nhánh con), `L` nối liên kết. Kéo một nhánh thả vào nhánh khác để đổi cha; tô màu theo nhánh; thu gọn/mở rộng.
-- **Mẫu "Phát triển bản thân"**: khi tạo mindmap, chọn mẫu để có sẵn thuộc tính Ưu tiên, Độ khó, Thời gian (giờ), Chi phí (₫). Quy ước: nhánh cấp 1 = lĩnh vực cần phát triển, nhánh cấp ≥2 = hành động.
-- **Trang của nhánh**: trình soạn kiểu Notion (TipTap, tự lưu sau 1 giây), trạng thái (Chưa làm/Đang làm/Xong), thuộc tính tùy chỉnh theo từng mindmap (văn bản, số có đơn vị tiền/giờ, đúng/sai, ngày, lựa chọn có mức), liên kết, danh sách todo gắn với nhánh.
+Một bản đồ duy nhất cho mỗi người dùng (`GET /api/mindmap/mindmaps/primary`: lấy mindmap cũ nhất, chưa có thì tự tạo theo mẫu). Trang đầu là **Kế hoạch** (`/growth`); sidebar có Sơ đồ (`/growth/map`), Todo hằng ngày, Thống kê. Link cũ `/mindmap/...` tự chuyển sang `/growth/...`. Tên code, route API và bảng DB (`mm_*`) vẫn giữ "mindmap".
+
+- **Sơ đồ**: canvas tự xếp từ trái sang phải. Phím tắt: `Tab` thêm nhánh con, `Enter` thêm nhánh ngang, `F2`/nhấp đúp đổi tên, `Delete` xóa (xóa cả nhánh con), `L` nối liên kết. Kéo một nhánh thả vào nhánh khác để đổi cha; tô màu theo nhánh; thu gọn/mở rộng.
+- **Thuộc tính có sẵn**: Ưu tiên, Độ khó, Thời gian (giờ), Chi phí (₫) — tạo cùng bản đồ. Quy ước: nhánh cấp 1 = lĩnh vực cần phát triển, nhánh cấp ≥2 = hành động.
+- **Trang của nhánh**: trình soạn kiểu Notion (TipTap, tự lưu sau 1 giây), trạng thái (Chưa làm/Đang làm/Xong), thuộc tính tùy chỉnh (văn bản, số có đơn vị tiền/giờ, đúng/sai, ngày, lựa chọn có mức), liên kết, danh sách todo gắn với nhánh.
 - **Liên kết giữa nhánh**: *bổ trợ* (A giúp B), *điều kiện trước* (A phải xong trước B, chặn vòng lặp), *liên quan* (kèm ghi chú). Vẽ thành cung cong trên canvas; bấm vào cung để sửa/xóa.
-- **Kế hoạch** (`/mindmap/<id>/plan`): thẻ lĩnh vực (tiến độ, giờ/chi phí còn lại, phút đầu tư 28 ngày, cảnh báo lĩnh vực ưu tiên cao bị bỏ quên 14 ngày), top 5 *Nên làm tiếp* kèm lý do, việc *Đang bị chặn*, bảng mọi hành động (sắp xếp/lọc). Điểm = 40% ưu tiên + 20% độ dễ + 20% đòn bẩy (số việc mở khóa/bổ trợ) + 10% rẻ + 10% nhanh, +5 nếu đang làm; thuộc tính được nhận ra qua *vai trò* gán trong "Thuộc tính".
-- **Todo hằng ngày**: mỗi todo gắn được với nhiều nhánh (ở nhiều mindmap), ghi số phút đã bỏ ra và chấm hiệu quả 1–5; nhánh hiện số todo đã xong / tổng (cộng dồn lên nhánh cha).
-- **Thống kê tuần**: số todo theo ngày, thời gian đầu tư, theo lĩnh vực (phút so với tuần trước, hiệu quả TB) và tiến độ theo nhánh.
+- **Kế hoạch** (`/growth`): thẻ lĩnh vực (tiến độ, giờ/chi phí còn lại, phút đầu tư 28 ngày, cảnh báo lĩnh vực ưu tiên cao bị bỏ quên 14 ngày), top 5 *Nên làm tiếp* kèm lý do, việc *Đang bị chặn*, bảng mọi hành động (sắp xếp/lọc). Điểm = 40% ưu tiên + 20% độ dễ + 20% đòn bẩy (số việc mở khóa/bổ trợ) + 10% rẻ + 10% nhanh, +5 nếu đang làm; thuộc tính được nhận ra qua *vai trò* gán trong "Thuộc tính".
+- **Todo hằng ngày**: mỗi todo gắn được với nhiều nhánh, ghi số phút đã bỏ ra và chấm hiệu quả 1–5; nhánh hiện số todo đã xong / tổng (cộng dồn lên nhánh cha).
+- **Thống kê tuần**: số todo theo ngày, thời gian đầu tư, theo lĩnh vực (phút so với tuần trước, hiệu quả TB).
 
 ## Ghi chú kỹ thuật
 

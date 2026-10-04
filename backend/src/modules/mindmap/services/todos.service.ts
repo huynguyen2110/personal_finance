@@ -34,7 +34,7 @@ export class TodosService {
     return todos.map((t) => this.serialize(t));
   }
 
-  // Tiến độ một tuần [start, start+6]: số todo theo ngày, theo nhánh (12 nhánh nhiều todo nhất) và theo lĩnh vực
+  // Tiến độ một tuần [start, start+6]: số todo theo ngày và theo lĩnh vực
   async weeklyStats(userId: number, start: string) {
     const end = addDaysStr(start, 6);
     const where = { userId, date: { gte: start, lte: end } };
@@ -46,34 +46,11 @@ export class TodosService {
       return { date, total: ofDay.length, done: ofDay.filter((r) => r.completed).length };
     });
 
-    const links = await this.prisma.todoNode.findMany({
-      where: { todo: where },
-      select: {
-        todo: { select: { completed: true } },
-        node: { select: { id: true, title: true, mindmapId: true, mindmap: { select: { title: true } } } },
-      },
-    });
-    const byNodeMap = new Map<number, { nodeId: number; title: string; mindmapId: number; mindmapTitle: string; total: number; done: number }>();
-    for (const l of links) {
-      const row = byNodeMap.get(l.node.id) ?? {
-        nodeId: l.node.id,
-        title: l.node.title,
-        mindmapId: l.node.mindmapId,
-        mindmapTitle: l.node.mindmap.title,
-        total: 0,
-        done: 0,
-      };
-      row.total++;
-      if (l.todo.completed) row.done++;
-      byNodeMap.set(l.node.id, row);
-    }
-    const byNode = [...byNodeMap.values()].sort((a, b) => b.total - a.total || b.done - a.done).slice(0, 12);
-
     const total = days.reduce((s, d) => s + d.total, 0);
     const done = days.reduce((s, d) => s + d.done, 0);
     const minutes = rows.reduce((s, r) => s + (r.durationMinutes ?? 0), 0);
     const byArea = await this.weeklyByArea(userId, start, end);
-    return { start, end, days, totals: { total, done, minutes }, byNode, byArea };
+    return { start, end, days, totals: { total, done, minutes }, byArea };
   }
 
   // Theo lĩnh vực (nhánh cấp 1) trên mọi mindmap, so phút với tuần trước

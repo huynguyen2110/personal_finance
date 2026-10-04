@@ -373,7 +373,6 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
         <Controls showInteractive={false} />
         <CanvasToolbar
-          mindmapId={mindmapId}
           title={mindmap?.title ?? ''}
           onOpenProperties={() => setPropertiesOpen(true)}
           showLinks={showLinks}

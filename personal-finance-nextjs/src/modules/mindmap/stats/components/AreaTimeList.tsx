@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { growthRoutes } from '@/modules/mindmap/lib/routes';
 import { formatMinutes, formatRating } from '@/modules/mindmap/lib/utils';
 import { AreaStat } from '../api';
 
@@ -35,13 +36,10 @@ export function AreaTimeList({ areas }: { areas: AreaStat[] }) {
               <li key={a.areaId}>
                 <div className="mb-1 flex items-baseline justify-between gap-2">
                   <Link
-                    href={`/mindmap/${a.mindmapId}/plan`}
+                    href={growthRoutes.node(a.areaId)}
                     className="truncate text-sm font-medium text-gray-700 hover:text-violet-700"
                   >
                     {a.title}
-                    <span className="ml-1.5 text-xs font-normal text-gray-400">
-                      {a.mindmapTitle}
-                    </span>
                   </Link>
                   <span className="shrink-0 text-xs tabular-nums text-gray-500">
                     {a.minutes > 0 ? formatMinutes(a.minutes) : '0 phút'}

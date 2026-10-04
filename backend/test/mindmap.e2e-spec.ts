@@ -51,6 +51,16 @@ describe('Mindmap API (e2e)', () => {
     await api().get('/api/mindmap/mindmaps').expect(401);
   });
 
+  it('bản đồ chính: lần đầu tự tạo theo mẫu "Phát triển bản thân", lần sau trả lại đúng bản đó', async () => {
+    const first = (await authed('get', '/api/mindmap/mindmaps/primary').expect(200)).body.data;
+    expect(first.title).toBe('Phát triển bản thân');
+    const roles = (await authed('get', `/api/mindmap/mindmaps/${first.id}/properties`).expect(200)).body.data.map((d: { role: string }) => d.role);
+    expect(roles).toEqual(['priority', 'difficulty', 'time', 'cost']);
+    const again = (await authed('get', '/api/mindmap/mindmaps/primary').expect(200)).body.data;
+    expect(again.id).toBe(first.id);
+    await authed('delete', `/api/mindmap/mindmaps/${first.id}`).expect(200);
+  });
+
   it('tạo mindmap → có sẵn nút gốc; danh sách đếm số node', async () => {
     const r = await authed('post', '/api/mindmap/mindmaps').send({ title: '  Phát triển bản thân  ' }).expect(201);
     mindmapId = r.body.data.id;
@@ -127,7 +137,6 @@ describe('Mindmap API (e2e)', () => {
     expect(stats.days).toHaveLength(7);
     expect(stats.days[0]).toEqual({ date: today, total: 1, done: 1 });
     expect(stats.totals).toEqual({ total: 1, done: 1, minutes: 0 });
-    expect(stats.byNode).toHaveLength(2);
 
     const options = (await authed('get', '/api/mindmap/todos/node-options').expect(200)).body.data;
     expect(options.filter((o: { mindmapId: number }) => o.mindmapId === mindmapId)).toHaveLength(4);

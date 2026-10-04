@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Spinner } from '@/modules/mindmap/components/ui/Spinner';
 import { AreaTimeList } from '@/modules/mindmap/stats/components/AreaTimeList';
-import { BranchProgressList } from '@/modules/mindmap/stats/components/BranchProgressList';
 import { WeekNav } from '@/modules/mindmap/stats/components/WeekNav';
 import { WeeklyBarChart } from '@/modules/mindmap/stats/components/WeeklyBarChart';
 import { useWeeklyStats } from '@/modules/mindmap/stats/hooks';
@@ -40,7 +39,7 @@ export default function StatsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Thống kê tuần</h1>
         <p className="mt-0.5 text-sm text-gray-500">
-          Tiến độ hoàn thành todo theo từng tuần
+          Todo hoàn thành và thời gian đầu tư cho từng lĩnh vực theo tuần
         </p>
       </div>
 
@@ -68,7 +67,6 @@ export default function StatsPage() {
 
           <WeeklyBarChart days={data.days} />
           <AreaTimeList areas={data.byArea} />
-          <BranchProgressList branches={data.byNode} />
         </>
       )}
     </div>

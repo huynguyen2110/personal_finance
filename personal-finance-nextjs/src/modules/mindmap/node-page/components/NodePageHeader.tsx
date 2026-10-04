@@ -3,7 +3,8 @@
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useMindmap, useUpdateNode } from '@/modules/mindmap/mindmaps/hooks';
+import { growthRoutes } from '@/modules/mindmap/lib/routes';
+import { useUpdateNode } from '@/modules/mindmap/mindmaps/hooks';
 
 export function NodePageHeader({
   mindmapId,
@@ -14,7 +15,6 @@ export function NodePageHeader({
   nodeId: number;
   title: string;
 }) {
-  const { data: mindmap } = useMindmap(mindmapId);
   const updateNode = useUpdateNode(mindmapId);
   const [value, setValue] = useState(title);
 
@@ -37,11 +37,11 @@ export function NodePageHeader({
   return (
     <div className="space-y-3">
       <Link
-        href={`/mindmap/${mindmapId}`}
+        href={growthRoutes.map}
         className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-violet-600"
       >
         <ArrowLeft size={15} />
-        {mindmap?.title ?? 'Về mindmap'}
+        Về sơ đồ
       </Link>
       <input
         value={value}

@@ -246,12 +246,12 @@ export function PropertyDefinitionManager({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} title="Thuộc tính của mindmap" wide>
+    <Dialog open={open} onClose={onClose} title="Thuộc tính" wide>
       <div className="space-y-4">
         <p className="text-sm text-gray-500">
-          Thuộc tính áp dụng cho mọi node trong mindmap này — giống database
-          của Notion (VD: Độ khó, Thời gian hoàn thành, Làm hàng ngày…). Gán
-          vai trò <b>Kế hoạch</b> để trang Kế hoạch dùng thuộc tính đó khi chấm
+          Thuộc tính áp dụng cho mọi lĩnh vực và hành động. Ưu tiên, Độ khó,
+          Thời gian, Chi phí đã có sẵn; có thể thêm thuộc tính riêng (VD: Làm
+          hằng ngày). Thuộc tính gán vai trò <b>Kế hoạch</b> được dùng khi chấm
           điểm hành động.
         </p>
 

@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { Spinner } from '@/modules/mindmap/components/ui/Spinner';
+import { PrimaryMindmapGate } from '@/modules/mindmap/mindmaps/components/PrimaryMindmapGate';
 import { LinksSection } from '@/modules/mindmap/node-page/components/LinksSection';
 import { LinkedTodosSection } from '@/modules/mindmap/node-page/components/LinkedTodosSection';
 import { NodePageEditor } from '@/modules/mindmap/node-page/components/NodePageEditor';
@@ -10,10 +11,16 @@ import { PropertyPanel } from '@/modules/mindmap/node-page/components/PropertyPa
 import { useNodeDetail } from '@/modules/mindmap/node-page/hooks';
 
 export default function NodePage() {
-  const params = useParams<{ id: string; nodeId: string }>();
-  const mindmapId = Number(params.id);
+  const params = useParams<{ nodeId: string }>();
   const nodeId = Number(params.nodeId);
+  return (
+    <PrimaryMindmapGate className="h-full">
+      {(mindmapId) => <NodeView mindmapId={mindmapId} nodeId={nodeId} />}
+    </PrimaryMindmapGate>
+  );
+}
 
+function NodeView({ mindmapId, nodeId }: { mindmapId: number; nodeId: number }) {
   const { data: node, isLoading } = useNodeDetail(mindmapId, nodeId);
 
   if (isLoading || !node) return <Spinner className="h-full" />;

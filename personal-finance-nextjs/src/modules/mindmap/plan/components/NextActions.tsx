@@ -2,6 +2,7 @@
 
 import { Lock, Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import { growthRoutes } from '@/modules/mindmap/lib/routes';
 import { PlanAction } from '../api';
 import { AddTodoButton, OptionBadge, StatusSelect } from './parts';
 
@@ -21,7 +22,7 @@ export function NextActions({
       {actions.length === 0 ? (
         <p className="text-sm text-gray-500">
           Chưa có hành động nào để gợi ý. Thêm hành động (nhánh cấp 2 trở
-          xuống) dưới các lĩnh vực trên canvas.
+          xuống) dưới các lĩnh vực trên sơ đồ.
         </p>
       ) : (
         <ol className="space-y-2">
@@ -36,7 +37,7 @@ export function NextActions({
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <Link
-                    href={`/mindmap/${mindmapId}/nodes/${a.nodeId}`}
+                    href={growthRoutes.node(a.nodeId)}
                     className="font-medium hover:text-violet-700"
                   >
                     {a.title}
@@ -95,11 +96,7 @@ export function NextActions({
 }
 
 /** Việc đang bị chặn bởi điều kiện trước chưa xong. */
-export function BlockedList({
-  mindmapId,
-  actions,
-}: {
-  mindmapId: number;
+export function BlockedList({ actions }: {
   actions: PlanAction[];
 }) {
   if (actions.length === 0) return null;
@@ -112,7 +109,7 @@ export function BlockedList({
         {actions.map((a) => (
           <li key={a.nodeId} className="text-sm">
             <Link
-              href={`/mindmap/${mindmapId}/nodes/${a.nodeId}`}
+              href={growthRoutes.node(a.nodeId)}
               className="font-medium hover:text-violet-700"
             >
               {a.title}
@@ -122,7 +119,7 @@ export function BlockedList({
               <span key={b.nodeId}>
                 {i > 0 && ', '}
                 <Link
-                  href={`/mindmap/${mindmapId}/nodes/${b.nodeId}`}
+                  href={growthRoutes.node(b.nodeId)}
                   className="text-orange-700 hover:underline"
                 >
                   {b.title}

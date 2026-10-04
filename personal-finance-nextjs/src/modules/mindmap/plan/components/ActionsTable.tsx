@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { formatCompactVND } from '@/lib/money';
+import { growthRoutes } from '@/modules/mindmap/lib/routes';
 import { cn, formatMinutes, formatRating } from '@/modules/mindmap/lib/utils';
 import { PlanAction, PlanArea } from '../api';
 import { AddTodoButton, OptionBadge, StatusSelect } from './parts';
@@ -140,7 +141,7 @@ export function ActionsTable({
                 >
                   <td className="max-w-64 py-2 pl-4 pr-2">
                     <Link
-                      href={`/mindmap/${mindmapId}/nodes/${a.nodeId}`}
+                      href={growthRoutes.node(a.nodeId)}
                       className={cn(
                         'block truncate font-medium hover:text-violet-700',
                         a.status === 'done' && 'line-through',
