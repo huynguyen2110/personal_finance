@@ -60,7 +60,7 @@ export function PropertyPanel({
                     : 'border-gray-200 text-gray-500 hover:bg-gray-50',
                 )}
               >
-                {s ? STATUS_LABELS[s] : 'Không theo dõi'}
+                {s ? STATUS_LABELS[s] : 'Chưa đặt'}
               </button>
             ))}
           </div>

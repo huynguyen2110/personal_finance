@@ -44,17 +44,18 @@ export function TodoItem({ todo }: { todo: Todo }) {
             ))}
           </div>
         )}
-        <TodoEffort
-          todo={todo}
+        {/* Chưa xong và chưa nhập gì → chỉ hiện khi hover / đang nhập, không chiếm chỗ */}
+        <div
           className={cn(
-            'mt-1.5 transition-opacity',
-            todo.completed ||
-              todo.durationMinutes !== null ||
-              todo.effectiveness !== null
-              ? 'opacity-100'
-              : 'opacity-0 focus-within:opacity-100 group-hover:opacity-100',
+            'mt-1.5',
+            !todo.completed &&
+              todo.durationMinutes === null &&
+              todo.effectiveness === null &&
+              'hidden focus-within:block group-hover:block',
           )}
-        />
+        >
+          <TodoEffort todo={todo} />
+        </div>
       </div>
       <button
         onClick={() => deleteTodo.mutate(todo.id)}

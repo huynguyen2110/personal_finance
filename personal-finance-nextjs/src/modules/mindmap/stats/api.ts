@@ -15,12 +15,26 @@ export interface BranchStat {
   done: number;
 }
 
+export interface AreaStat {
+  areaId: number;
+  title: string;
+  mindmapId: number;
+  mindmapTitle: string;
+  total: number;
+  done: number;
+  /** Phút tuần này (todo gắn nhiều lĩnh vực được chia đều). */
+  minutes: number;
+  prevMinutes: number;
+  avgEffectiveness: number | null;
+}
+
 export interface WeeklyStats {
   start: string;
   end: string;
   days: DayStat[];
-  totals: { total: number; done: number };
+  totals: { total: number; done: number; minutes: number };
   byNode: BranchStat[];
+  byArea: AreaStat[];
 }
 
 export const statsApi = {

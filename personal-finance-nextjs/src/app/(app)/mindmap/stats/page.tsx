@@ -2,11 +2,16 @@
 
 import { useState } from 'react';
 import { Spinner } from '@/modules/mindmap/components/ui/Spinner';
+import { AreaTimeList } from '@/modules/mindmap/stats/components/AreaTimeList';
 import { BranchProgressList } from '@/modules/mindmap/stats/components/BranchProgressList';
 import { WeekNav } from '@/modules/mindmap/stats/components/WeekNav';
 import { WeeklyBarChart } from '@/modules/mindmap/stats/components/WeeklyBarChart';
 import { useWeeklyStats } from '@/modules/mindmap/stats/hooks';
-import { startOfWeek, toDateKey } from '@/modules/mindmap/lib/utils';
+import {
+  formatMinutes,
+  startOfWeek,
+  toDateKey,
+} from '@/modules/mindmap/lib/utils';
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
@@ -27,6 +32,7 @@ export default function StatsPage() {
 
   const total = data?.totals.total ?? 0;
   const done = data?.totals.done ?? 0;
+  const minutes = data?.totals.minutes ?? 0;
   const percent = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
@@ -44,13 +50,24 @@ export default function StatsPage() {
         <Spinner />
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile label="Tổng todo" value={String(total)} />
             <StatTile label="Đã hoàn thành" value={String(done)} />
             <StatTile label="Tỷ lệ hoàn thành" value={`${percent}%`} />
+            <StatTile
+              label="Thời gian đầu tư"
+              value={
+                minutes === 0
+                  ? '—'
+                  : minutes < 60
+                    ? formatMinutes(minutes)
+                    : `${(minutes / 60).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} giờ`
+              }
+            />
           </div>
 
           <WeeklyBarChart days={data.days} />
+          <AreaTimeList areas={data.byArea} />
           <BranchProgressList branches={data.byNode} />
         </>
       )}

@@ -35,9 +35,11 @@ import { layoutTree } from '../layout';
 import { MindFlowNode } from '../types';
 import { collectSubtreeIds, useMindmapTree } from '../useMindmapTree';
 import { CanvasToolbar } from './CanvasToolbar';
+import { LinkEdge } from './LinkEdge';
 import { MindNode } from './MindNode';
 
 const nodeTypes = { mindNode: MindNode };
+const edgeTypes = { link: LinkEdge };
 
 function CanvasInner({ mindmapId }: { mindmapId: number }) {
   const { data: mindmap } = useMindmap(mindmapId);
@@ -160,14 +162,10 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
               target: String(l.targetNodeId),
               sourceHandle: 'link-out',
               targetHandle: 'link-in',
-              type: 'default',
+              type: 'link',
               zIndex: 1,
               data: { link: l },
               label: l.note ?? undefined,
-              labelStyle: { fontSize: 10, fill: meta.color },
-              labelBgStyle: { fill: 'white', fillOpacity: 0.9 },
-              labelBgPadding: [4, 2],
-              labelBgBorderRadius: 4,
               markerEnd: meta.arrow
                 ? {
                     type: MarkerType.ArrowClosed,
@@ -334,6 +332,7 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onNodeClick={(_, n) => {
           const id = Number(n.id);
@@ -374,6 +373,7 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
         <Controls showInteractive={false} />
         <CanvasToolbar
+          mindmapId={mindmapId}
           title={mindmap?.title ?? ''}
           onOpenProperties={() => setPropertiesOpen(true)}
           showLinks={showLinks}

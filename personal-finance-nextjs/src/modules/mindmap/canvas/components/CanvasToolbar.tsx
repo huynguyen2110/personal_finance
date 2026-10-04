@@ -1,18 +1,20 @@
 'use client';
 
 import { Panel } from '@xyflow/react';
-import { ArrowLeft, Link2, Settings2 } from 'lucide-react';
+import { ArrowLeft, Link2, ListChecks, Settings2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/modules/mindmap/components/ui/Button';
 import { cn } from '@/modules/mindmap/lib/utils';
 
 export function CanvasToolbar({
+  mindmapId,
   title,
   onOpenProperties,
   showLinks,
   linkCount,
   onToggleLinks,
 }: {
+  mindmapId: number;
   title: string;
   onOpenProperties: () => void;
   showLinks: boolean;
@@ -45,9 +47,16 @@ export function CanvasToolbar({
           >
             <Link2 size={14} /> Liên kết{linkCount > 0 && ` (${linkCount})`}
           </Button>
+          <Link
+            href={`/mindmap/${mindmapId}/plan`}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-violet-700"
+          >
+            <ListChecks size={14} /> Kế hoạch
+          </Link>
         </div>
       </Panel>
-      <Panel position="top-right">
+      {/* Gợi ý phím tắt: ẩn khi màn hình hẹp để không che thanh công cụ */}
+      <Panel position="top-right" className="hidden 2xl:block">
         <div className="rounded-xl border border-gray-200/80 bg-white/90 px-3 py-1.5 text-[11px] text-gray-500 shadow-lg shadow-gray-950/5 backdrop-blur-md">
           <b>Tab</b> thêm nhánh con · <b>Enter</b> thêm nhánh ngang ·{' '}
           <b>Click đúp</b> đổi tên · <b>Delete</b> xóa · <b>L</b> nối liên kết ·

@@ -221,14 +221,14 @@ function MindNodeComponent({ data, selected }: NodeProps<MindFlowNode>) {
       <Handle
         id="link-out"
         type="source"
-        position={Position.Bottom}
+        position={Position.Right}
         className="mind-handle"
         isConnectable={false}
       />
       <Handle
         id="link-in"
         type="target"
-        position={Position.Top}
+        position={Position.Right}
         className="mind-handle"
         isConnectable={false}
       />

@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { addDaysStr } from '../../../common/utils/dates.util';
 import type { CreateTodoDto, UpdateTodoDto } from '../dto/todo.dto';
+import { aggregateByArea } from '../utils/plan';
 
 const todoInclude = {
   nodes: { include: { node: { select: { id: true, title: true, mindmapId: true, mindmap: { select: { title: true } } } } } },
@@ -33,12 +34,12 @@ export class TodosService {
     return todos.map((t) => this.serialize(t));
   }
 
-  // Tiến độ một tuần [start, start+6]: số todo theo ngày + theo nhánh (12 nhánh nhiều todo nhất)
+  // Tiến độ một tuần [start, start+6]: số todo theo ngày, theo nhánh (12 nhánh nhiều todo nhất) và theo lĩnh vực
   async weeklyStats(userId: number, start: string) {
     const end = addDaysStr(start, 6);
     const where = { userId, date: { gte: start, lte: end } };
 
-    const rows = await this.prisma.todo.findMany({ where, select: { date: true, completed: true } });
+    const rows = await this.prisma.todo.findMany({ where, select: { date: true, completed: true, durationMinutes: true } });
     const days = Array.from({ length: 7 }, (_, i) => {
       const date = addDaysStr(start, i);
       const ofDay = rows.filter((r) => r.date === date);
@@ -70,7 +71,37 @@ export class TodosService {
 
     const total = days.reduce((s, d) => s + d.total, 0);
     const done = days.reduce((s, d) => s + d.done, 0);
-    return { start, end, days, totals: { total, done }, byNode };
+    const minutes = rows.reduce((s, r) => s + (r.durationMinutes ?? 0), 0);
+    const byArea = await this.weeklyByArea(userId, start, end);
+    return { start, end, days, totals: { total, done, minutes }, byNode, byArea };
+  }
+
+  // Theo lĩnh vực (nhánh cấp 1) trên mọi mindmap, so phút với tuần trước
+  private async weeklyByArea(userId: number, start: string, end: string) {
+    const select = {
+      date: true,
+      completed: true,
+      durationMinutes: true,
+      effectiveness: true,
+      nodes: { select: { nodeId: true, node: { select: { mindmapId: true } } } },
+    } as const;
+    const [current, prev] = await Promise.all([
+      this.prisma.todo.findMany({ where: { userId, date: { gte: start, lte: end }, nodes: { some: {} } }, select }),
+      this.prisma.todo.findMany({ where: { userId, date: { gte: addDaysStr(start, -7), lte: addDaysStr(start, -1) }, nodes: { some: {} } }, select }),
+    ]);
+    const mindmapIds = [...new Set([...current, ...prev].flatMap((t) => t.nodes.map((n) => n.node.mindmapId)))];
+    if (!mindmapIds.length) return [];
+
+    const nodes = await this.prisma.mindmapNode.findMany({
+      where: { mindmapId: { in: mindmapIds } },
+      select: { id: true, parentId: true, title: true, mindmapId: true, mindmap: { select: { title: true } } },
+    });
+    const toPlanTodo = ({ nodes: links, ...t }: (typeof current)[number]) => ({ ...t, nodeIds: links.map((l) => l.nodeId) });
+    return aggregateByArea(
+      nodes.map(({ mindmap, ...n }) => ({ ...n, mindmapTitle: mindmap.title })),
+      current.map(toPlanTodo),
+      prev.map(toPlanTodo),
+    );
   }
 
   // Mọi node trong các mindmap của người dùng (để chọn nhánh khi tạo todo)

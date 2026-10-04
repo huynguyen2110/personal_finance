@@ -43,3 +43,17 @@ export function formatDateVi(dateKey: string): string {
   ];
   return `${weekdays[date.getDay()]}, ${d}/${m}/${y}`;
 }
+
+/** 95 → "1 giờ 35 phút", 40 → "40 phút". */
+export function formatMinutes(minutes: number): string {
+  const m = Math.round(minutes);
+  if (m < 60) return `${m} phút`;
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  return rest ? `${h} giờ ${rest} phút` : `${h} giờ`;
+}
+
+/** 3.7 → "★3,7" */
+export function formatRating(n: number): string {
+  return `★${n.toLocaleString('vi-VN', { maximumFractionDigits: 1 })}`;
+}

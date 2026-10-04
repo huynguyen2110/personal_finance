@@ -41,7 +41,8 @@ export function SelectOptionsEditor({
         {showWeight && (
           <span className="font-normal text-gray-400">
             {' '}
-            · Mức: số càng lớn càng ưu tiên / càng khó
+            · Mức: số càng lớn càng ưu tiên / càng khó (bỏ trống = theo thứ
+            tự, lựa chọn sau mức cao hơn)
           </span>
         )}
       </p>

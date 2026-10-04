@@ -126,7 +126,7 @@ describe('Mindmap API (e2e)', () => {
     const stats = (await authed('get', `/api/mindmap/todos/stats/weekly?start=${today}`).expect(200)).body.data;
     expect(stats.days).toHaveLength(7);
     expect(stats.days[0]).toEqual({ date: today, total: 1, done: 1 });
-    expect(stats.totals).toEqual({ total: 1, done: 1 });
+    expect(stats.totals).toEqual({ total: 1, done: 1, minutes: 0 });
     expect(stats.byNode).toHaveLength(2);
 
     const options = (await authed('get', '/api/mindmap/todos/node-options').expect(200)).body.data;
@@ -224,6 +224,39 @@ describe('Mindmap API (e2e)', () => {
       const left = (await authed('get', `${gbase()}/links`).expect(200)).body.data;
       expect(left.map((l: { id: number }) => l.id)).toEqual([sup.id]);
       await authed('delete', `${gbase()}/links/${pre.id}`).expect(404);
+    });
+
+    it('kế hoạch: gợi ý việc ưu tiên cao/dễ/mở khóa, việc bị chặn; thống kê tuần theo lĩnh vực', async () => {
+      const node = async (parentId: number, title: string) => (await authed('post', `${gbase()}/nodes`).send({ parentId, title }).expect(201)).body.data.id as number;
+      const area = await node(groot, 'Kỹ năng số');
+      const easy = await node(area, 'Học Excel');
+      const hard = await node(area, 'Học Power BI');
+      const setValues = (id: number, values: Record<number, unknown>) => authed('put', `${gbase()}/nodes/${id}/properties`).send({ values }).expect(200);
+      await setValues(area, { [props.priority.id]: 'high' });
+      await setValues(easy, { [props.difficulty.id]: 'easy', [props.time.id]: 2, [props.cost.id]: 0 });
+      await setValues(hard, { [props.difficulty.id]: 'hard', [props.time.id]: 40, [props.cost.id]: 1_500_000 });
+      await authed('post', `${gbase()}/links`).send({ sourceNodeId: easy, targetNodeId: hard, kind: 'prerequisite' }).expect(201);
+      const t = (await authed('post', '/api/mindmap/todos').send({ title: 'Bài 1 Excel', date: today, nodeIds: [easy], durationMinutes: 45, effectiveness: 5 }).expect(201)).body.data;
+      await authed('patch', `/api/mindmap/todos/${t.id}`).send({ completed: true }).expect(200);
+
+      const plan = (await authed('get', `${gbase()}/plan`).expect(200)).body.data;
+      expect(plan.roles).toEqual({ priority: true, difficulty: true, time: true, cost: true });
+      expect(plan.next[0]).toMatchObject({ nodeId: easy, areaId: area, priorityInherited: true, unlocks: [{ nodeId: hard, title: 'Học Power BI' }] });
+      expect(plan.next[0].reasons).toEqual(expect.arrayContaining(['Lĩnh vực ưu tiên cao', 'Dễ', 'Mở khóa 1 việc', 'Không tốn tiền']));
+      expect(plan.blocked.map((a: { nodeId: number }) => a.nodeId)).toEqual([hard]);
+      const areaRow = plan.areas.find((a: { nodeId: number }) => a.nodeId === area);
+      expect(areaRow).toMatchObject({ actionsTotal: 2, actionsDone: 0, remainingHours: 42, remainingCost: 1_500_000, neglected: false });
+      expect(areaRow.todos).toMatchObject({ total: 1, done: 1, minutes: 45, avgEffectiveness: 5 });
+
+      // Xong việc điều kiện → việc khó hết bị chặn
+      await authed('patch', `${gbase()}/nodes/${easy}`).send({ status: 'done' }).expect(200);
+      const after = (await authed('get', `${gbase()}/plan`).expect(200)).body.data;
+      expect(after.blocked).toEqual([]);
+      expect(after.next.map((a: { nodeId: number }) => a.nodeId)).toContain(hard);
+
+      const stats = (await authed('get', `/api/mindmap/todos/stats/weekly?start=${today}`).expect(200)).body.data;
+      expect(stats.totals.minutes).toBeGreaterThanOrEqual(45);
+      expect(stats.byArea.find((r: { areaId: number }) => r.areaId === area)).toMatchObject({ title: 'Kỹ năng số', mindmapId: gid, total: 1, done: 1, minutes: 45, prevMinutes: 0, avgEffectiveness: 5 });
     });
   });
 

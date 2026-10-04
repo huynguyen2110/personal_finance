@@ -5,7 +5,7 @@
 | Module | Đường dẫn | Nội dung |
 |---|---|---|
 | **Tài chính cá nhân** | `/finance/*` | Thu chi đọc tự động từ email ngân hàng, phân loại theo quy tắc, ngân sách, mục tiêu tiết kiệm, thống kê, xuất Excel |
-| **Mindmap** | `/mindmap/*` | Sơ đồ tư duy (kéo thả, phím tắt), trang ghi chú kiểu Notion cho từng nhánh, thuộc tính tùy chỉnh, todo hằng ngày gắn với nhánh, thống kê tuần |
+| **Mindmap** | `/mindmap/*` | Sơ đồ tư duy (kéo thả, phím tắt), trang ghi chú kiểu Notion cho từng nhánh, thuộc tính tùy chỉnh, liên kết giữa nhánh, trang Kế hoạch gợi ý nên làm gì, todo hằng ngày (phút + hiệu quả) gắn với nhánh, thống kê tuần |
 
 Một đăng nhập dùng chung cho mọi module (một tài khoản, username/password). Link cũ dạng `/dashboard`, `/transactions?…` tự chuyển sang `/finance/...`.
 
@@ -33,7 +33,7 @@ frontend/
   src/app/               (app)/page.tsx = launcher; (app)/finance/*, (app)/mindmap/* (layout riêng mỗi module); login/
   src/modules/launcher/  trang chủ chọn module
   src/modules/finance/   các tính năng tài chính: components/, lib/ (query key + hook + API), types/
-  src/modules/mindmap/   canvas, mindmaps, node-page, properties, todos, stats; lib/api.ts; mindmap.css (chỉ nạp ở /mindmap)
+  src/modules/mindmap/   canvas, mindmaps, node-page, properties, links, plan, todos, stats; lib/api.ts; mindmap.css (chỉ nạp ở /mindmap)
   src/modules/auth/      form đăng nhập, đổi mật khẩu
   src/lib/               api-client (Bearer + tự refresh token), auth-storage, dates, money…
   src/components/        layout (khung module dùng chung), shared, charts
@@ -146,10 +146,13 @@ Kiểm tra bộ đọc email: `npm test -- providers` trong `backend`.
 
 ## Module Mindmap
 
-- **Mindmap**: canvas tự xếp từ trái sang phải. Phím tắt: `Tab` thêm nhánh con, `Enter` thêm nhánh ngang, `F2`/nhấp đúp đổi tên, `Delete` xóa (xóa cả nhánh con). Kéo một nhánh thả vào nhánh khác để đổi cha; tô màu theo nhánh; thu gọn/mở rộng.
-- **Trang của nhánh**: trình soạn kiểu Notion (TipTap, tự lưu sau 1 giây), thuộc tính tùy chỉnh theo từng mindmap (văn bản, số, đúng/sai, ngày, lựa chọn), danh sách todo gắn với nhánh.
-- **Todo hằng ngày**: mỗi todo gắn được với nhiều nhánh (ở nhiều mindmap); nhánh hiện số todo đã xong / tổng.
-- **Thống kê tuần**: số todo theo ngày và tiến độ theo nhánh.
+- **Mindmap**: canvas tự xếp từ trái sang phải. Phím tắt: `Tab` thêm nhánh con, `Enter` thêm nhánh ngang, `F2`/nhấp đúp đổi tên, `Delete` xóa (xóa cả nhánh con), `L` nối liên kết. Kéo một nhánh thả vào nhánh khác để đổi cha; tô màu theo nhánh; thu gọn/mở rộng.
+- **Mẫu "Phát triển bản thân"**: khi tạo mindmap, chọn mẫu để có sẵn thuộc tính Ưu tiên, Độ khó, Thời gian (giờ), Chi phí (₫). Quy ước: nhánh cấp 1 = lĩnh vực cần phát triển, nhánh cấp ≥2 = hành động.
+- **Trang của nhánh**: trình soạn kiểu Notion (TipTap, tự lưu sau 1 giây), trạng thái (Chưa làm/Đang làm/Xong), thuộc tính tùy chỉnh theo từng mindmap (văn bản, số có đơn vị tiền/giờ, đúng/sai, ngày, lựa chọn có mức), liên kết, danh sách todo gắn với nhánh.
+- **Liên kết giữa nhánh**: *bổ trợ* (A giúp B), *điều kiện trước* (A phải xong trước B, chặn vòng lặp), *liên quan* (kèm ghi chú). Vẽ thành cung cong trên canvas; bấm vào cung để sửa/xóa.
+- **Kế hoạch** (`/mindmap/<id>/plan`): thẻ lĩnh vực (tiến độ, giờ/chi phí còn lại, phút đầu tư 28 ngày, cảnh báo lĩnh vực ưu tiên cao bị bỏ quên 14 ngày), top 5 *Nên làm tiếp* kèm lý do, việc *Đang bị chặn*, bảng mọi hành động (sắp xếp/lọc). Điểm = 40% ưu tiên + 20% độ dễ + 20% đòn bẩy (số việc mở khóa/bổ trợ) + 10% rẻ + 10% nhanh, +5 nếu đang làm; thuộc tính được nhận ra qua *vai trò* gán trong "Thuộc tính".
+- **Todo hằng ngày**: mỗi todo gắn được với nhiều nhánh (ở nhiều mindmap), ghi số phút đã bỏ ra và chấm hiệu quả 1–5; nhánh hiện số todo đã xong / tổng (cộng dồn lên nhánh cha).
+- **Thống kê tuần**: số todo theo ngày, thời gian đầu tư, theo lĩnh vực (phút so với tuần trước, hiệu quả TB) và tiến độ theo nhánh.
 
 ## Ghi chú kỹ thuật
 
