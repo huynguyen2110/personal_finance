@@ -12,6 +12,15 @@ export interface NodePropertyValue {
   value: unknown;
 }
 
+/** Trạng thái hành động; null = không theo dõi. */
+export type NodeStatus = 'todo' | 'doing' | 'done';
+
+export const STATUS_LABELS: Record<NodeStatus, string> = {
+  todo: 'Chưa làm',
+  doing: 'Đang làm',
+  done: 'Xong',
+};
+
 export interface TreeNode {
   id: number;
   parentId: number | null;
@@ -19,6 +28,7 @@ export interface TreeNode {
   orderIndex: number;
   collapsed: boolean;
   color: string | null;
+  status: NodeStatus | null;
   hasPage: boolean;
   todoTotal: number;
   todoDone: number;

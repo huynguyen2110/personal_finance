@@ -2,11 +2,15 @@
 
 import { useState } from 'react';
 import { Spinner } from '@/modules/mindmap/components/ui/Spinner';
-import { BranchProgressList } from '@/modules/mindmap/stats/components/BranchProgressList';
+import { AreaTimeList } from '@/modules/mindmap/stats/components/AreaTimeList';
 import { WeekNav } from '@/modules/mindmap/stats/components/WeekNav';
 import { WeeklyBarChart } from '@/modules/mindmap/stats/components/WeeklyBarChart';
 import { useWeeklyStats } from '@/modules/mindmap/stats/hooks';
-import { startOfWeek, toDateKey } from '@/modules/mindmap/lib/utils';
+import {
+  formatMinutes,
+  startOfWeek,
+  toDateKey,
+} from '@/modules/mindmap/lib/utils';
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
@@ -27,6 +31,7 @@ export default function StatsPage() {
 
   const total = data?.totals.total ?? 0;
   const done = data?.totals.done ?? 0;
+  const minutes = data?.totals.minutes ?? 0;
   const percent = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
@@ -34,7 +39,7 @@ export default function StatsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Thống kê tuần</h1>
         <p className="mt-0.5 text-sm text-gray-500">
-          Tiến độ hoàn thành todo theo từng tuần
+          Todo hoàn thành và thời gian đầu tư cho từng lĩnh vực theo tuần
         </p>
       </div>
 
@@ -44,14 +49,24 @@ export default function StatsPage() {
         <Spinner />
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile label="Tổng todo" value={String(total)} />
             <StatTile label="Đã hoàn thành" value={String(done)} />
             <StatTile label="Tỷ lệ hoàn thành" value={`${percent}%`} />
+            <StatTile
+              label="Thời gian đầu tư"
+              value={
+                minutes === 0
+                  ? '—'
+                  : minutes < 60
+                    ? formatMinutes(minutes)
+                    : `${(minutes / 60).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} giờ`
+              }
+            />
           </div>
 
           <WeeklyBarChart days={data.days} />
-          <BranchProgressList branches={data.byNode} />
+          <AreaTimeList areas={data.byArea} />
         </>
       )}
     </div>

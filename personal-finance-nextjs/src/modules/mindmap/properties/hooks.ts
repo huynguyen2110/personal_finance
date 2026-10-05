@@ -5,7 +5,11 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { propertiesApi, PropertyType, SelectOption } from './api';
+import {
+  CreatePropertyBody,
+  propertiesApi,
+  UpdatePropertyBody,
+} from './api';
 
 export function useProperties(mindmapId: number) {
   return useQuery({
@@ -18,11 +22,8 @@ export function useProperties(mindmapId: number) {
 export function useCreateProperty(mindmapId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: {
-      name: string;
-      type: PropertyType;
-      options?: SelectOption[];
-    }) => propertiesApi.create(mindmapId, body),
+    mutationFn: (body: CreatePropertyBody) =>
+      propertiesApi.create(mindmapId, body),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['properties', mindmapId] }),
   });
@@ -31,16 +32,12 @@ export function useCreateProperty(mindmapId: number) {
 export function useUpdateProperty(mindmapId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      propId,
-      ...body
-    }: {
-      propId: number;
-      name?: string;
-      options?: SelectOption[];
-    }) => propertiesApi.update(mindmapId, propId, body),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['properties', mindmapId] }),
+    mutationFn: ({ propId, ...body }: UpdatePropertyBody & { propId: number }) =>
+      propertiesApi.update(mindmapId, propId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['properties', mindmapId] });
+      qc.invalidateQueries({ queryKey: ['plan', mindmapId] });
+    },
   });
 }
 

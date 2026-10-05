@@ -1,6 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import type { CreateMindmapDto, UpdateMindmapDto } from '../dto/mindmap.dto';
+import { MINDMAP_TEMPLATES } from '../utils/templates';
+
+const PRIMARY_TITLE = 'Phát triển bản thân';
 
 @Injectable()
 export class MindmapsService {
@@ -22,16 +26,36 @@ export class MindmapsService {
     return rows.map(({ _count, ...m }) => ({ ...m, nodeCount: _count.nodes }));
   }
 
-  // Tạo mindmap kèm nút gốc cùng tên
+  // Tạo mindmap kèm nút gốc cùng tên; có mẫu thì tạo luôn bộ thuộc tính của mẫu
   create(userId: number, dto: CreateMindmapDto) {
+    const template = dto.template ? MINDMAP_TEMPLATES[dto.template] : null;
     return this.prisma.mindmap.create({
       data: {
         userId,
         title: dto.title,
         description: dto.description ?? null,
         nodes: { create: { title: dto.title, parentId: null, orderIndex: 0 } },
+        properties: template
+          ? {
+              create: template.properties.map((p, i) => ({
+                name: p.name,
+                type: p.type,
+                role: p.role,
+                unit: p.type === 'number' ? p.unit : null,
+                options: p.type === 'select' ? p.options : Prisma.DbNull,
+                orderIndex: i,
+              })),
+            }
+          : undefined,
       },
     });
+  }
+
+  // Bản đồ chính = mindmap cũ nhất của người dùng; chưa có thì tạo theo mẫu "Phát triển bản thân"
+  async getOrCreatePrimary(userId: number) {
+    const existing = await this.prisma.mindmap.findFirst({ where: { userId }, orderBy: { id: 'asc' } });
+    if (existing) return existing;
+    return this.create(userId, { title: PRIMARY_TITLE, template: 'growth' });
   }
 
   get(id: number, userId: number) {

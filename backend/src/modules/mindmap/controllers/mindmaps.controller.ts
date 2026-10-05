@@ -20,6 +20,12 @@ export class MindmapsController {
     return this.mindmaps.create(user.sub, dto);
   }
 
+  // Bản đồ "Phát triển bản thân" của người dùng (module chỉ dùng một bản): khai báo trước ':id'
+  @Get('primary')
+  primary(@CurrentUser() user: JwtUser) {
+    return this.mindmaps.getOrCreatePrimary(user.sub);
+  }
+
   @Get(':id')
   get(@CurrentUser() user: JwtUser, @Param('id', ParseIntPipe) id: number) {
     return this.mindmaps.get(id, user.sub);

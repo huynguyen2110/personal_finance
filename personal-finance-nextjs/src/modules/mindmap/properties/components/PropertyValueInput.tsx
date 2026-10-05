@@ -1,6 +1,7 @@
 'use client';
 
 import { PropertyDefinition } from '../api';
+import { formatPropertyNumber } from '../format';
 
 export function PropertyValueInput({
   definition,
@@ -31,14 +32,23 @@ export function PropertyValueInput({
       );
     case 'number':
       return (
-        <input
-          type="number"
-          className={base}
-          value={typeof value === 'number' ? value : ''}
-          onChange={(e) =>
-            onChange(e.target.value === '' ? null : Number(e.target.value))
-          }
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={definition.unit ? 0 : undefined}
+            step={definition.unit === 'money' ? 1000 : 'any'}
+            className={base}
+            value={typeof value === 'number' ? value : ''}
+            onChange={(e) =>
+              onChange(e.target.value === '' ? null : Number(e.target.value))
+            }
+          />
+          {definition.unit && typeof value === 'number' && (
+            <span className="shrink-0 text-xs text-gray-400 tabular-nums">
+              {formatPropertyNumber(definition.unit, value)}
+            </span>
+          )}
+        </div>
       );
     case 'date':
       return (

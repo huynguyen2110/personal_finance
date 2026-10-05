@@ -1,5 +1,6 @@
 import { NodePropertyValue } from '@/modules/mindmap/mindmaps/types';
 import { PropertyDefinition } from '@/modules/mindmap/properties/api';
+import { formatPropertyNumber } from '@/modules/mindmap/properties/format';
 
 export interface NodeChip {
   key: string;
@@ -45,7 +46,13 @@ export function buildChips(
         });
         break;
       case 'number':
-        chips.push({ key, label: `${def.name}: ${entry.value}`, color: null });
+        chips.push({
+          key,
+          label: def.unit
+            ? formatPropertyNumber(def.unit, Number(entry.value), true)
+            : `${def.name}: ${entry.value}`,
+          color: null,
+        });
         break;
       default:
         chips.push({
@@ -56,9 +63,4 @@ export function buildChips(
     }
   }
   return chips;
-}
-
-/** Rough pixel width of one chip, kept in sync with MindNode's chip CSS. */
-export function chipWidth(chip: NodeChip): number {
-  return 14 + chip.label.length * 5.6;
 }

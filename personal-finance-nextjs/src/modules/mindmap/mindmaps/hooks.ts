@@ -8,8 +8,12 @@ import {
 import { mindmapsApi, nodesApi, UpdateNodeBody } from './api';
 import { TreeNode } from './types';
 
-export function useMindmaps() {
-  return useQuery({ queryKey: ['mindmaps'], queryFn: mindmapsApi.list });
+export function usePrimaryMindmap() {
+  return useQuery({
+    queryKey: ['mindmap', 'primary'],
+    queryFn: mindmapsApi.primary,
+    staleTime: Infinity,
+  });
 }
 
 export function useMindmap(id: number) {
@@ -17,34 +21,6 @@ export function useMindmap(id: number) {
     queryKey: ['mindmap', id],
     queryFn: () => mindmapsApi.get(id),
     enabled: Number.isFinite(id),
-  });
-}
-
-export function useCreateMindmap() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: mindmapsApi.create,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['mindmaps'] }),
-  });
-}
-
-export function useUpdateMindmap() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, ...body }: { id: number; title?: string; description?: string }) =>
-      mindmapsApi.update(id, body),
-    onSuccess: (_, { id }) => {
-      qc.invalidateQueries({ queryKey: ['mindmaps'] });
-      qc.invalidateQueries({ queryKey: ['mindmap', id] });
-    },
-  });
-}
-
-export function useDeleteMindmap() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: mindmapsApi.remove,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['mindmaps'] }),
   });
 }
 
@@ -91,8 +67,10 @@ export function useUpdateNode(mindmapId: number) {
         qc.setQueryData(['nodes', mindmapId], context.previous);
       }
     },
-    onSettled: () => {
+    onSettled: (_data, _err, { nodeId }) => {
       qc.invalidateQueries({ queryKey: ['nodes', mindmapId] });
+      qc.invalidateQueries({ queryKey: ['node', nodeId] });
+      qc.invalidateQueries({ queryKey: ['plan', mindmapId] });
     },
   });
 }
@@ -135,6 +113,9 @@ export function useDeleteNode(mindmapId: number) {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['nodes', mindmapId] });
+      // Xóa nhánh → liên kết của nhánh bị xóa theo (cascade)
+      qc.invalidateQueries({ queryKey: ['links', mindmapId] });
+      qc.invalidateQueries({ queryKey: ['plan', mindmapId] });
     },
   });
 }

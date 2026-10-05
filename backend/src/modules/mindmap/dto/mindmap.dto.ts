@@ -1,6 +1,10 @@
-import { PartialType } from '@nestjs/swagger';
+import { OmitType, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import { MINDMAP_TEMPLATES, type MindmapTemplateId } from '../utils/templates';
+
+export const NODE_STATUSES = ['todo', 'doing', 'done'] as const;
+export type NodeStatus = (typeof NODE_STATUSES)[number];
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
@@ -14,9 +18,14 @@ export class CreateMindmapDto {
   @IsOptional()
   @IsString()
   description?: string | null;
+
+  // Mẫu tạo sẵn thuộc tính (VD "growth" = phát triển bản thân); bỏ trống = mindmap trống
+  @IsOptional()
+  @IsIn(Object.keys(MINDMAP_TEMPLATES))
+  template?: MindmapTemplateId;
 }
 
-export class UpdateMindmapDto extends PartialType(CreateMindmapDto) {}
+export class UpdateMindmapDto extends PartialType(OmitType(CreateMindmapDto, ['template'] as const)) {}
 
 export class CreateNodeDto {
   // Id của node cha
@@ -66,4 +75,9 @@ export class UpdateNodeDto {
   @IsOptional()
   @IsObject()
   pageContent?: object;
+
+  // Trạng thái hành động; null = không theo dõi
+  @IsOptional()
+  @IsIn(NODE_STATUSES)
+  status?: NodeStatus | null;
 }

@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, type PropertyDefinition } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
-import type { CreatePropertyDto, SetNodeValuesDto, UpdatePropertyDto } from '../dto/property.dto';
+import { ROLE_LABEL, ROLE_TYPE, type CreatePropertyDto, type PropertyRole, type PropertyTypeName, type SetNodeValuesDto, type UpdatePropertyDto } from '../dto/property.dto';
 import { MindmapsService } from './mindmaps.service';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -31,6 +31,8 @@ export class PropertiesService {
     }
     const duplicate = await this.prisma.propertyDefinition.findFirst({ where: { mindmapId, name: dto.name } });
     if (duplicate) throw new BadRequestException('Tên thuộc tính đã tồn tại');
+    if (dto.unit && dto.type !== 'number') throw new BadRequestException('Chỉ thuộc tính kiểu number mới có đơn vị');
+    if (dto.role) await this.checkRole(mindmapId, dto.role, dto.type);
 
     const { _max } = await this.prisma.propertyDefinition.aggregate({ where: { mindmapId }, _max: { orderIndex: true } });
     return this.prisma.propertyDefinition.create({
@@ -39,6 +41,8 @@ export class PropertiesService {
         name: dto.name,
         type: dto.type,
         options: dto.type === 'select' ? (dto.options as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
+        role: dto.role ?? null,
+        unit: dto.unit ?? null,
         orderIndex: _max.orderIndex === null ? 0 : _max.orderIndex + 1,
       },
     });
@@ -56,6 +60,14 @@ export class PropertiesService {
     if (dto.options !== undefined) {
       if (def.type !== 'select') throw new BadRequestException('Chỉ thuộc tính kiểu select mới có options');
       data.options = dto.options as unknown as Prisma.InputJsonValue;
+    }
+    if (dto.unit !== undefined) {
+      if (dto.unit !== null && def.type !== 'number') throw new BadRequestException('Chỉ thuộc tính kiểu number mới có đơn vị');
+      data.unit = dto.unit;
+    }
+    if (dto.role !== undefined && dto.role !== def.role) {
+      if (dto.role !== null) await this.checkRole(mindmapId, dto.role, def.type, propId);
+      data.role = dto.role;
     }
     return this.prisma.propertyDefinition.update({ where: { id: propId }, data });
   }
@@ -117,6 +129,17 @@ export class PropertiesService {
         break;
       }
     }
+  }
+
+  // Role phải hợp kiểu và chưa được thuộc tính khác trong mindmap dùng
+  private async checkRole(mindmapId: number, role: PropertyRole, type: PropertyTypeName, exceptId?: number) {
+    if (ROLE_TYPE[role] !== type) {
+      throw new BadRequestException(`Vai trò "${ROLE_LABEL[role]}" chỉ dùng cho thuộc tính kiểu ${ROLE_TYPE[role]}`);
+    }
+    const taken = await this.prisma.propertyDefinition.findFirst({
+      where: { mindmapId, role, ...(exceptId ? { NOT: { id: exceptId } } : {}) },
+    });
+    if (taken) throw new BadRequestException(`Thuộc tính "${taken.name}" đang giữ vai trò "${ROLE_LABEL[role]}"`);
   }
 
   private async findOwnedDefinition(mindmapId: number, propId: number, userId: number) {

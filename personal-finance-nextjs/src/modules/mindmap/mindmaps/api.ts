@@ -1,14 +1,10 @@
 import { api } from '@/modules/mindmap/lib/api';
-import { Mindmap, NodeDetail, TreeNode } from './types';
+import { Mindmap, NodeDetail, NodeStatus, TreeNode } from './types';
 
 export const mindmapsApi = {
-  list: () => api.get<Mindmap[]>('/mindmaps'),
-  create: (body: { title: string; description?: string }) =>
-    api.post<Mindmap>('/mindmaps', body),
+  /** Bản đồ Phát triển bản thân của người dùng; lần đầu backend tự tạo theo mẫu. */
+  primary: () => api.get<Mindmap>('/mindmaps/primary'),
   get: (id: number) => api.get<Mindmap>(`/mindmaps/${id}`),
-  update: (id: number, body: { title?: string; description?: string }) =>
-    api.patch<Mindmap>(`/mindmaps/${id}`, body),
-  remove: (id: number) => api.delete<{ success: boolean }>(`/mindmaps/${id}`),
 };
 
 export interface UpdateNodeBody {
@@ -17,6 +13,7 @@ export interface UpdateNodeBody {
   orderIndex?: number;
   collapsed?: boolean;
   color?: string | null;
+  status?: NodeStatus | null;
   pageContent?: object;
 }
 

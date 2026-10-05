@@ -29,8 +29,7 @@ export function NodePicker({
       .filter(
         (o) =>
           !q ||
-          o.title.toLowerCase().includes(q) ||
-          o.mindmapTitle.toLowerCase().includes(q),
+          o.title.toLowerCase().includes(q),
       )
       .slice(0, 30);
   }, [options, search]);
@@ -43,7 +42,7 @@ export function NodePicker({
         className="flex w-full flex-wrap items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-left text-sm"
       >
         {selected.length === 0 ? (
-          <span className="text-gray-400">Gắn với nhánh mindmap…</span>
+          <span className="text-gray-400">Gắn với hành động / lĩnh vực…</span>
         ) : (
           selected.map((o) => (
             <span
@@ -96,9 +95,6 @@ export function NodePicker({
                     className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${isSelected ? 'bg-violet-50' : ''}`}
                   >
                     <span>{o.title}</span>
-                    <span className="text-xs text-gray-400">
-                      {o.mindmapTitle}
-                    </span>
                   </button>
                 </li>
               );
