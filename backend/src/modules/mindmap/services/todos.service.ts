@@ -1,9 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
-import { addDaysStr } from '../../../common/utils/dates.util';
+import { addDaysStr, todayVN } from '../../../common/utils/dates.util';
 import type { CreateTodoDto, UpdateTodoDto } from '../dto/todo.dto';
 import { aggregateByArea } from '../utils/plan';
+import { computeStreak } from '../utils/streak';
 
 const todoInclude = {
   nodes: { include: { node: { select: { id: true, title: true, mindmapId: true, mindmap: { select: { title: true } } } } } },
@@ -79,6 +80,16 @@ export class TodosService {
       current.map(toPlanTodo),
       prev.map(toPlanTodo),
     );
+  }
+
+  // Chuỗi ngày liên tục có todo hoàn thành ("Kỷ luật liên tục")
+  async streak(userId: number) {
+    const rows = await this.prisma.todo.findMany({
+      where: { userId, completed: true },
+      select: { date: true },
+      distinct: ['date'],
+    });
+    return computeStreak(rows.map((r) => r.date), todayVN());
   }
 
   // Mọi node trong các mindmap của người dùng (để chọn nhánh khi tạo todo)

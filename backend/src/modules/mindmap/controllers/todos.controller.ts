@@ -21,6 +21,11 @@ export class TodosController {
     return this.todos.nodeOptions(user.sub);
   }
 
+  @Get('streak')
+  streak(@CurrentUser() user: JwtUser) {
+    return this.todos.streak(user.sub);
+  }
+
   @Get('stats/weekly')
   weeklyStats(@CurrentUser() user: JwtUser, @Query() query: WeeklyStatsDto) {
     return this.todos.weeklyStats(user.sub, query.start);
