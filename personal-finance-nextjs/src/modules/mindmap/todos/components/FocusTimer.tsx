@@ -1,10 +1,11 @@
 'use client';
 
-import { Network, Pause, Play, Square, Timer } from 'lucide-react';
+import { Maximize2, Network, Pause, Play, Square, Timer } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/modules/mindmap/lib/utils';
 import { Todo } from '../api';
 import { useUpdateTodo } from '../hooks';
+import { FlipClockOverlay } from './FlipClock';
 
 type Mode = 'focus' | 'short' | 'long';
 const MINUTES: Record<Mode, number> = { focus: 25, short: 5, long: 15 };
@@ -29,6 +30,8 @@ export function FocusTimer({
   const [remaining, setRemaining] = useState(MINUTES.focus * 60);
   const [running, setRunning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [big, setBig] = useState(false);
+  const closeBig = useCallback(() => setBig(false), []);
   const endAtRef = useRef(0);
   const targetRef = useRef(target);
   useEffect(() => {
@@ -118,8 +121,18 @@ export function FocusTimer({
         <span className="flex items-center gap-1.5 font-semibold text-violet-700">
           <Timer size={19} /> Chế độ tập trung
         </span>
-        <span className="rounded-md bg-violet-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
-          Pomodoro
+        <span className="flex items-center gap-1.5">
+          <span className="rounded-md bg-violet-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+            Pomodoro
+          </span>
+          <button
+            type="button"
+            onClick={() => setBig(true)}
+            title="Toàn màn hình (đồng hồ lật)"
+            className="rounded-lg p-1 text-gray-500 transition hover:bg-[#eaedff] hover:text-violet-700"
+          >
+            <Maximize2 size={16} />
+          </button>
         </span>
       </div>
 
@@ -206,6 +219,21 @@ export function FocusTimer({
           ))}
         </div>
       </div>
+
+      {big && (
+        <FlipClockOverlay
+          remaining={remaining}
+          running={running}
+          modeLabel={
+            mode === 'focus' ? 'Focus' : mode === 'short' ? 'Nghỉ ngắn' : 'Nghỉ dài'
+          }
+          targetTitle={mode === 'focus' ? (target?.title ?? null) : null}
+          canStop={remaining < total}
+          onToggle={toggle}
+          onStop={stopAndLog}
+          onClose={closeBig}
+        />
+      )}
 
       {notice && (
         <p className="mt-3 w-full rounded-lg bg-teal-50 px-2 py-1.5 text-xs font-semibold text-teal-800">{notice}</p>

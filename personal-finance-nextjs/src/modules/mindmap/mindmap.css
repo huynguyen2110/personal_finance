@@ -150,3 +150,76 @@
   min-width: 0;
   min-height: 0;
 }
+
+/* Đồng hồ lật (Pomodoro toàn màn hình): mỗi ô gồm nửa trên / dưới tĩnh + 2 nửa lật khi đổi số */
+.flip-card {
+  position: relative;
+  perspective: 1600px;
+}
+.flip-half {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50%;
+  overflow: hidden;
+  background: linear-gradient(180deg, #1f1f22 0%, #19191b 100%);
+  backface-visibility: hidden;
+}
+.flip-half > span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 200%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.flip-top {
+  top: 0;
+  border-radius: 0.08em 0.08em 0 0;
+  transform-origin: bottom;
+}
+.flip-top > span {
+  top: 0;
+}
+.flip-bottom {
+  bottom: 0;
+  border-radius: 0 0 0.08em 0.08em;
+  transform-origin: top;
+  background: linear-gradient(180deg, #19191b 0%, #151517 100%);
+}
+.flip-bottom > span {
+  bottom: 0;
+}
+.flip-top.flipping {
+  z-index: 2;
+  animation: flip-top-down 0.3s ease-in forwards;
+}
+.flip-bottom.flipping {
+  z-index: 2;
+  animation: flip-bottom-up 0.3s ease-out 0.3s both;
+}
+@keyframes flip-top-down {
+  from {
+    transform: rotateX(0deg);
+  }
+  to {
+    transform: rotateX(-90deg);
+  }
+}
+@keyframes flip-bottom-up {
+  from {
+    transform: rotateX(90deg);
+  }
+  to {
+    transform: rotateX(0deg);
+  }
+}
+/* Giảm chuyển động: lật tức thì (vẫn chạy animation để nửa dưới hiện số mới) */
+@media (prefers-reduced-motion: reduce) {
+  .flip-top.flipping,
+  .flip-bottom.flipping {
+    animation-duration: 1ms;
+    animation-delay: 0s;
+  }
+}
