@@ -26,14 +26,18 @@ export class TransactionsService {
     const pageSize = Math.min(200, Math.max(10, Number(sp.get('pageSize')) || 50));
     const orderBy = SORTS[sp.get('sort') ?? ''] ?? SORTS.date_desc;
 
-    const [items, total, sums] = await Promise.all([
+    // Tổng tiền vào/ra và tỷ lệ phân loại chỉ tính giao dịch trong thống kê (bỏ chuyển nội bộ / khoản tự loại ra)
+    const statsWhere: Prisma.TransactionWhereInput = { AND: [where, { excludeFromStats: false }] };
+    const [items, total, sums, statsCount, statsUncategorized] = await Promise.all([
       this.prisma.transaction.findMany({ where, select: txnSelect, orderBy, skip: (page - 1) * pageSize, take: pageSize }),
       this.prisma.transaction.count({ where }),
-      this.prisma.transaction.groupBy({ by: ['direction'], where, _sum: { amount: true } }),
+      this.prisma.transaction.groupBy({ by: ['direction'], where: statsWhere, _sum: { amount: true } }),
+      this.prisma.transaction.count({ where: statsWhere }),
+      this.prisma.transaction.count({ where: { AND: [statsWhere, { categoryId: null }] } }),
     ]);
 
     const sumOf = (d: 'IN' | 'OUT') => Number(sums.find((s) => s.direction === d)?._sum.amount ?? 0);
-    return { items, total, page, pageSize, sumIn: sumOf('IN'), sumOut: sumOf('OUT') };
+    return { items, total, page, pageSize, sumIn: sumOf('IN'), sumOut: sumOf('OUT'), statsCount, statsUncategorized };
   }
 
   findOne(id: number) {

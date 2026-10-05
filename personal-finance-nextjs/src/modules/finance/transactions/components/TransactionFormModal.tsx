@@ -4,6 +4,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { ArrowLeftRight } from 'lucide-react';
 import Modal from '@/components/shared/Modal';
+import MoneyInput from '@/components/shared/MoneyInput';
 import CategorySelect from '@/components/shared/CategorySelect';
 import DatePicker from '@/components/shared/DatePicker';
 import TimePicker from '@/components/shared/TimePicker';
@@ -49,6 +50,8 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
   const [direction, setDirection] = useState<Direction>(transaction?.direction ?? 'OUT');
   const [amount, setAmount] = useState(transaction ? String(transaction.amount) : '');
   const [content, setContent] = useState(transaction?.content ?? '');
+  // Nội dung đang là tên danh mục do form tự điền (chưa gõ tay) → đổi danh mục thì đổi theo
+  const [autoContent, setAutoContent] = useState(false);
   const [date, setDate] = useState(init.date);
   const [time, setTime] = useState(init.time);
   const [categoryId, setCategoryId] = useState<number | null>(transaction?.categoryId ?? null);
@@ -59,6 +62,15 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
   const amountNum = Number(amount.replace(/[^\d]/g, ''));
   // Danh mục thuộc nhóm của tài khoản đang chọn được đưa lên đầu ô chọn
   const suggested = suggestionFor(accounts.find((a) => a.id === accountId), categories);
+
+  // Giao dịch nhập tay chưa có nội dung: chọn danh mục thì lấy tên danh mục làm nội dung
+  function pickCategory(id: number | null) {
+    setCategoryId(id);
+    if (!manual || (content.trim() !== '' && !autoContent)) return;
+    const name = id === null ? '' : (categories.find((c) => c.id === id)?.name ?? '');
+    setContent(name);
+    setAutoContent(name !== '');
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -149,7 +161,8 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
                   type="button"
                   onClick={() => {
                     setDirection(d);
-                    setCategoryId(null);
+                    // Danh mục bị bỏ chọn → bỏ luôn nội dung đã tự điền theo danh mục
+                    pickCategory(null);
                   }}
                   className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
                     direction === d
@@ -167,14 +180,7 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="block">
                 <span className="block text-xs font-medium text-text-secondary mb-1">Số tiền (₫)</span>
-                <input
-                  inputMode="numeric"
-                  className="input-field tabular"
-                  value={amountNum ? new Intl.NumberFormat('vi-VN').format(amountNum) : amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="50.000"
-                  autoFocus
-                />
+                <MoneyInput value={amountNum || null} onChange={(v) => setAmount(v === null ? '' : String(v))} placeholder="50.000" ariaLabel="Số tiền" autoFocus />
               </label>
               <label className="block">
                 <span className="block text-xs font-medium text-text-secondary mb-1">Tài khoản</span>
@@ -183,7 +189,15 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
             </div>
             <label className="block">
               <span className="block text-xs font-medium text-text-secondary mb-1">Nội dung</span>
-              <input className="input-field" value={content} onChange={(e) => setContent(e.target.value)} placeholder="VD: Ăn trưa" />
+              <input
+                className="input-field"
+                value={content}
+                onChange={(e) => {
+                  setContent(e.target.value);
+                  setAutoContent(false);
+                }}
+                placeholder="VD: Ăn trưa (để trống sẽ lấy tên danh mục)"
+              />
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
@@ -221,7 +235,7 @@ function Inner({ isOpen, onClose, onSaved, accounts, categories, transaction }: 
 
         <label className="block">
           <span className="block text-xs font-medium text-text-secondary mb-1">Danh mục</span>
-          <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} direction={direction} suggested={suggested} />
+          <CategorySelect categories={categories} value={categoryId} onChange={pickCategory} direction={direction} suggested={suggested} />
         </label>
         <label className="block">
           <span className="block text-xs font-medium text-text-secondary mb-1">Ghi chú</span>

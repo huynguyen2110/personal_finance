@@ -116,6 +116,8 @@ export default function DashboardPage() {
   // Nguồn thu lớn nhất đã phân loại (bỏ "Chưa phân loại")
   const topIncome = data?.incomeByCategory.find((c) => c.categoryId !== null);
   const budgetPct = data && data.budget.totalBudget > 0 ? data.budget.totalSpent / data.budget.totalBudget : null;
+  // Chế độ chỉ lấy email tiền đi: thu nhập là kế hoạch (hạn mức + tiết kiệm), không theo dõi số dư
+  const planned = data?.incomeMode === 'PLANNED';
   const last6 = data?.monthly.slice(-6) ?? [];
   const avgExpense6 = last6.length ? last6.reduce((t, m) => t + m.expense, 0) / last6.length : 0;
   // Nhịp chi của tháng ngân sách so với thời gian đã trôi qua
@@ -155,23 +157,45 @@ export default function DashboardPage() {
           <>
             {/* 4 KPI */}
             <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-              <Kpi label="Tổng số dư khả dụng" icon={<Wallet className="w-5 h-5" />} iconClass="bg-teal-50 text-teal-700" accent="bg-teal-700/30 group-hover:bg-teal-700">
-                <Amount value={data.totalBalance} />
-                <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-2 text-xs text-slate-500">
-                  <Link href="/finance/accounts" className="inline-flex items-center gap-1 text-teal-700 font-semibold hover:underline">
-                    {data.balances.length} tài khoản <ChevronRight className="w-3.5 h-3.5" aria-hidden />
-                  </Link>
-                  <span className="fin-num">
-                    {banks} NH • {cash} ví tiền mặt
-                  </span>
-                </div>
-              </Kpi>
+              {planned ? (
+                // Không theo dõi số dư → thay bằng số còn được chi theo hạn mức của tháng ngân sách
+                <Kpi label="Còn được chi tháng này" icon={<Wallet className="w-5 h-5" />} iconClass="bg-teal-50 text-teal-700" accent="bg-teal-700/30 group-hover:bg-teal-700">
+                  <Amount value={data.budget.totalBudget - data.budget.totalSpent} className={data.budget.totalSpent > data.budget.totalBudget ? 'text-rose-600' : undefined} />
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-2 text-xs text-slate-500">
+                    <Link href="/finance/budgets" className="inline-flex items-center gap-1 text-teal-700 font-semibold hover:underline">
+                      Ngân sách <ChevronRight className="w-3.5 h-3.5" aria-hidden />
+                    </Link>
+                    <span className="fin-num">Hạn mức {formatCompactVND(data.budget.totalBudget)} ₫</span>
+                  </div>
+                </Kpi>
+              ) : (
+                <Kpi label="Tổng số dư khả dụng" icon={<Wallet className="w-5 h-5" />} iconClass="bg-teal-50 text-teal-700" accent="bg-teal-700/30 group-hover:bg-teal-700">
+                  <Amount value={data.totalBalance} />
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-2 text-xs text-slate-500">
+                    <Link href="/finance/accounts" className="inline-flex items-center gap-1 text-teal-700 font-semibold hover:underline">
+                      {data.balances.length} tài khoản <ChevronRight className="w-3.5 h-3.5" aria-hidden />
+                    </Link>
+                    <span className="fin-num">
+                      {banks} NH • {cash} ví tiền mặt
+                    </span>
+                  </div>
+                </Kpi>
+              )}
 
-              <Kpi label={`Thu nhập ${preset === 'this_month' ? 'tháng này' : 'kỳ này'}`} icon={<ArrowDownLeft className="w-5 h-5" />} iconClass="bg-emerald-50 text-emerald-700" accent="bg-emerald-500/30 group-hover:bg-emerald-600">
-                <Amount value={s.income} className="text-emerald-700" />
+              <Kpi
+                label={`Thu nhập ${planned ? 'kế hoạch ' : ''}${preset === 'this_month' ? 'tháng này' : 'kỳ này'}`}
+                icon={<ArrowDownLeft className="w-5 h-5" />}
+                iconClass="bg-emerald-50 text-emerald-700"
+                accent="bg-emerald-500/30 group-hover:bg-emerald-600"
+              >
+                {planned && accountId ? (
+                  <p className="text-sm text-slate-500 py-1.5">Không tính theo từng tài khoản</p>
+                ) : (
+                  <Amount value={s.income} className="text-emerald-700" />
+                )}
                 <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-2 text-xs text-slate-500">
                   <Delta value={change(s.income, p.income)} upIsGood />
-                  <span className="truncate">{topIncome ? topIncome.name : `${s.incomeCount} giao dịch`}</span>
+                  <span className="truncate">{planned ? 'Hạn mức + kế hoạch tiết kiệm' : topIncome ? topIncome.name : `${s.incomeCount} giao dịch`}</span>
                 </div>
               </Kpi>
 
@@ -401,7 +425,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className={`text-[15px] font-bold fin-num ${a.balance < 0 ? 'text-rose-600' : 'text-slate-900'}`}>{formatVND(a.balance)}</p>
+                          {!planned && <p className={`text-[15px] font-bold fin-num ${a.balance < 0 ? 'text-rose-600' : 'text-slate-900'}`}>{formatVND(a.balance)}</p>}
                           <span className={`text-[11px] inline-flex items-center justify-end gap-1 ${a.tracking.method === 'EMAIL' ? 'text-emerald-700' : 'text-slate-500'}`}>
                             {a.tracking.method === 'EMAIL' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden />}
                             {a.tracking.method === 'EMAIL' ? 'Email tự động' : 'Nhập tay'}
@@ -441,15 +465,18 @@ export default function DashboardPage() {
             </section>
 
             {/* Hàng phụ: thu theo nguồn, chi theo thứ, khoản chi lớn */}
-            <section className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
-              <ChartCard
-                className="fin-card !bg-white !border-slate-200 !rounded-2xl !shadow-none"
-                title="Thu theo nguồn"
-                subtitle={`${s.incomeCount} giao dịch trong kỳ`}
-                table={<DataTable head={['Danh mục', 'Số tiền', 'Số GD']} rows={data.incomeByCategory.map((c) => [c.name, formatVND(c.total), c.count])} />}
-              >
-                <CategoryBreakdown data={data.incomeByCategory} barColor={CHART.income} limit={6} onSelect={(id) => (window.location.href = txnLink({ direction: 'IN', categoryId: id ?? 'none' }))} />
-              </ChartCard>
+            <section className={`grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 ${planned ? '' : 'xl:grid-cols-3'}`}>
+              {/* Thu nhập kế hoạch không có nguồn/danh mục */}
+              {!planned && (
+                <ChartCard
+                  className="fin-card !bg-white !border-slate-200 !rounded-2xl !shadow-none"
+                  title="Thu theo nguồn"
+                  subtitle={`${s.incomeCount} giao dịch trong kỳ`}
+                  table={<DataTable head={['Danh mục', 'Số tiền', 'Số GD']} rows={data.incomeByCategory.map((c) => [c.name, formatVND(c.total), c.count])} />}
+                >
+                  <CategoryBreakdown data={data.incomeByCategory} barColor={CHART.income} limit={6} onSelect={(id) => (window.location.href = txnLink({ direction: 'IN', categoryId: id ?? 'none' }))} />
+                </ChartCard>
+              )}
               <ChartCard className="fin-card !bg-white !border-slate-200 !rounded-2xl !shadow-none" title="Chi trung bình theo thứ" table={<WeekdayTable data={weekdayData} />}>
                 <WeekdayChart data={weekdayData} />
               </ChartCard>

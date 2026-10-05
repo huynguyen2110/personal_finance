@@ -189,9 +189,16 @@ export default function BudgetsPage() {
                     <span className="w-1.5 h-1.5 rounded-full bg-teal-700" />{' '}
                     {[budgetedGroups.length ? `${budgetedGroups.length} nhóm` : '', budgetedOutside.length ? `${budgetedOutside.length} danh mục` : ''].filter(Boolean).join(' · ') || 'Chưa áp dụng'}
                   </span>
-                  <span className="font-semibold text-teal-700 fin-num">
-                    {data.income > 0 ? `${pct(totalBudget / data.income)} thu nhập` : 'Chưa có thu nhập tháng này'}
-                  </span>
+                  {data.plannedIncome ? (
+                    // Chế độ chỉ lấy email tiền đi: thu nhập tháng = hạn mức này + kế hoạch tiết kiệm
+                    <span className="font-semibold text-teal-700 fin-num" title={`Thu nhập kế hoạch = hạn mức + tiết kiệm ${formatCompactVND(data.plannedIncome.savings)} ₫`}>
+                      Thu nhập {formatCompactVND(data.plannedIncome.total)} ₫
+                    </span>
+                  ) : (
+                    <span className="font-semibold text-teal-700 fin-num">
+                      {data.income > 0 ? `${pct(totalBudget / data.income)} thu nhập` : 'Chưa có thu nhập tháng này'}
+                    </span>
+                  )}
                 </div>
               </Kpi>
 

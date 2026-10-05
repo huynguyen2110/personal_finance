@@ -17,7 +17,7 @@ import { createGoal, deleteGoal, updateGoal } from '../lib';
 import type { GoalDTO, GoalInput, GoalJar, GoalPriority } from '../types';
 import { GOAL_ICONS, JARS, PRIORITIES, monthText, nf } from '../utils/goal-meta';
 import { monthsLeftUntil, projectMonth, simulateGoal } from '../utils/goal-calc';
-import MoneyInput from './MoneyInput';
+import MoneyInput from '@/components/shared/MoneyInput';
 
 interface Props {
   goal: GoalDTO | null; // null = tạo mới

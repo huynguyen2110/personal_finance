@@ -13,7 +13,7 @@ import { formatVNDate, todayVN, toVNDateString } from '@/lib/dates';
 import { addContribution, useLinkableTransactions } from '../lib';
 import type { ContributionInput, GoalDTO } from '../types';
 import { pct } from '../utils/goal-meta';
-import MoneyInput from './MoneyInput';
+import MoneyInput from '@/components/shared/MoneyInput';
 
 type Kind = ContributionInput['kind'];
 

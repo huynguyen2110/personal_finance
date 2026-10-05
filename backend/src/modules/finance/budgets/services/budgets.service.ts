@@ -4,7 +4,7 @@ import { addMonths, monthRange } from '../../../../common/utils/dates.util';
 import { SettingsService } from '../../../../services/settings.service';
 import { StatsService } from '../../stats/services/stats.service';
 import type { BudgetItemDto } from '../dto/budget.dto';
-import { budgetTotalsOf, categoriesBudgetOf } from '../utils/budget-math';
+import { budgetTotalsOf, categoriesBudgetOf, familyAmount } from '../utils/budget-math';
 
 export const DEFAULT_BUDGET_MONTH = '*';
 
@@ -155,6 +155,40 @@ export class BudgetsService {
     }
     for (const l of lines) l.percent = l.amount && l.amount > 0 ? l.spent / l.amount : null;
     return lines;
+  }
+
+  // Tổng hạn mức hiệu lực của nhiều tháng (chỉ hạn mức, không tính số đã chi) — cùng quy tắc với totals(): nhóm có hạn mức riêng
+  // tính theo nhóm, còn lại theo danh mục cha (cha chưa đặt thì cộng các con). Chỉ 3 truy vấn cho mọi tháng.
+  async budgetAmountsByMonth(months: string[]): Promise<Map<string, number>> {
+    const monthKeys = [...new Set(months), DEFAULT_BUDGET_MONTH];
+    const [categories, budgets, groups] = await Promise.all([
+      this.prisma.category.findMany({ where: { kind: 'EXPENSE' }, select: { id: true, parentId: true } }),
+      this.prisma.budget.findMany({ where: { month: { in: monthKeys } } }),
+      this.prisma.categoryGroup.findMany({
+        where: { kind: 'EXPENSE' },
+        include: { categories: { where: { parentId: null }, select: { id: true } }, budgets: { where: { month: { in: monthKeys } } } },
+      }),
+    ]);
+    const effective = <T extends { month: string; amount: bigint }>(rows: T[], month: string) => {
+      const row = rows.find((b) => b.month === month) ?? rows.find((b) => b.month === DEFAULT_BUDGET_MONTH);
+      return row ? Number(row.amount) : null;
+    };
+    const result = new Map<string, number>();
+    for (const month of new Set(months)) {
+      const own = new Map(categories.map((c) => [c.id, effective(budgets.filter((b) => b.categoryId === c.id), month)]));
+      const lines = categories.map((c) => ({
+        categoryId: c.id,
+        parentId: c.parentId,
+        amount:
+          c.parentId === null
+            ? familyAmount(own.get(c.id) ?? null, categories.filter((x) => x.parentId === c.id).map((x) => own.get(x.id) ?? null))
+            : (own.get(c.id) ?? null),
+        spent: 0,
+      }));
+      const groupLines = groups.map((g) => ({ categoryIds: g.categories.map((c) => c.id), amount: effective(g.budgets, month), spent: 0 }));
+      result.set(month, budgetTotalsOf(lines, groupLines).budget);
+    }
+    return result;
   }
 
   // Hạn mức của từng nhóm chi tiêu trong tháng. `lines` đã gộp con vào cha nên số đã chi của nhóm = tổng các danh mục cha.

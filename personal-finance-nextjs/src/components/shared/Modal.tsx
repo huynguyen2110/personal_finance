@@ -13,6 +13,12 @@ interface ModalProps {
 
 export default function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  // Nhấn chuột có bắt đầu ở nền không: chỉ đóng khi cả lúc nhấn lẫn lúc thả đều ở nền,
+  // để kéo chuột từ trong modal ra ngoài (VD bôi đen chữ) không đóng nhầm.
+  const downOnBackdrop = useRef(false);
+  // Chỉ chính overlay/nền mới tính là "bấm ra ngoài" (popover chọn ngày… render qua portal nhưng sự kiện vẫn nổi lên đây)
+  const isBackdrop = (target: EventTarget) => target === overlayRef.current || target === backdropRef.current;
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -40,10 +46,16 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
     <div
       ref={overlayRef}
       className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      onClick={(e) => e.target === overlayRef.current && onClose()}
+      onMouseDown={(e) => {
+        downOnBackdrop.current = isBackdrop(e.target);
+      }}
+      onClick={(e) => {
+        if (downOnBackdrop.current && isBackdrop(e.target)) onClose();
+        downOnBackdrop.current = false;
+      }}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-fadeIn" />
+      <div ref={backdropRef} className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-fadeIn" />
       
       {/* Modal */}
       <div className={`relative w-full ${sizeClasses[size]} glass-card p-0 animate-fadeIn`}>

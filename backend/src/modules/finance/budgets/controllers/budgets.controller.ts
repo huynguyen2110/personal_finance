@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { currentMonthVN } from '../../../../common/utils/dates.util';
 import { SettingsService } from '../../../../services/settings.service';
 import { BudgetsService } from '../services/budgets.service';
+import { PlannedIncomeService } from '../services/planned-income.service';
 import { BudgetItemDto, BudgetQueryDto, CopyBudgetsDto, SaveBudgetsDto } from '../dto/budget.dto';
 
 @ApiTags('Budgets')
@@ -12,12 +13,18 @@ export class BudgetsController {
   constructor(
     private readonly budgets: BudgetsService,
     private readonly settings: SettingsService,
+    private readonly plannedIncome: PlannedIncomeService,
   ) {}
 
   // Không truyền tháng → tháng tài chính hiện tại (theo ngày bắt đầu tháng trong cài đặt)
   @Get()
   async page(@Query() query: BudgetQueryDto) {
-    return this.budgets.getBudgetPage(query.month ?? currentMonthVN(await this.settings.monthStartDay()));
+    const sd = await this.settings.monthStartDay();
+    const page = await this.budgets.getBudgetPage(query.month ?? currentMonthVN(sd));
+    if (!(await this.plannedIncome.isPlanned())) return { ...page, plannedIncome: null };
+    // Chế độ chỉ lấy email tiền đi: thu nhập tháng = hạn mức + kế hoạch tiết kiệm
+    const plan = (await this.plannedIncome.byMonth([page.month], sd)).get(page.month)!;
+    return { ...page, income: plan.total, plannedIncome: plan };
   }
 
   @Put()

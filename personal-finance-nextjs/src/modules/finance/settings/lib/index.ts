@@ -20,4 +20,10 @@ export function useMonthStartDay(): number {
   return useSettings().data?.monthStartDay ?? DEFAULT_MONTH_START_DAY;
 }
 
+// Đang theo dõi tiền vào thực tế (Cài đặt → Loại email giao dịch). false = chỉ lấy email tiền đi:
+// thu nhập tính theo kế hoạch (hạn mức + tiết kiệm) và không theo dõi số dư tài khoản. Mặc định true khi chưa tải xong.
+export function useTracksIncome(): boolean {
+  return useSettings().data?.emailIncoming ?? true;
+}
+
 export const updateSettings = (payload: SettingsInput) => apiClient<AppSettings>({ method: 'put', url: BASE_URL, payload });

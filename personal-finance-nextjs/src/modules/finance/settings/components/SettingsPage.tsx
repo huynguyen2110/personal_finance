@@ -367,7 +367,7 @@ function EmailDirectionCard({ initial }: { initial: boolean }) {
 
   const options = [
     { value: true, title: 'Cả tiền đến và tiền đi', desc: 'Ghi nhận mọi giao dịch có email báo: lương, tiền được chuyển đến, chi tiêu…', Icon: ArrowLeftRight },
-    { value: false, title: 'Chỉ tiền đi', desc: 'Bỏ qua email báo tiền đến; khoản thu bạn tự nhập tay.', Icon: ArrowUpRight },
+    { value: false, title: 'Chỉ tiền đi', desc: 'Bỏ qua email báo tiền đến. Thu nhập tự tính = hạn mức ngân sách + kế hoạch tiết kiệm; không theo dõi số dư tài khoản.', Icon: ArrowUpRight },
   ] as const;
 
   return (
