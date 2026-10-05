@@ -304,6 +304,8 @@ model GoalContribution {
   transactionId Int?             @unique
   // Web đã tự loại giao dịch gắn kèm khỏi thống kê → bỏ gắn thì trả lại như cũ
   excludedTxn   Boolean          @default(false)
+  // Giao dịch gắn kèm do chính lần ghi này tạo ra (chi tiêu từ quỹ → tạo khoản chi) → xóa lần ghi thì xóa luôn giao dịch
+  createdTxn    Boolean          @default(false)
   createdAt     DateTime         @default(now())
 
   goal        SavingsGoal  @relation(fields: [goalId], references: [id], onDelete: Cascade)

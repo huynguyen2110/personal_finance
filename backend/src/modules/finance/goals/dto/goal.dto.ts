@@ -1,5 +1,5 @@
 import { OmitType, PartialType } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsDateString,
@@ -14,6 +14,8 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
@@ -122,6 +124,26 @@ export class ArchiveGoalDto {
 export const CONTRIBUTION_KINDS = ['DEPOSIT', 'WITHDRAW', 'INTEREST', 'SPEND'] as const;
 export type ContributionInputKind = (typeof CONTRIBUTION_KINDS)[number];
 
+// Chi tiêu từ quỹ mà chưa có giao dịch chi tương ứng → tạo khoản chi mới (nhập tay, tính vào thống kê chi tiêu).
+// Số tiền và ngày lấy theo lần chi tiêu.
+export class NewContributionTxnDto {
+  @IsInt()
+  @IsPositive()
+  accountId: number;
+
+  @Transform(trim)
+  @IsString()
+  @IsNotEmpty({ message: 'Nhập nội dung giao dịch' })
+  @MaxLength(500)
+  content: string;
+
+  @IsOptional()
+  @ValidateIf((o) => o.categoryId !== null)
+  @IsInt()
+  @IsPositive()
+  categoryId?: number | null;
+}
+
 export class CreateContributionDto {
   @IsIn(CONTRIBUTION_KINDS)
   kind: ContributionInputKind;
@@ -149,10 +171,17 @@ export class CreateContributionDto {
   @IsPositive()
   transactionId?: number | null;
 
-  // Khi gắn giao dịch: loại giao dịch đó khỏi thống kê thu chi (tiền để dành không phải khoản chi)
+  // Khi gắn giao dịch: loại giao dịch đó khỏi thống kê thu chi (tiền để dành không phải khoản chi).
+  // Không áp dụng cho chi tiêu từ quỹ: khoản chi gắn kèm luôn được tính vào thống kê.
   @IsOptional()
   @IsBoolean()
   excludeFromStats?: boolean;
+
+  // Chỉ dùng khi chi tiêu từ quỹ: tạo giao dịch chi mới thay cho chọn giao dịch có sẵn
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => NewContributionTxnDto)
+  newTransaction?: NewContributionTxnDto;
 }
 
 export class LinkableTxnQueryDto {

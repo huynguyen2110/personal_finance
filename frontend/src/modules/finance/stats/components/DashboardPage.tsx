@@ -183,7 +183,7 @@ export default function DashboardPage() {
               )}
 
               <Kpi
-                label={`Thu nhập ${planned ? 'kế hoạch ' : ''}${preset === 'this_month' ? 'tháng này' : 'kỳ này'}`}
+                label={`Thu nhập ${planned ? 'tự tính ' : ''}${preset === 'this_month' ? 'tháng này' : 'kỳ này'}`}
                 icon={<ArrowDownLeft className="w-5 h-5" />}
                 iconClass="bg-emerald-50 text-emerald-700"
                 accent="bg-emerald-500/30 group-hover:bg-emerald-600"
@@ -195,7 +195,7 @@ export default function DashboardPage() {
                 )}
                 <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-2 text-xs text-slate-500">
                   <Delta value={change(s.income, p.income)} upIsGood />
-                  <span className="truncate">{planned ? 'Hạn mức + kế hoạch tiết kiệm' : topIncome ? topIncome.name : `${s.incomeCount} giao dịch`}</span>
+                  <span className="truncate">{planned ? 'Hạn mức + tiết kiệm đã nạp' : topIncome ? topIncome.name : `${s.incomeCount} giao dịch`}</span>
                 </div>
               </Kpi>
 

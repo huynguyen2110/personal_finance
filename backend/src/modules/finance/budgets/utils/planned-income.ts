@@ -1,27 +1,25 @@
 import { monthOfDateVN, monthOfDate, monthRange, monthsBetween } from '../../../../common/utils/dates.util';
 
 // Phép tính thuần cho "thu nhập kế hoạch" (chế độ chỉ lấy email tiền đi) — có test riêng.
-// Thu nhập của một tháng tài chính = tổng hạn mức ngân sách + tổng số tiền nạp hằng tháng của các mục tiêu tiết kiệm.
+// Thu nhập của một tháng tài chính = tổng hạn mức ngân sách + tiền tiết kiệm đã ghi nạp trong tháng.
+// Thu nhập ≠ ngân sách: phần đem đi tiết kiệm cũng là thu nhập của tháng đó.
 // Ghi nhận vào NGÀY ĐẦU của tháng tài chính (như ngày lương): kỳ nào chứa ngày đó thì có trọn thu nhập của tháng.
 
-export interface PlannedGoal {
-  monthlyPlan: bigint | number | null;
-  createdAt: Date;
-  archivedAt: Date | null;
-  completedAt: Date | null;
+export interface SavingsContribution {
+  kind: string; // OPENING | DEPOSIT | WITHDRAW | INTEREST | SPEND
+  amount: bigint | number;
+  date: Date;
 }
 
-// Tổng kế hoạch nạp của các mục tiêu còn chạy trong tháng `month`: đã tạo trước hết tháng, chưa lưu trữ / chưa hoàn thành
-// trước tháng đó (lưu trữ hay hoàn thành ngay trong tháng vẫn tính tháng đó).
-export function plannedSavingsFor(goals: PlannedGoal[], month: string, startDay: number): number {
-  return goals.reduce((s, g) => {
-    const plan = Number(g.monthlyPlan ?? 0);
-    if (plan <= 0) return s;
-    if (monthOfDateVN(g.createdAt, startDay) > month) return s;
-    if (g.archivedAt && monthOfDateVN(g.archivedAt, startDay) < month) return s;
-    if (g.completedAt && monthOfDateVN(g.completedAt, startDay) < month) return s;
-    return s + plan;
+// Tiền tiết kiệm của tháng = tổng nạp − rút ở mọi quỹ trong tháng (tối thiểu 0).
+// Không tính số dư ban đầu (tiền có sẵn từ trước), tiền lãi (không phải từ thu nhập) và khoản tiêu từ quỹ.
+export function depositedSavingsFor(contributions: SavingsContribution[], month: string, startDay: number): number {
+  const net = contributions.reduce((s, c) => {
+    if (c.kind !== 'DEPOSIT' && c.kind !== 'WITHDRAW') return s;
+    if (monthOfDateVN(c.date, startDay) !== month) return s;
+    return s + (c.kind === 'DEPOSIT' ? 1 : -1) * Number(c.amount);
   }, 0);
+  return Math.max(0, net);
 }
 
 // Các tháng tài chính có ngày đầu tháng nằm trong [from, to]

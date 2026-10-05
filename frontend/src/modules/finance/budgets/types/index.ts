@@ -73,7 +73,7 @@ export interface BudgetPageData {
   lines: BudgetLine[];
   groups: GroupBudgetStatus[];
   income: number;
-  // Chế độ chỉ lấy email tiền đi: thu nhập tháng = hạn mức + kế hoạch tiết kiệm (null = đang theo dõi tiền vào thực tế)
+  // Chế độ chỉ lấy email tiền đi: thu nhập tháng = hạn mức + tiền tiết kiệm đã nạp trong tháng (null = đang theo dõi tiền vào thực tế)
   plannedIncome: { budget: number; savings: number; total: number } | null;
   expense: number;
   history: BudgetMonthTotals[];

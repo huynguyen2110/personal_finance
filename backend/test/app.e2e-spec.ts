@@ -23,6 +23,7 @@ describe('Personal Finance API (e2e)', () => {
   const password = randomBytes(18).toString('base64url');
   let access = '';
   let refresh = '';
+  let spendAccountId = 0; // ví tạm để tạo khoản chi khi chi tiêu từ quỹ
 
   const api = () => request(app.getHttpServer());
   const authed = (method: 'get' | 'post' | 'patch' | 'put' | 'delete', url: string) => api()[method](url).set('Authorization', `Bearer ${access}`);
@@ -158,6 +159,23 @@ describe('Personal Finance API (e2e)', () => {
       expect(r.body.message).toBe('Số tiền rút lớn hơn số còn trong quỹ');
     });
 
+    it('chi tiêu từ quỹ bắt buộc gắn với giao dịch chi được tính vào thống kê', async () => {
+      spendAccountId = (await prisma.account.create({ data: { type: 'CASH', name: `${username} ví chi quỹ` } })).id;
+      const none = await authed('post', `/api/goals/${goalId}/contributions`).send({ kind: 'SPEND', amount: 100_000 }).expect(400);
+      expect(none.body.message).toMatch(/^Chi tiêu từ quỹ phải gắn với giao dịch chi/);
+      const incoming = await prisma.transaction.create({
+        data: { accountId: spendAccountId, source: 'MANUAL', direction: 'IN', amount: 100_000n, content: 'e2e tien vao', transactionDate: new Date() },
+      });
+      const r = await authed('post', `/api/goals/${goalId}/contributions`).send({ kind: 'SPEND', transactionId: incoming.id }).expect(400);
+      expect(r.body.message).toBe('Chi tiêu từ quỹ phải gắn với một giao dịch chi (tiền ra)');
+      await prisma.transaction.delete({ where: { id: incoming.id } });
+      // Rút quỹ không bắt buộc gắn giao dịch; chỉ chi tiêu mới tạo kèm giao dịch mới
+      const w = await authed('post', `/api/goals/${goalId}/contributions`)
+        .send({ kind: 'WITHDRAW', amount: 100_000, newTransaction: { accountId: spendAccountId, content: 'x' } })
+        .expect(400);
+      expect(w.body.message).toBe('Chỉ chi tiêu từ quỹ mới tạo kèm giao dịch chi mới');
+    });
+
     it('chạm mục tiêu → hoàn thành; rút bớt → bỏ hoàn thành', async () => {
       await authed('post', `/api/goals/${goalId}/contributions`).send({ kind: 'DEPOSIT', amount: 7_000_000 }).expect(201);
       let g = await view();
@@ -168,7 +186,8 @@ describe('Personal Finance API (e2e)', () => {
       expect(g).toMatchObject({ saved: 9_500_000, completedAt: null });
       const list = await authed('get', `/api/goals/${goalId}/contributions`).expect(200);
       expect(list.body.data.map((c: { kind: string }) => c.kind)).toEqual(expect.arrayContaining(['OPENING', 'DEPOSIT', 'WITHDRAW']));
-      await authed('delete', `/api/goals/contributions/${list.body.data[0].id}`).expect(200);
+      const withdrawal = list.body.data.find((c: { kind: string }) => c.kind === 'WITHDRAW');
+      await authed('delete', `/api/goals/contributions/${withdrawal.id}`).expect(200);
       expect((await view()).saved).toBe(10_000_000);
     });
 
@@ -189,18 +208,31 @@ describe('Personal Finance API (e2e)', () => {
       expect((await prisma.transaction.findUniqueOrThrow({ where: { id: txn.id } })).excludeFromStats).toBe(false);
     });
 
-    it('tiêu tiền của quỹ: vẫn hoàn thành, giảm số còn trong quỹ; tiêu quá số còn → 400', async () => {
-      await authed('post', `/api/goals/${goalId}/contributions`).send({ kind: 'SPEND', amount: 4_000_000, note: 'Đã dùng' }).expect(201);
+    it('tiêu tiền của quỹ: vẫn hoàn thành, giảm số còn trong quỹ, tạo khoản chi; tiêu quá số còn → 400', async () => {
+      const spendBody = (amount: number) => ({ kind: 'SPEND', amount, note: 'Đã dùng', newTransaction: { accountId: spendAccountId, content: 'e2e chi từ quỹ' } });
+      await authed('post', `/api/goals/${goalId}/contributions`).send(spendBody(4_000_000)).expect(201);
       let g = await view();
       expect(g).toMatchObject({ saved: 10_000_000, spent: 4_000_000, balance: 6_000_000, spendStatus: 'partial', status: 'done' });
       expect(g.completedAt).not.toBeNull();
-      const r = await authed('post', `/api/goals/${goalId}/contributions`).send({ kind: 'SPEND', amount: 7_000_000 }).expect(400);
+      // Lần chi tiêu tạo một khoản chi nhập tay, được tính vào thống kê chi tiêu
+      let txns = await prisma.transaction.findMany({ where: { accountId: spendAccountId } });
+      expect(txns).toHaveLength(1);
+      expect(txns[0]).toMatchObject({ direction: 'OUT', amount: 4_000_000n, excludeFromStats: false, source: 'MANUAL' });
+      const r = await authed('post', `/api/goals/${goalId}/contributions`).send(spendBody(7_000_000)).expect(400);
       expect(r.body.message).toBe('Số tiền tiêu lớn hơn số còn trong quỹ');
-      await authed('post', `/api/goals/${goalId}/contributions`).send({ kind: 'SPEND', amount: 6_000_000 }).expect(201);
+      // Tiêu không thành → không để lại khoản chi nào
+      expect(await prisma.transaction.count({ where: { accountId: spendAccountId } })).toBe(1);
+      await authed('post', `/api/goals/${goalId}/contributions`).send(spendBody(6_000_000)).expect(201);
       g = await view();
       expect(g).toMatchObject({ balance: 0, spendStatus: 'spent', status: 'done' });
       // Hết tiền trong quỹ thì không rút được nữa
       await authed('post', `/api/goals/${goalId}/contributions`).send({ kind: 'WITHDRAW', amount: 1 }).expect(400);
+      // Xóa lần chi tiêu → xóa luôn khoản chi do nó tạo ra
+      const list = await authed('get', `/api/goals/${goalId}/contributions`).expect(200);
+      const last = list.body.data.find((c: { kind: string; amount: number }) => c.kind === 'SPEND' && c.amount === 6_000_000);
+      await authed('delete', `/api/goals/contributions/${last.id}`).expect(200);
+      txns = await prisma.transaction.findMany({ where: { accountId: spendAccountId } });
+      expect(txns.map((t) => Number(t.amount))).toEqual([4_000_000]);
     });
 
     it('quỹ duy trì: tiêu bớt thì quay lại tích lũy, nạp bù đầy thì hoàn thành lại', async () => {
@@ -210,7 +242,9 @@ describe('Personal Finance API (e2e)', () => {
       const id = r.body.data.id;
       const get = async () => (await authed('get', '/api/goals').expect(200)).body.data.goals.find((g: { id: number }) => g.id === id);
       expect(await get()).toMatchObject({ ongoing: true, status: 'done', current: 1_000_000 });
-      await authed('post', `/api/goals/${id}/contributions`).send({ kind: 'SPEND', amount: 400_000 }).expect(201);
+      await authed('post', `/api/goals/${id}/contributions`)
+        .send({ kind: 'SPEND', amount: 400_000, newTransaction: { accountId: spendAccountId, content: 'e2e chi quỹ khẩn cấp' } })
+        .expect(201);
       let g = await get();
       expect(g).toMatchObject({ saved: 1_000_000, current: 600_000, remaining: 400_000, completedAt: null });
       expect(g.status).not.toBe('done');

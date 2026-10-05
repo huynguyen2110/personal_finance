@@ -190,8 +190,8 @@ export default function BudgetsPage() {
                     {[budgetedGroups.length ? `${budgetedGroups.length} nhóm` : '', budgetedOutside.length ? `${budgetedOutside.length} danh mục` : ''].filter(Boolean).join(' · ') || 'Chưa áp dụng'}
                   </span>
                   {data.plannedIncome ? (
-                    // Chế độ chỉ lấy email tiền đi: thu nhập tháng = hạn mức này + kế hoạch tiết kiệm
-                    <span className="font-semibold text-teal-700 fin-num" title={`Thu nhập kế hoạch = hạn mức + tiết kiệm ${formatCompactVND(data.plannedIncome.savings)} ₫`}>
+                    // Chế độ chỉ lấy email tiền đi: thu nhập tháng = hạn mức này + tiền tiết kiệm đã nạp trong tháng
+                    <span className="font-semibold text-teal-700 fin-num" title={`Thu nhập = hạn mức + tiết kiệm đã nạp trong tháng ${formatCompactVND(data.plannedIncome.savings)} ₫`}>
                       Thu nhập {formatCompactVND(data.plannedIncome.total)} ₫
                     </span>
                   ) : (

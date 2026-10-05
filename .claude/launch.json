@@ -10,7 +10,7 @@
     {
       "name": "pf-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "personal-finance-nextjs", "run", "dev"],
+      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
       "port": 3003
     },
     {
@@ -22,7 +22,7 @@
     {
       "name": "pf-web-prod",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "personal-finance-nextjs", "run", "start"],
+      "runtimeArgs": ["--prefix", "frontend", "run", "start"],
       "port": 3002
     }
   ]
