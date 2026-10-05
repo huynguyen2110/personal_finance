@@ -19,6 +19,7 @@ import { StatsService } from '../../stats/services/stats.service';
 import type { CategoryMonthCell, StatsScope } from '../../stats/types/stats.types';
 import { foldCategoryTotals } from '../../stats/utils/category-rollup';
 import { BudgetsService, budgetUnits } from '../../budgets/services/budgets.service';
+import { PlannedIncomeService } from '../../budgets/services/planned-income.service';
 import { AccountsService } from '../../accounts/services/accounts.service';
 import { txnSelect } from '../../transactions/utils/txn-query';
 import type { DashboardQueryDto, ReportQueryDto } from '../dto/report.dto';
@@ -51,7 +52,17 @@ export class ReportsService {
     private readonly budgets: BudgetsService,
     private readonly accounts: AccountsService,
     private readonly settings: SettingsService,
+    private readonly plannedIncome: PlannedIncomeService,
   ) {}
+
+  // Chế độ chỉ lấy email tiền đi: thu nhập theo tháng = hạn mức + kế hoạch tiết kiệm (lọc một tài khoản → 0).
+  // Trả null khi đang theo dõi tiền vào thực tế.
+  private async plannedMonthly(months: string[], sd: number, accountId?: number | null): Promise<Map<string, number> | null> {
+    if (!(await this.plannedIncome.isPlanned())) return null;
+    if (accountId) return new Map(months.map((m) => [m, 0]));
+    const plan = await this.plannedIncome.byMonth(months, sd);
+    return new Map(months.map((m) => [m, plan.get(m)?.total ?? 0]));
+  }
 
   parseDashboardScope(q: DashboardQueryDto): StatsScope {
     const { from, to } = q;
@@ -87,7 +98,8 @@ export class ReportsService {
     const budgetMonth = toMonth;
     const budgetMonthRange = monthRange(budgetMonth, sd);
 
-    const [
+    // `let`: summary/prevSummary bị thay khi dùng thu nhập kế hoạch
+    let [
       summary,
       prevSummary,
       monthlyRaw,
@@ -134,10 +146,21 @@ export class ReportsService {
       this.prisma.transaction.count({ where: { ...accountFilter, categoryId: null, excludeFromStats: false } }),
     ]);
 
+    // Chế độ chỉ lấy email tiền đi: thay thu nhập thực bằng thu nhập kế hoạch (ghi nhận vào ngày đầu tháng tài chính)
+    const monthKeys = monthsBetween(addMonths(toMonth, -11), toMonth);
+    const plannedMonthly = await this.plannedMonthly(monthKeys, sd, scope.accountId);
+    const planned = plannedMonthly !== null;
+    if (planned) {
+      summary = await this.plannedIncome.applyToSummary(summary, scope, sd);
+      prevSummary = await this.plannedIncome.applyToSummary(prevSummary, prevScope, sd);
+    }
+    const plannedDaily = planned && !scope.accountId ? await this.plannedIncome.dailyFor(scope.from, scope.to, sd) : null;
+    const dayIncome = (date: string, actual: number | undefined) => (planned ? (plannedDaily?.get(date) ?? 0) : (actual ?? 0));
+
     // 12 tháng, điền 0 cho tháng trống
-    const monthly = monthsBetween(addMonths(toMonth, -11), toMonth).map((m) => {
+    const monthly = monthKeys.map((m) => {
       const p = monthlyRaw.find((r) => r.month === m);
-      return { month: m, income: p?.income ?? 0, expense: p?.expense ?? 0 };
+      return { month: m, income: plannedMonthly?.get(m) ?? p?.income ?? 0, expense: p?.expense ?? 0 };
     });
 
     // Theo ngày trong kỳ + lũy kế chi, so với cùng thứ tự ngày của kỳ trước
@@ -155,7 +178,7 @@ export class ReportsService {
         prevCum += pd?.expense ?? 0;
         prevCumulative = prevCum;
       }
-      return { date, income: d?.income ?? 0, expense: d?.expense ?? 0, cumulativeExpense: cum, prevCumulativeExpense: prevCumulative };
+      return { date, income: dayIncome(date, d?.income), expense: d?.expense ?? 0, cumulativeExpense: cum, prevCumulativeExpense: prevCumulative };
     });
 
     // Ngân sách: nhóm có hạn mức riêng tính theo nhóm, còn lại theo dòng cấp cao nhất (đã gộp con); cảnh báo theo từng đơn vị hạn mức
@@ -174,7 +197,9 @@ export class ReportsService {
       daily,
       // Cơ cấu theo danh mục cha (con gộp vào cha, chi tiết nằm trong `children`)
       expenseByCategory: foldCategoryTotals(expenseRaw, categories),
-      incomeByCategory: foldCategoryTotals(incomeRaw, categories),
+      // Thu nhập kế hoạch không có danh mục
+      incomeByCategory: planned ? [] : foldCategoryTotals(incomeRaw, categories),
+      incomeMode: planned ? ('PLANNED' as const) : ('ACTUAL' as const),
       weekday,
       topExpenses,
       recent,
@@ -207,7 +232,7 @@ export class ReportsService {
       monthStartDay: sd,
     };
 
-    const [monthlyRaw, prevYearRaw, expenseCells, incomeCells, categories, summary] = await Promise.all([
+    const [monthlyRaw, prevYearRaw, expenseCells, incomeCells, categories, actualSummary] = await Promise.all([
       this.stats.getMonthly(scope),
       this.stats.getMonthly(prevYearScope),
       this.stats.getCategoryMonthMatrix(scope, 'OUT'),
@@ -216,10 +241,15 @@ export class ReportsService {
       this.stats.getSummary(scope),
     ]);
 
+    // Chế độ chỉ lấy email tiền đi: thu nhập kế hoạch cho cả các tháng cùng kỳ năm trước
+    const plannedMonthly = await this.plannedMonthly([...months, ...months.map((m) => addMonths(m, -12))], sd, r.accountId);
+    const planned = plannedMonthly !== null;
+    const summary = planned ? await this.plannedIncome.applyToSummary(actualSummary, scope, sd) : actualSummary;
+
     const monthly = months.map((m) => {
       const p = monthlyRaw.find((x) => x.month === m);
       const py = prevYearRaw.find((x) => x.month === addMonths(m, -12));
-      const income = p?.income ?? 0;
+      const income = plannedMonthly?.get(m) ?? p?.income ?? 0;
       const expense = p?.expense ?? 0;
       return {
         month: m,
@@ -227,7 +257,7 @@ export class ReportsService {
         expense,
         net: income - expense,
         savingsRate: income > 0 ? (income - expense) / income : null,
-        prevYearIncome: py?.income ?? 0,
+        prevYearIncome: plannedMonthly?.get(addMonths(m, -12)) ?? py?.income ?? 0,
         prevYearExpense: py?.expense ?? 0,
       };
     });
@@ -269,7 +299,9 @@ export class ReportsService {
       summary,
       monthCount: months.length,
       expenseRows: buildRows(expenseCells, 'EXPENSE'),
-      incomeRows: buildRows(incomeCells, 'INCOME'),
+      // Thu nhập kế hoạch không có danh mục
+      incomeRows: planned ? [] : buildRows(incomeCells, 'INCOME'),
+      incomeMode: planned ? ('PLANNED' as const) : ('ACTUAL' as const),
     };
   }
 }

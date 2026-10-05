@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Trash2 } from 'lucide-react';
 import Modal from '@/components/shared/Modal';
+import MoneyInput from '@/components/shared/MoneyInput';
 import CategoryIcon from '@/components/shared/CategoryIcon';
 import { errorMessage } from '@/lib/api-client';
 import { formatVND } from '@/lib/money';
@@ -128,14 +129,14 @@ export default function GroupBudgetModal({ group, lines, month, onClose, onSaved
 
         <label className="block">
           <span className="fin-label block mb-1.5">Hạn mức cả nhóm (₫)</span>
-          <input
-            inputMode="numeric"
-            autoFocus
-            className="input-field fin-num !text-lg !font-semibold"
-            value={amountNum ? nf.format(amountNum) : value}
-            onChange={(e) => setValue(e.target.value)}
+          <MoneyInput
+            value={value.trim() === '' ? null : amountNum}
+            onChange={(v) => setValue(v === null ? '' : String(v))}
             placeholder="VD: 2.500.000"
-            aria-invalid={!!floorError}
+            ariaLabel="Hạn mức cả nhóm"
+            className="!text-lg !font-semibold"
+            invalid={!!floorError}
+            autoFocus
           />
           {floorError ? (
             <span className="block text-xs text-rose-600 mt-1.5 fin-num">{floorError}</span>

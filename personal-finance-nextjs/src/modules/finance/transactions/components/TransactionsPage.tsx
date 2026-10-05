@@ -486,8 +486,9 @@ export default function TransactionsPage() {
   const suggestionByAccount = useMemo(() => new Map(accounts.map((a) => [a.id, suggestionFor(a, categories)])), [accounts, categories]);
   const bulkSuggestion = filters.accountId ? suggestionByAccount.get(Number(filters.accountId)) : undefined;
 
-  const baseTotal = allData?.total ?? 0;
-  const noneCount = noneData?.total ?? 0;
+  // Tỷ lệ phân loại chỉ xét giao dịch trong thống kê: chuyển nội bộ / khoản đã loại ra không cần danh mục
+  const baseTotal = allData?.statsCount ?? 0;
+  const noneCount = allData?.statsUncategorized ?? 0;
   const classifiedRatio = baseTotal > 0 ? (baseTotal - noneCount) / baseTotal : 1;
 
   return (

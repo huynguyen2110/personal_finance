@@ -29,6 +29,8 @@ export interface WeekdayPoint {
   count: number;
 }
 
+export type IncomeMode = 'ACTUAL' | 'PLANNED';
+
 export interface DashboardData {
   period: { from: string; to: string };
   prevPeriod: { from: string; to: string };
@@ -45,6 +47,8 @@ export interface DashboardData {
   }[];
   expenseByCategory: CategoryTotal[];
   incomeByCategory: CategoryTotal[];
+  // PLANNED: chế độ chỉ lấy email tiền đi — thu nhập = hạn mức ngân sách + kế hoạch tiết kiệm, không theo dõi số dư
+  incomeMode: IncomeMode;
   weekday: WeekdayPoint[];
   topExpenses: TransactionDTO[];
   recent: TransactionDTO[];
@@ -88,4 +92,5 @@ export interface ReportData {
   monthCount: number;
   expenseRows: ReportRow[];
   incomeRows: ReportRow[];
+  incomeMode: IncomeMode;
 }

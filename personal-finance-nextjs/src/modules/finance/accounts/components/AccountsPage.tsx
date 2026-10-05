@@ -24,6 +24,7 @@ import Modal from '@/components/shared/Modal';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import EmailReceiptsCard from '@/modules/finance/email/components/EmailReceiptsCard';
 import { useEmailStatus } from '@/modules/finance/email/lib';
+import { useTracksIncome } from '@/modules/finance/settings/lib';
 import { useCategoryGroups } from '@/modules/finance/categories/lib';
 import type { CategoryGroupDTO } from '@/modules/finance/categories/types';
 import { groupsOfAccount } from '@/modules/finance/categories/utils/groups';
@@ -108,6 +109,15 @@ function Kpi({
   );
 }
 
+// Ô KPI dạng đếm (chế độ chỉ lấy email tiền đi không theo dõi số dư)
+function Count({ value, unit }: { value: number; unit: string }) {
+  return (
+    <p className="text-[28px] leading-9 font-bold tracking-[-0.02em] fin-num text-slate-900">
+      {value} <span className="text-base font-semibold text-slate-500">{unit}</span>
+    </p>
+  );
+}
+
 function Amount({ value, className = 'text-slate-900' }: { value: number; className?: string }) {
   return (
     <p className={`text-[28px] leading-9 font-bold tracking-[-0.02em] fin-num truncate ${className}`} title={formatVND(value)}>
@@ -128,6 +138,8 @@ export default function AccountsPage() {
   const [scanning, setScanning] = useState(false);
 
   const reload = () => invalidateFinanceData(qc);
+  // Chế độ chỉ lấy email tiền đi: không theo dõi số dư
+  const tracksBalance = useTracksIncome();
 
   const list = useMemo(() => accounts ?? [], [accounts]);
   const summary = useMemo(() => {
@@ -196,7 +208,7 @@ export default function AccountsPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" className="fin-btn fin-btn-outline" onClick={reload}>
-              <RefreshCw className="w-4 h-4 text-slate-400" aria-hidden /> <span className="hidden sm:inline">Làm mới số dư</span>
+              <RefreshCw className="w-4 h-4 text-slate-400" aria-hidden /> <span className="hidden sm:inline">{tracksBalance ? 'Làm mới số dư' : 'Làm mới'}</span>
             </button>
             <button type="button" className="fin-btn fin-btn-primary" onClick={() => setEditing('new')}>
               <Plus className="w-4 h-4" aria-hidden /> Thêm tài khoản / Ví
@@ -215,8 +227,8 @@ export default function AccountsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <Kpi label="Tổng số dư khả dụng" icon={Wallet} iconClass="text-teal-700">
-              <Amount value={summary.total} />
+            <Kpi label={tracksBalance ? 'Tổng số dư khả dụng' : 'Tài khoản đang theo dõi'} icon={Wallet} iconClass="text-teal-700">
+              {tracksBalance ? <Amount value={summary.total} /> : <Count value={summary.activeCount} unit="tài khoản" />}
               <div className="flex items-center justify-between text-xs text-slate-600">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-700" aria-hidden /> {summary.activeCount} tài khoản đang theo dõi
@@ -226,7 +238,7 @@ export default function AccountsPage() {
             </Kpi>
 
             <Kpi label="Tài khoản ngân hàng" icon={Landmark} iconClass="text-teal-700">
-              <Amount value={summary.bank} />
+              {tracksBalance ? <Amount value={summary.bank} /> : <Count value={summary.bankCount} unit="tài khoản" />}
               <div className="flex items-center justify-between gap-2 text-xs text-slate-600">
                 <span>{summary.bankCount} nguồn liên kết</span>
                 <span className="font-semibold text-teal-700 truncate" title={summary.bankShorts.join(', ')}>
@@ -236,7 +248,7 @@ export default function AccountsPage() {
             </Kpi>
 
             <Kpi label="Tiền mặt & Ví" icon={Banknote} iconClass="text-slate-500">
-              <Amount value={summary.cash} />
+              {tracksBalance ? <Amount value={summary.cash} /> : <Count value={summary.cashCount} unit="ví" />}
               <div className="flex items-center justify-between text-xs text-slate-600">
                 <span>{summary.cashCount ? `${summary.cashCount} ví tiền mặt` : 'Chưa có ví tiền mặt'}</span>
                 {summary.cashCount > 0 && summary.cashManual && (
@@ -326,7 +338,7 @@ export default function AccountsPage() {
                           <Layers className="w-3 h-3" aria-hidden /> {g.name}
                         </span>
                       ))}
-                      {a.balanceSource === 'BANK' && (
+                      {tracksBalance && a.balanceSource === 'BANK' && (
                         <>
                           <span aria-hidden>•</span>
                           <span className="inline-flex items-center gap-1 text-emerald-700">
@@ -339,26 +351,28 @@ export default function AccountsPage() {
                 </div>
 
                 <div className="flex items-center justify-between md:justify-end gap-4 md:gap-6 pl-16 md:pl-0">
-                  <div className="flex flex-col text-left md:text-right min-w-0">
-                    <span className="text-[16px] font-bold text-slate-900 tracking-tight fin-num">{formatVND(a.balance)}</span>
-                    {a.balanceSource === 'BANK' ? (
-                      <span
-                        className="fin-label normal-case tracking-normal font-medium"
-                        title="Số dư trong email ngân hàng gần nhất, cộng các giao dịch phát sinh sau đó"
-                      >
-                        Ngân hàng báo {a.bankBalanceAt ? formatVNDateTime(a.bankBalanceAt) : ''}
-                      </span>
-                    ) : a.tracking.in && a.tracking.out ? (
-                      <span className="fin-label normal-case tracking-normal font-medium">Số dư đầu + thu − chi</span>
-                    ) : (
-                      <span
-                        className="inline-flex items-center gap-1 md:justify-end text-[11px] font-semibold text-amber-700"
-                        title="Email chỉ báo một chiều nên số dư không phản ánh số dư thật. Nhập tay khoản thu hoặc chỉnh số dư đầu kỳ."
-                      >
-                        <CircleAlert className="w-3 h-3" aria-hidden /> Chưa đủ tiền vào
-                      </span>
-                    )}
-                  </div>
+                  {tracksBalance && (
+                    <div className="flex flex-col text-left md:text-right min-w-0">
+                      <span className="text-[16px] font-bold text-slate-900 tracking-tight fin-num">{formatVND(a.balance)}</span>
+                      {a.balanceSource === 'BANK' ? (
+                        <span
+                          className="fin-label normal-case tracking-normal font-medium"
+                          title="Số dư trong email ngân hàng gần nhất, cộng các giao dịch phát sinh sau đó"
+                        >
+                          Ngân hàng báo {a.bankBalanceAt ? formatVNDateTime(a.bankBalanceAt) : ''}
+                        </span>
+                      ) : a.tracking.in && a.tracking.out ? (
+                        <span className="fin-label normal-case tracking-normal font-medium">Số dư đầu + thu − chi</span>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1 md:justify-end text-[11px] font-semibold text-amber-700"
+                          title="Email chỉ báo một chiều nên số dư không phản ánh số dư thật. Nhập tay khoản thu hoặc chỉnh số dư đầu kỳ."
+                        >
+                          <CircleAlert className="w-3 h-3" aria-hidden /> Chưa đủ tiền vào
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center gap-1 text-slate-500">
                     <button
                       type="button"
@@ -451,6 +465,7 @@ function AccountModal({
   const [bankName, setBankName] = useState(account?.bankName ?? '');
   const [accountNumber, setAccountNumber] = useState(account?.accountNumber ?? '');
   const [opening, setOpening] = useState(String(account?.openingBalance ?? 0));
+  const tracksBalance = useTracksIncome();
   const [isActive, setIsActive] = useState(account?.isActive ?? true);
   const [groupIds, setGroupIds] = useState<number[]>(account?.groupIds ?? []);
   const [saving, setSaving] = useState(false);
@@ -541,11 +556,13 @@ function AccountModal({
             </label>
           </div>
         )}
-        <label className="block">
-          <span className="block text-xs font-medium text-slate-600 mb-1">Số dư đầu kỳ (₫)</span>
-          <input inputMode="numeric" className="input-field fin-num" value={opening} onChange={(e) => setOpening(e.target.value)} />
-          <span className="block text-xs text-slate-500 mt-1">Số dư hiện tại = số dư đầu kỳ + tổng thu − tổng chi của tài khoản.</span>
-        </label>
+        {tracksBalance && (
+          <label className="block">
+            <span className="block text-xs font-medium text-slate-600 mb-1">Số dư đầu kỳ (₫)</span>
+            <input inputMode="numeric" className="input-field fin-num" value={opening} onChange={(e) => setOpening(e.target.value)} />
+            <span className="block text-xs text-slate-500 mt-1">Số dư hiện tại = số dư đầu kỳ + tổng thu − tổng chi của tài khoản.</span>
+          </label>
+        )}
         {groups.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <span className="block text-xs font-medium text-slate-600">Nhóm chi tiêu / thu nhập thường dùng</span>

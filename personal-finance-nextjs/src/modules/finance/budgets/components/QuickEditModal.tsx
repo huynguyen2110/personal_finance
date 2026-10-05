@@ -4,6 +4,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { CornerDownRight } from 'lucide-react';
 import Modal from '@/components/shared/Modal';
+import MoneyInput from '@/components/shared/MoneyInput';
 import CategoryIcon from '@/components/shared/CategoryIcon';
 import { errorMessage } from '@/lib/api-client';
 import { saveBudgets } from '../lib';
@@ -12,12 +13,7 @@ import { formatMonthLabel } from '@/lib/dates';
 import { childrenByParent, orderByTree, topLevelLines } from '../utils/budget-insights';
 import type { BudgetLine } from '../types';
 
-const nf = new Intl.NumberFormat('vi-VN');
 const toNum = (s: string) => (s.trim() === '' ? null : Number(s.replace(/[^\d]/g, '')) || 0);
-const fmt = (s: string) => {
-  const n = toNum(s);
-  return n === null ? '' : nf.format(n);
-};
 
 // Sửa hạn mức của mọi danh mục chi trong một màn: cột mặc định + cột riêng tháng (để trống = không có).
 // Danh mục con thụt vào dưới cha; tổng chỉ cộng theo cha (cha đặt riêng thì lấy của cha, không thì cộng các con).
@@ -122,22 +118,24 @@ export default function QuickEditModal({
                     </td>
                     <td className="px-3 py-2 text-right text-slate-600 fin-num whitespace-nowrap">{formatVND(l.spent)}</td>
                     <td className="px-2 py-1.5">
-                      <input
-                        inputMode="numeric"
-                        aria-label={`Hạn mức mặc định ${l.name}`}
-                        className="input-field !py-1.5 !text-right fin-num"
-                        value={fmt(def[l.categoryId] ?? '')}
-                        onChange={(e) => setDef((s) => ({ ...s, [l.categoryId]: e.target.value }))}
+                      <MoneyInput
+                        ariaLabel={`Hạn mức mặc định ${l.name}`}
+                        size="sm"
+                        className="!text-right"
+                        showCurrency={false}
+                        value={toNum(def[l.categoryId] ?? '')}
+                        onChange={(v) => setDef((s) => ({ ...s, [l.categoryId]: v === null ? '' : String(v) }))}
                         placeholder="—"
                       />
                     </td>
                     <td className="px-2 py-1.5">
-                      <input
-                        inputMode="numeric"
-                        aria-label={`Hạn mức riêng tháng ${l.name}`}
-                        className="input-field !py-1.5 !text-right fin-num"
-                        value={fmt(own[l.categoryId] ?? '')}
-                        onChange={(e) => setOwn((s) => ({ ...s, [l.categoryId]: e.target.value }))}
+                      <MoneyInput
+                        ariaLabel={`Hạn mức riêng tháng ${l.name}`}
+                        size="sm"
+                        className="!text-right"
+                        showCurrency={false}
+                        value={toNum(own[l.categoryId] ?? '')}
+                        onChange={(v) => setOwn((s) => ({ ...s, [l.categoryId]: v === null ? '' : String(v) }))}
                         placeholder="—"
                       />
                     </td>

@@ -21,14 +21,6 @@ export interface Todo {
   nodes: TodoNodeRef[];
 }
 
-export interface NodeOption {
-  id: number;
-  title: string;
-  isRoot: boolean;
-  mindmapId: number;
-  mindmapTitle: string;
-}
-
 export interface UpdateTodoBody {
   title?: string;
   date?: string;
@@ -38,11 +30,22 @@ export interface UpdateTodoBody {
   effectiveness?: number | null;
 }
 
+export interface Streak {
+  current: number;
+  best: number;
+  activeToday: boolean;
+}
+
 export const todosApi = {
+  streak: () => api.get<Streak>('/todos/streak'),
   listByDate: (date: string) => api.get<Todo[]>('/todos', { params: { date } }),
   listByNode: (nodeId: number) => api.get<Todo[]>(`/todos/by-node/${nodeId}`),
-  nodeOptions: () => api.get<NodeOption[]>('/todos/node-options'),
-  create: (body: { title: string; date: string; nodeIds?: number[] }) =>
+  create: (body: {
+    title: string;
+    date: string;
+    nodeIds?: number[];
+    durationMinutes?: number | null;
+  }) =>
     api.post<Todo>('/todos', body),
   update: (id: number, body: UpdateTodoBody) =>
     api.patch<Todo>(`/todos/${id}`, body),

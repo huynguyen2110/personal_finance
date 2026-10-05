@@ -2,6 +2,7 @@
 
 import {
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
@@ -16,6 +17,7 @@ function useInvalidateTodoRelated() {
     qc.invalidateQueries({ queryKey: ['nodes'] });
     qc.invalidateQueries({ queryKey: ['weekly-stats'] });
     qc.invalidateQueries({ queryKey: ['plan'] });
+    qc.invalidateQueries({ queryKey: ['todo-streak'] });
   };
 }
 
@@ -26,19 +28,32 @@ export function useTodos(dateKey: string) {
   });
 }
 
+/** Todo của nhiều ngày (chế độ xem theo tuần); dùng chung cache với useTodos. */
+export function useTodosOfDays(dateKeys: string[]) {
+  return useQueries({
+    queries: dateKeys.map((dateKey) => ({
+      queryKey: ['todos', dateKey],
+      queryFn: () => todosApi.listByDate(dateKey),
+    })),
+    combine: (results) => ({
+      byDate: dateKeys.map((dateKey, i) => ({
+        dateKey,
+        todos: results[i].data ?? [],
+      })),
+      isLoading: results.some((r) => r.isLoading),
+    }),
+  });
+}
+
+export function useStreak() {
+  return useQuery({ queryKey: ['todo-streak'], queryFn: todosApi.streak });
+}
+
 export function useNodeTodos(nodeId: number) {
   return useQuery({
     queryKey: ['node-todos', nodeId],
     queryFn: () => todosApi.listByNode(nodeId),
     enabled: Number.isFinite(nodeId),
-  });
-}
-
-export function useNodeOptions(enabled: boolean) {
-  return useQuery({
-    queryKey: ['node-options'],
-    queryFn: todosApi.nodeOptions,
-    enabled,
   });
 }
 

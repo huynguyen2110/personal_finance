@@ -77,7 +77,9 @@ export default function ReportsPage() {
   const insights = useMemo(() => (data ? deriveInsights(data) : null), [data]);
   const mix = useMemo(() => (data ? buildMix(data) : undefined), [data]);
 
-  const rows = matrixKind === 'OUT' ? (data?.expenseRows ?? []) : (data?.incomeRows ?? []);
+  // Chế độ chỉ lấy email tiền đi: thu nhập là kế hoạch (hạn mức + tiết kiệm), không có danh mục thu
+  const planned = data?.incomeMode === 'PLANNED';
+  const rows = matrixKind === 'OUT' || planned ? (data?.expenseRows ?? []) : (data?.incomeRows ?? []);
   const trendRow: Row | undefined = data?.expenseRows.find((r) => String(r.categoryId) === trendCategory) ?? data?.expenseRows[0];
   const yoyData = data?.monthly.map((m) => ({ month: m.month, expense: m.expense, prevYearExpense: m.prevYearExpense })) ?? [];
   const hasPrevYear = data?.monthly.some((m) => m.prevYearExpense > 0 || m.prevYearIncome > 0);
@@ -133,13 +135,13 @@ export default function ReportsPage() {
           <>
             {/* 4 KPI */}
             <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Kpi label="Tổng thu nhập kỳ" icon={<Banknote className="w-[18px] h-[18px]" />} iconClass="bg-teal-50 text-teal-700" badge={<MoM value={insights.incomeMoM} upIsGood />}>
+              <Kpi label={planned ? 'Thu nhập kế hoạch kỳ' : 'Tổng thu nhập kỳ'} icon={<Banknote className="w-[18px] h-[18px]" />} iconClass="bg-teal-50 text-teal-700" badge={<MoM value={insights.incomeMoM} upIsGood />}>
                 <Big value={data.summary.income} />
                 <Foot>
                   <span>
                     TB: <b className="text-slate-900 fin-num">{formatVND(Math.round(data.summary.income / data.monthCount))}</b>/tháng
                   </span>
-                  <span className="fin-label">{data.monthCount} chu kỳ</span>
+                  <span className="fin-label">{planned ? 'Hạn mức + tiết kiệm' : `${data.monthCount} chu kỳ`}</span>
                 </Foot>
               </Kpi>
 
@@ -204,11 +206,11 @@ export default function ReportsPage() {
               <div className="p-4 md:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-[18px] font-semibold text-slate-900 tracking-[-0.01em]">Ma trận phân bổ {matrixKind === 'OUT' ? 'chi tiêu' : 'thu nhập'} theo danh mục</h2>
+                    <h2 className="text-[18px] font-semibold text-slate-900 tracking-[-0.01em]">Ma trận phân bổ {matrixKind === 'OUT' || planned ? 'chi tiêu' : 'thu nhập'} theo danh mục</h2>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-100 border border-slate-200" role="tablist" aria-label="Loại dòng tiền">
+                  <div className={`items-center p-0.5 rounded-lg bg-slate-100 border border-slate-200 ${planned ? 'hidden' : 'inline-flex'}`} role="tablist" aria-label="Loại dòng tiền">
                     {(['OUT', 'IN'] as const).map((k) => (
                       <button key={k} type="button" role="tab" aria-selected={matrixKind === k} onClick={() => setMatrixKind(k)} className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${matrixKind === k ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
                         {k === 'OUT' ? 'Chi tiêu' : 'Thu nhập'}
@@ -229,7 +231,7 @@ export default function ReportsPage() {
                   </div>
                 </div>
               </div>
-              <Matrix months={data.months} rows={rows} color={matrixKind === 'OUT' ? CHART.expense : CHART.income} mode={matrixMode} upIsGood={matrixKind === 'IN'} />
+              <Matrix months={data.months} rows={rows} color={matrixKind === 'OUT' || planned ? CHART.expense : CHART.income} mode={matrixMode} upIsGood={matrixKind === 'IN' && !planned} />
             </section>
 
             {/* Hàng cuối: cùng kỳ năm trước, xu hướng một danh mục, tổng hợp tháng */}

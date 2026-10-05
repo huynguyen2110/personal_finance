@@ -125,6 +125,8 @@ describe('Mindmap API (e2e)', () => {
     await authed('post', '/api/mindmap/todos').send({ title: 'x', date: today, nodeIds: [999999999] }).expect(400);
 
     await authed('patch', `/api/mindmap/todos/${todoId}`).send({ completed: true }).expect(200);
+    const streak = (await authed('get', '/api/mindmap/todos/streak').expect(200)).body.data;
+    expect(streak).toEqual({ current: 1, best: 1, activeToday: true });
     const tree = (await authed('get', `${base()}/nodes`).expect(200)).body.data;
     expect(tree.find((n: { id: number }) => n.id === leaf)).toMatchObject({ todoTotal: 1, todoDone: 1 });
 

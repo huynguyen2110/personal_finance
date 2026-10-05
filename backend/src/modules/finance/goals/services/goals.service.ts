@@ -13,6 +13,7 @@ import {
 } from '../../../../common/utils/dates.util';
 import { SettingsService } from '../../../../services/settings.service';
 import { StatsService } from '../../stats/services/stats.service';
+import { PlannedIncomeService } from '../../budgets/services/planned-income.service';
 import type { CreateContributionDto, CreateGoalDto, UpdateGoalDto } from '../dto/goal.dto';
 import {
   disciplineGrade,
@@ -86,6 +87,7 @@ export class GoalsService {
     private readonly prisma: PrismaService,
     private readonly stats: StatsService,
     private readonly settings: SettingsService,
+    private readonly plannedIncome: PlannedIncomeService,
   ) {}
 
   // ─── Trang mục tiêu ───
@@ -96,13 +98,19 @@ export class GoalsService {
     const month = currentMonthVN(sd);
     const today = todayVN();
     const range = monthRange(month, sd);
-    const [goals, avgMonthlyExpense, summary, last3] = await Promise.all([
+    const last3Range = { from: monthRange(addMonths(month, -3), sd).from, to: monthRange(addMonths(month, -1), sd).to };
+    const [goals, avgMonthlyExpense, actualSummary, actualLast3, planned] = await Promise.all([
       this.prisma.savingsGoal.findMany({ include: goalInclude, orderBy: { id: 'asc' } }),
       this.avgMonthlyExpense(month, sd),
       this.stats.getSummary(range),
       // Tỷ lệ tiết kiệm trên 3 tháng đã trọn vẹn gần nhất
-      this.stats.getSummary({ from: monthRange(addMonths(month, -3), sd).from, to: monthRange(addMonths(month, -1), sd).to }),
+      this.stats.getSummary(last3Range),
+      this.plannedIncome.isPlanned(),
     ]);
+    // Chế độ chỉ lấy email tiền đi: thu nhập = hạn mức ngân sách + kế hoạch tiết kiệm
+    const [summary, last3] = planned
+      ? await Promise.all([this.plannedIncome.applyToSummary(actualSummary, range, sd), this.plannedIncome.applyToSummary(actualLast3, last3Range, sd)])
+      : [actualSummary, actualLast3];
 
     const views = goals.map((g) => this.toView(g, month, today, avgMonthlyExpense, sd));
 
