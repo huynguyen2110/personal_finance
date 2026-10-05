@@ -45,11 +45,11 @@ function FlipCard({ value }: { value: string }) {
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /**
- * Pomodoro toàn màn hình kiểu đồng hồ lật: nền đen, hai ô phút : giây.
+ * Pomodoro toàn màn hình kiểu đồng hồ lật: nền đen, hai ô phút : giây (thêm ô giờ khi ≥ 1 giờ — chế độ Vô hạn).
  * Mở bằng Fullscreen API (không được thì vẫn phủ kín cửa sổ); Esc hoặc nút thu nhỏ để thoát.
  */
 export function FlipClockOverlay({
-  remaining,
+  seconds,
   running,
   modeLabel,
   targetTitle,
@@ -58,7 +58,8 @@ export function FlipClockOverlay({
   onStop,
   onClose,
 }: {
-  remaining: number;
+  /** Số giây hiển thị (đếm ngược còn lại hoặc đếm lên đã qua); ≥ 1 giờ thì thêm ô giờ. */
+  seconds: number;
   running: boolean;
   modeLabel: string;
   targetTitle: string | null;
@@ -69,6 +70,7 @@ export function FlipClockOverlay({
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [idle, setIdle] = useState(false);
+  const hours = Math.floor(seconds / 3600);
   // Callback mới nhất (cha có thể truyền hàm mới mỗi lần render) — effect fullscreen chỉ chạy một lần
   const closeRef = useRef(onClose);
   useEffect(() => {
@@ -135,7 +137,8 @@ export function FlipClockOverlay({
         className="flex items-center font-bold text-[#bdbdc2] tabular-nums"
         style={
           {
-            '--flip-w': 'min(42vw, 68vh)',
+            // 3 ô (giờ : phút : giây) thì thu nhỏ để vừa màn hình
+            '--flip-w': hours > 0 ? 'min(29vw, 52vh)' : 'min(42vw, 68vh)',
             gap: 'calc(var(--flip-w) * 0.04)',
             fontSize: 'calc(var(--flip-w) * 0.62)',
             lineHeight: 1,
@@ -144,8 +147,9 @@ export function FlipClockOverlay({
           } as React.CSSProperties
         }
       >
-        <FlipCard value={pad(Math.floor(remaining / 60))} />
-        <FlipCard value={pad(remaining % 60)} />
+        {hours > 0 && <FlipCard value={String(hours)} />}
+        <FlipCard value={pad(Math.floor((seconds % 3600) / 60))} />
+        <FlipCard value={pad(seconds % 60)} />
       </div>
 
       <div
