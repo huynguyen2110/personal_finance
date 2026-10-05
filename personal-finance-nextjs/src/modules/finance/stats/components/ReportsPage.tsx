@@ -135,13 +135,13 @@ export default function ReportsPage() {
           <>
             {/* 4 KPI */}
             <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Kpi label={planned ? 'Thu nhập kế hoạch kỳ' : 'Tổng thu nhập kỳ'} icon={<Banknote className="w-[18px] h-[18px]" />} iconClass="bg-teal-50 text-teal-700" badge={<MoM value={insights.incomeMoM} upIsGood />}>
+              <Kpi label={planned ? 'Thu nhập tự tính kỳ' : 'Tổng thu nhập kỳ'} icon={<Banknote className="w-[18px] h-[18px]" />} iconClass="bg-teal-50 text-teal-700" badge={<MoM value={insights.incomeMoM} upIsGood />}>
                 <Big value={data.summary.income} />
                 <Foot>
                   <span>
                     TB: <b className="text-slate-900 fin-num">{formatVND(Math.round(data.summary.income / data.monthCount))}</b>/tháng
                   </span>
-                  <span className="fin-label">{planned ? 'Hạn mức + tiết kiệm' : `${data.monthCount} chu kỳ`}</span>
+                  <span className="fin-label">{planned ? 'Hạn mức + tiết kiệm đã nạp' : `${data.monthCount} chu kỳ`}</span>
                 </Foot>
               </Kpi>
 

@@ -22,7 +22,7 @@ export class BudgetsController {
     const sd = await this.settings.monthStartDay();
     const page = await this.budgets.getBudgetPage(query.month ?? currentMonthVN(sd));
     if (!(await this.plannedIncome.isPlanned())) return { ...page, plannedIncome: null };
-    // Chế độ chỉ lấy email tiền đi: thu nhập tháng = hạn mức + kế hoạch tiết kiệm
+    // Chế độ chỉ lấy email tiền đi: thu nhập tháng = hạn mức + tiền tiết kiệm đã nạp trong tháng
     const plan = (await this.plannedIncome.byMonth([page.month], sd)).get(page.month)!;
     return { ...page, income: plan.total, plannedIncome: plan };
   }

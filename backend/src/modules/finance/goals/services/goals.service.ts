@@ -14,6 +14,7 @@ import {
 import { SettingsService } from '../../../../services/settings.service';
 import { StatsService } from '../../stats/services/stats.service';
 import { PlannedIncomeService } from '../../budgets/services/planned-income.service';
+import { TransactionsService } from '../../transactions/services/transactions.service';
 import type { CreateContributionDto, CreateGoalDto, UpdateGoalDto } from '../dto/goal.dto';
 import {
   disciplineGrade,
@@ -88,6 +89,7 @@ export class GoalsService {
     private readonly stats: StatsService,
     private readonly settings: SettingsService,
     private readonly plannedIncome: PlannedIncomeService,
+    private readonly transactions: TransactionsService,
   ) {}
 
   // ─── Trang mục tiêu ───
@@ -107,7 +109,7 @@ export class GoalsService {
       this.stats.getSummary(last3Range),
       this.plannedIncome.isPlanned(),
     ]);
-    // Chế độ chỉ lấy email tiền đi: thu nhập = hạn mức ngân sách + kế hoạch tiết kiệm
+    // Chế độ chỉ lấy email tiền đi: thu nhập = hạn mức ngân sách + tiền tiết kiệm đã nạp trong tháng
     const [summary, last3] = planned
       ? await Promise.all([this.plannedIncome.applyToSummary(actualSummary, range, sd), this.plannedIncome.applyToSummary(actualLast3, last3Range, sd)])
       : [actualSummary, actualLast3];
@@ -476,16 +478,25 @@ export class GoalsService {
     });
     if (!goal) throw new NotFoundException('Không tìm thấy mục tiêu');
 
-    let txn: { id: number; amount: bigint; transactionDate: Date; excludeFromStats: boolean } | null = null;
+    // Chi tiêu từ quỹ → bắt buộc gắn với một khoản chi (đã ghi nhận, hoặc tạo mới) được tính vào thống kê chi tiêu
+    const spend = dto.kind === 'SPEND';
+    if (dto.newTransaction && !spend) throw new BadRequestException('Chỉ chi tiêu từ quỹ mới tạo kèm giao dịch chi mới');
+    if (spend && !dto.transactionId === !dto.newTransaction) {
+      throw new BadRequestException('Chi tiêu từ quỹ phải gắn với giao dịch chi: chọn giao dịch đã ghi nhận hoặc tạo giao dịch mới');
+    }
+
+    let txn: { id: number; amount: bigint; transactionDate: Date; excludeFromStats: boolean; direction: string } | null = null;
     if (dto.transactionId) {
       txn = await this.prisma.transaction.findUnique({
         where: { id: dto.transactionId },
-        select: { id: true, amount: true, transactionDate: true, excludeFromStats: true, goalContribution: { select: { id: true } } },
+        select: { id: true, amount: true, transactionDate: true, excludeFromStats: true, direction: true, goalContribution: { select: { id: true } } },
       }).then((t) => {
         if (!t) throw new BadRequestException('Giao dịch không tồn tại');
         if (t.goalContribution) throw new BadRequestException('Giao dịch này đã được gắn với một lần nạp/rút khác');
         return t;
       });
+      if (spend && txn?.direction !== 'OUT') throw new BadRequestException('Chi tiêu từ quỹ phải gắn với một giao dịch chi (tiền ra)');
+      if (spend && txn?.excludeFromStats) throw new BadRequestException('Giao dịch này đang bị loại khỏi thống kê, không dùng cho chi tiêu từ quỹ được');
     }
 
     const amount = dto.amount ?? (txn ? Number(txn.amount) : 0);
@@ -507,21 +518,46 @@ export class GoalsService {
       : (txn?.transactionDate ?? new Date());
     if (date.getTime() > Date.now() + 60_000) throw new BadRequestException('Không ghi nạp/rút cho ngày trong tương lai');
 
-    const excludeTxn = !!txn && !!dto.excludeFromStats && !txn.excludeFromStats;
-    await this.prisma.$transaction([
-      ...(excludeTxn ? [this.prisma.transaction.update({ where: { id: txn!.id }, data: { excludeFromStats: true } })] : []),
-      this.prisma.goalContribution.create({
-        data: {
-          goalId,
-          kind: dto.kind,
-          amount: BigInt(amount),
-          date,
-          note: dto.note || null,
-          transactionId: txn?.id ?? null,
-          excludedTxn: excludeTxn,
-        },
-      }),
-    ]);
+    // Khoản chi của lần chi tiêu từ quỹ luôn tính vào thống kê → không bao giờ loại ra
+    const excludeTxn = !spend && !!txn && !!dto.excludeFromStats && !txn.excludeFromStats;
+
+    // Chưa có giao dịch chi → tạo khoản chi nhập tay (số tiền, ngày theo lần chi tiêu)
+    let createdTxnId: number | null = null;
+    if (dto.newTransaction) {
+      const created = await this.transactions.create({
+        accountId: dto.newTransaction.accountId,
+        direction: 'OUT',
+        amount,
+        content: dto.newTransaction.content,
+        transactionDate: date.toISOString(),
+        categoryId: dto.newTransaction.categoryId ?? null,
+        note: dto.note || null,
+        excludeFromStats: false,
+      });
+      createdTxnId = created.id;
+    }
+
+    try {
+      await this.prisma.$transaction([
+        ...(excludeTxn ? [this.prisma.transaction.update({ where: { id: txn!.id }, data: { excludeFromStats: true } })] : []),
+        this.prisma.goalContribution.create({
+          data: {
+            goalId,
+            kind: dto.kind,
+            amount: BigInt(amount),
+            date,
+            note: dto.note || null,
+            transactionId: createdTxnId ?? txn?.id ?? null,
+            excludedTxn: excludeTxn,
+            createdTxn: createdTxnId !== null,
+          },
+        }),
+      ]);
+    } catch (e) {
+      // Không ghi được → bỏ luôn khoản chi vừa tạo để không còn giao dịch mồ côi
+      if (createdTxnId !== null) await this.prisma.transaction.delete({ where: { id: createdTxnId } }).catch(() => {});
+      throw e;
+    }
     await this.syncCompletion(goalId);
     return { ok: true };
   }
@@ -529,13 +565,15 @@ export class GoalsService {
   async removeContribution(id: number) {
     const c = await this.prisma.goalContribution.findUniqueOrThrow({
       where: { id },
-      select: { goalId: true, transactionId: true, excludedTxn: true },
+      select: { goalId: true, transactionId: true, excludedTxn: true, createdTxn: true },
     });
     await this.prisma.$transaction([
       ...(c.excludedTxn && c.transactionId
         ? [this.prisma.transaction.updateMany({ where: { id: c.transactionId, transferPairId: null }, data: { excludeFromStats: false } })]
         : []),
       this.prisma.goalContribution.delete({ where: { id } }),
+      // Khoản chi do chính lần ghi này tạo ra → xóa theo
+      ...(c.createdTxn && c.transactionId ? [this.prisma.transaction.deleteMany({ where: { id: c.transactionId } })] : []),
     ]);
     await this.syncCompletion(c.goalId);
     return { ok: true };

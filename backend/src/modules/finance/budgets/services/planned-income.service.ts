@@ -3,17 +3,17 @@ import { PrismaService } from '../../../../database/prisma.service';
 import { monthOfDate, monthRange } from '../../../../common/utils/dates.util';
 import { SettingsService } from '../../../../services/settings.service';
 import type { Summary } from '../../stats/types/stats.types';
-import { incomeMonthsIn, plannedSavingsFor } from '../utils/planned-income';
+import { depositedSavingsFor, incomeMonthsIn } from '../utils/planned-income';
 import { BudgetsService } from './budgets.service';
 
 export interface PlannedMonthIncome {
   budget: number; // tổng hạn mức ngân sách của tháng
-  savings: number; // tổng kế hoạch nạp tiết kiệm của tháng
+  savings: number; // tiền tiết kiệm của tháng: nạp − rút ở mọi quỹ (tối thiểu 0)
   total: number;
 }
 
 // Chế độ "chỉ lấy email tiền đi" (Cài đặt → Loại email giao dịch): không theo dõi tiền vào nữa,
-// thu nhập được tính = hạn mức ngân sách + kế hoạch tiết kiệm (xem utils/planned-income.ts).
+// thu nhập được tính = hạn mức ngân sách + tiền tiết kiệm đã nạp trong tháng (xem utils/planned-income.ts).
 // Giao dịch tiền vào vẫn nằm trong danh sách giao dịch nhưng không được cộng vào thu nhập.
 @Injectable()
 export class PlannedIncomeService {
@@ -36,18 +36,19 @@ export class PlannedIncomeService {
     const tracked = unique.filter((m) => !firstMonth || m >= firstMonth);
     const empty: PlannedMonthIncome = { budget: 0, savings: 0, total: 0 };
     if (!tracked.length) return new Map(unique.map((m) => [m, empty]));
-    const [budgetByMonth, goals] = await Promise.all([
+    const [budgetByMonth, contributions] = await Promise.all([
       this.budgets.budgetAmountsByMonth(tracked),
-      this.prisma.savingsGoal.findMany({
-        where: { monthlyPlan: { gt: 0 } },
-        select: { monthlyPlan: true, createdAt: true, archivedAt: true, completedAt: true },
+      // Mọi quỹ (kể cả đã lưu trữ): tiền đã nạp trong tháng nào thì là thu nhập của tháng đó
+      this.prisma.goalContribution.findMany({
+        where: { kind: { in: ['DEPOSIT', 'WITHDRAW'] } },
+        select: { kind: true, amount: true, date: true },
       }),
     ]);
     return new Map(
       unique.map((m) => {
         if (firstMonth && m < firstMonth) return [m, empty];
         const budget = budgetByMonth.get(m) ?? 0;
-        const savings = plannedSavingsFor(goals, m, startDay);
+        const savings = depositedSavingsFor(contributions, m, startDay);
         return [m, { budget, savings, total: budget + savings }];
       }),
     );

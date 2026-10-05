@@ -47,7 +47,7 @@ export interface DashboardData {
   }[];
   expenseByCategory: CategoryTotal[];
   incomeByCategory: CategoryTotal[];
-  // PLANNED: chế độ chỉ lấy email tiền đi — thu nhập = hạn mức ngân sách + kế hoạch tiết kiệm, không theo dõi số dư
+  // PLANNED: chế độ chỉ lấy email tiền đi — thu nhập = hạn mức ngân sách + tiền tiết kiệm đã nạp trong tháng, không theo dõi số dư
   incomeMode: IncomeMode;
   weekday: WeekdayPoint[];
   topExpenses: TransactionDTO[];

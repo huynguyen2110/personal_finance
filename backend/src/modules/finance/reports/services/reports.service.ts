@@ -55,7 +55,7 @@ export class ReportsService {
     private readonly plannedIncome: PlannedIncomeService,
   ) {}
 
-  // Chế độ chỉ lấy email tiền đi: thu nhập theo tháng = hạn mức + kế hoạch tiết kiệm (lọc một tài khoản → 0).
+  // Chế độ chỉ lấy email tiền đi: thu nhập theo tháng = hạn mức + tiền tiết kiệm đã nạp trong tháng (lọc một tài khoản → 0).
   // Trả null khi đang theo dõi tiền vào thực tế.
   private async plannedMonthly(months: string[], sd: number, accountId?: number | null): Promise<Map<string, number> | null> {
     if (!(await this.plannedIncome.isPlanned())) return null;

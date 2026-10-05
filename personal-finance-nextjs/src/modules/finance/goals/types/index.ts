@@ -147,6 +147,8 @@ export interface ContributionInput {
   note?: string | null;
   transactionId?: number | null;
   excludeFromStats?: boolean;
+  // Rút quỹ chưa có giao dịch chi tương ứng → tạo khoản chi mới (số tiền, ngày theo lần rút)
+  newTransaction?: { accountId: number; content: string; categoryId?: number | null };
 }
 
 export interface LinkableTxn {

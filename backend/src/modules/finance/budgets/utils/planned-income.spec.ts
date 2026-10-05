@@ -1,25 +1,36 @@
-import { incomeMonthsIn, plannedSavingsFor } from './planned-income';
+import { depositedSavingsFor, incomeMonthsIn } from './planned-income';
 
 const at = (date: string) => new Date(`${date}T10:00:00+07:00`);
 
 describe('planned-income', () => {
-  it('plannedSavingsFor: chỉ tính mục tiêu còn chạy trong tháng', () => {
-    const goals = [
-      { monthlyPlan: 1_000_000n, createdAt: at('2026-08-10'), archivedAt: null, completedAt: null },
-      { monthlyPlan: 500_000n, createdAt: at('2026-10-20'), archivedAt: null, completedAt: null }, // tạo sau tháng 9
-      { monthlyPlan: 300_000n, createdAt: at('2026-01-01'), archivedAt: at('2026-08-15'), completedAt: null }, // lưu trữ từ tháng 8
-      { monthlyPlan: 200_000n, createdAt: at('2026-01-01'), archivedAt: null, completedAt: at('2026-09-12') }, // hoàn thành trong tháng 9
-      { monthlyPlan: null, createdAt: at('2026-01-01'), archivedAt: null, completedAt: null },
+  it('depositedSavingsFor: nạp − rút trong tháng, bỏ số dư ban đầu / lãi / khoản tiêu', () => {
+    const cs = [
+      { kind: 'OPENING', amount: 50_000_000n, date: at('2026-10-06') },
+      { kind: 'DEPOSIT', amount: 10_000_000n, date: at('2026-10-06') },
+      { kind: 'DEPOSIT', amount: 2_000_000n, date: at('2026-10-20') },
+      { kind: 'WITHDRAW', amount: 3_000_000n, date: at('2026-10-21') },
+      { kind: 'INTEREST', amount: 40_000n, date: at('2026-10-25') },
+      { kind: 'SPEND', amount: 12_000_000n, date: at('2026-10-26') },
+      { kind: 'DEPOSIT', amount: 10_000_000n, date: at('2026-09-10') },
     ];
-    expect(plannedSavingsFor(goals, '2026-09', 1)).toBe(1_200_000);
-    expect(plannedSavingsFor(goals, '2026-10', 1)).toBe(1_500_000);
-    expect(plannedSavingsFor(goals, '2026-08', 1)).toBe(1_500_000);
+    expect(depositedSavingsFor(cs, '2026-10', 1)).toBe(9_000_000);
+    expect(depositedSavingsFor(cs, '2026-09', 1)).toBe(10_000_000);
+    expect(depositedSavingsFor(cs, '2026-08', 1)).toBe(0);
   });
 
-  it('plannedSavingsFor: theo tháng tài chính (ngày bắt đầu tháng 5)', () => {
-    const goals = [{ monthlyPlan: 1_000_000n, createdAt: at('2026-10-03'), archivedAt: null, completedAt: null }];
-    // 03/10 thuộc tháng tài chính 2026-09 (05/09 → 04/10)
-    expect(plannedSavingsFor(goals, '2026-09', 5)).toBe(1_000_000);
+  it('depositedSavingsFor: theo tháng tài chính, rút nhiều hơn nạp thì 0', () => {
+    // Ngày bắt đầu tháng 5: 03/10 thuộc tháng tài chính 2026-09 (05/09 → 04/10)
+    expect(depositedSavingsFor([{ kind: 'DEPOSIT', amount: 1_000_000n, date: at('2026-10-03') }], '2026-09', 5)).toBe(1_000_000);
+    expect(
+      depositedSavingsFor(
+        [
+          { kind: 'DEPOSIT', amount: 1_000_000n, date: at('2026-10-10') },
+          { kind: 'WITHDRAW', amount: 5_000_000n, date: at('2026-10-11') },
+        ],
+        '2026-10',
+        5,
+      ),
+    ).toBe(0);
   });
 
   it('incomeMonthsIn: tháng nào có ngày đầu tháng nằm trong kỳ', () => {
