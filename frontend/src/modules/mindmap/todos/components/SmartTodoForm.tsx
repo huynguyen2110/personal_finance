@@ -1,6 +1,6 @@
 'use client';
 
-import { Clock, KeyRound, Link2, ListPlus, Lock, PenLine, Plus, TrendingUp } from 'lucide-react';
+import { KeyRound, Link2, ListPlus, Lock, PenLine, Plus, TrendingUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { formatCompactVND } from '@/lib/money';
 import { Dot, GOption, GSelect } from '@/modules/mindmap/components/ui/GSelect';
@@ -9,15 +9,7 @@ import { areaIcon } from '@/modules/mindmap/lib/areaIcon';
 import { cn } from '@/modules/mindmap/lib/utils';
 import { useCreateTodo } from '../hooks';
 import { GrowthLookup } from '../lookup';
-
-const DURATION_OPTIONS: GOption<number>[] = [
-  { value: 15, label: '15 phút', meta: 'khởi động' },
-  { value: 25, label: '25 phút', meta: '1 Pomodoro' },
-  { value: 45, label: '45 phút', meta: 'khối sâu' },
-  { value: 60, label: '1 giờ' },
-  { value: 90, label: '1 giờ 30 phút' },
-  { value: 120, label: '2 giờ', meta: 'khối rất sâu' },
-].map((o) => ({ ...o, icon: <Clock size={14} className="text-gray-400" /> }));
+import { DurationPicker } from './DurationPicker';
 
 /** Thêm việc cho ngày đang xem, gắn thẳng vào lĩnh vực / hành động trên bản đồ. */
 export function SmartTodoForm({ dateKey, lookup }: { dateKey: string; lookup: GrowthLookup }) {
@@ -92,7 +84,7 @@ export function SmartTodoForm({ dateKey, lookup }: { dateKey: string; lookup: Gr
         />
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-[2fr_1fr]">
+      <div className="grid items-start gap-2 sm:grid-cols-[2fr_1fr]">
         <GSelect
           options={nodeOptions}
           value={nodeId}
@@ -103,16 +95,7 @@ export function SmartTodoForm({ dateKey, lookup }: { dateKey: string; lookup: Gr
           searchPlaceholder="Tìm lĩnh vực / hành động…"
           ariaLabel="Gắn với nhánh"
         />
-        <GSelect
-          options={DURATION_OPTIONS}
-          value={minutes}
-          onChange={setMinutes}
-          clearable
-          searchable={false}
-          placeholder="Chưa ước lượng thời gian"
-          placeholderIcon={<Clock size={14} className="text-gray-400" />}
-          ariaLabel="Thời lượng dự kiến"
-        />
+        <DurationPicker value={minutes} onChange={setMinutes} />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
