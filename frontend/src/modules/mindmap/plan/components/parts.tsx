@@ -6,6 +6,7 @@ import { cn, toDateKey } from '@/modules/mindmap/lib/utils';
 import { useUpdateNode } from '@/modules/mindmap/mindmaps/hooks';
 import { NodeStatus, STATUS_LABELS } from '@/modules/mindmap/mindmaps/types';
 import { useCreateTodo } from '@/modules/mindmap/todos/hooks';
+import { Dot, GSelect } from '@/modules/mindmap/components/ui/GSelect';
 import { OptionRef } from '../api';
 
 export function OptionBadge({
@@ -32,14 +33,19 @@ export function OptionBadge({
   );
 }
 
-const STATUS_STYLES: Record<NodeStatus | 'none', string> = {
-  none: 'border-gray-200 text-gray-400',
-  todo: 'border-gray-300 text-gray-600',
-  doing: 'border-amber-300 bg-amber-50 text-amber-700',
-  done: 'border-green-300 bg-green-50 text-green-700',
+const STATUS_COLORS: Record<NodeStatus | 'none', string> = {
+  none: '#d1d5db',
+  todo: '#9ca3af',
+  doing: '#f59e0b',
+  done: '#16a34a',
 };
+const STATUS_OPTIONS = (['none', 'todo', 'doing', 'done'] as const).map((s) => ({
+  value: s,
+  label: s === 'none' ? 'Chưa đặt' : STATUS_LABELS[s],
+  icon: <Dot color={STATUS_COLORS[s]} />,
+}));
 
-/** Ô chọn trạng thái gọn — đổi ngay trên trang Kế hoạch. */
+/** Ô chọn trạng thái gọn (pill màu theo trạng thái) — đổi ngay trên trang Kế hoạch. */
 export function StatusSelect({
   mindmapId,
   nodeId,
@@ -51,26 +57,17 @@ export function StatusSelect({
 }) {
   const updateNode = useUpdateNode(mindmapId);
   return (
-    <select
-      value={status ?? ''}
-      onChange={(e) =>
-        updateNode.mutate({
-          nodeId,
-          status: (e.target.value || null) as NodeStatus | null,
-        })
-      }
-      className={cn(
-        'rounded-full border px-2 py-0.5 text-xs outline-none',
-        STATUS_STYLES[status ?? 'none'],
-      )}
-    >
-      <option value="">Chưa đặt</option>
-      {(Object.keys(STATUS_LABELS) as NodeStatus[]).map((s) => (
-        <option key={s} value={s}>
-          {STATUS_LABELS[s]}
-        </option>
-      ))}
-    </select>
+    <GSelect
+      size="sm"
+      pill
+      soft={false}
+      options={STATUS_OPTIONS}
+      value={status ?? 'none'}
+      onChange={(v) => updateNode.mutate({ nodeId, status: v === 'none' || v === null ? null : v })}
+      searchable={false}
+      ariaLabel="Trạng thái"
+      className={`tsel-st-${status ?? 'none'}`}
+    />
   );
 }
 

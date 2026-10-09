@@ -4,6 +4,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/modules/mindmap/components/ui/Button';
 import { Dialog } from '@/modules/mindmap/components/ui/Dialog';
+import { GSelect } from '@/modules/mindmap/components/ui/GSelect';
 import { Input } from '@/modules/mindmap/components/ui/Input';
 import { extractErrorMessage } from '@/modules/mindmap/lib/api';
 import {
@@ -32,10 +33,15 @@ const TYPE_LABELS: Record<PropertyType, string> = {
   select: 'Lựa chọn',
 };
 
-const selectClass =
-  'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-violet-500';
-const inlineSelectClass =
-  'rounded-md border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-600 outline-none focus:border-violet-500';
+
+const TYPE_OPTIONS = (Object.keys(TYPE_LABELS) as PropertyType[]).map((t) => ({
+  value: t,
+  label: TYPE_LABELS[t],
+}));
+const UNIT_OPTIONS = [
+  { value: 'none', label: 'Không đơn vị' },
+  ...(Object.keys(UNIT_LABELS) as PropertyUnit[]).map((u) => ({ value: u, label: UNIT_LABELS[u] })),
+];
 
 /** Các role hợp với kiểu dữ liệu (priority/difficulty → select, time/cost → number). */
 function rolesFor(type: PropertyType): PropertyRole[] {
@@ -77,48 +83,38 @@ function DefinitionRow({
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {def.type === 'number' && (
-            <select
-              value={def.unit ?? ''}
-              title="Đơn vị"
-              onChange={(e) =>
-                update.mutate({
-                  propId: def.id,
-                  unit: (e.target.value || null) as PropertyUnit | null,
-                })
+            <GSelect
+              size="sm"
+              auto
+              options={UNIT_OPTIONS}
+              value={def.unit ?? 'none'}
+              onChange={(v) =>
+                update.mutate({ propId: def.id, unit: !v || v === 'none' ? null : (v as PropertyUnit) })
               }
-              className={inlineSelectClass}
-            >
-              <option value="">Không đơn vị</option>
-              {Object.entries(UNIT_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
+              searchable={false}
+              ariaLabel="Đơn vị"
+            />
           )}
           {roles.length > 0 && (
-            <select
-              value={def.role ?? ''}
-              title="Dùng trong kế hoạch như"
-              onChange={(e) =>
-                update.mutate({
-                  propId: def.id,
-                  role: (e.target.value || null) as PropertyRole | null,
-                })
+            <GSelect
+              size="sm"
+              auto
+              options={[
+                { value: 'none', label: 'Không dùng trong kế hoạch' },
+                ...roles.map((r) => ({
+                  value: r,
+                  label: `Kế hoạch: ${ROLE_LABELS[r]}`,
+                  disabled: r !== def.role && takenRoles.has(r),
+                  meta: r !== def.role && takenRoles.has(r) ? 'đã dùng' : undefined,
+                })),
+              ]}
+              value={def.role ?? 'none'}
+              onChange={(v) =>
+                update.mutate({ propId: def.id, role: !v || v === 'none' ? null : (v as PropertyRole) })
               }
-              className={inlineSelectClass}
-            >
-              <option value="">Không dùng trong kế hoạch</option>
-              {roles.map((r) => (
-                <option
-                  key={r}
-                  value={r}
-                  disabled={r !== def.role && takenRoles.has(r)}
-                >
-                  Kế hoạch: {ROLE_LABELS[r]}
-                </option>
-              ))}
-            </select>
+              searchable={false}
+              ariaLabel="Dùng trong kế hoạch như"
+            />
           )}
           {def.type === 'select' && (
             <button
@@ -286,39 +282,34 @@ export function PropertyDefinitionManager({
                 <label className="block text-sm font-medium text-gray-700">
                   Kiểu dữ liệu
                 </label>
-                <select
+                <GSelect
+                  options={TYPE_OPTIONS}
                   value={type}
-                  onChange={(e) => {
-                    setType(e.target.value as PropertyType);
+                  onChange={(v) => {
+                    if (!v) return;
+                    setType(v as PropertyType);
                     setRole('');
                     setUnit('');
                   }}
-                  className={selectClass}
-                >
-                  {Object.entries(TYPE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                  searchable={false}
+                  ariaLabel="Kiểu dữ liệu"
+                />
               </div>
               <div className="space-y-1">
                 <label className="block text-sm font-medium text-gray-700">
                   Dùng trong kế hoạch như
                 </label>
-                <select
-                  value={role}
+                <GSelect
+                  options={[
+                    { value: 'none', label: 'Không' },
+                    ...availableRoles.map((r) => ({ value: r, label: ROLE_LABELS[r] })),
+                  ]}
+                  value={role || 'none'}
+                  onChange={(v) => setRole(!v || v === 'none' ? '' : (v as PropertyRole))}
                   disabled={availableRoles.length === 0}
-                  onChange={(e) => setRole(e.target.value as PropertyRole | '')}
-                  className={selectClass}
-                >
-                  <option value="">Không</option>
-                  {availableRoles.map((r) => (
-                    <option key={r} value={r}>
-                      {ROLE_LABELS[r]}
-                    </option>
-                  ))}
-                </select>
+                  searchable={false}
+                  ariaLabel="Dùng trong kế hoạch như"
+                />
               </div>
             </div>
             {type === 'number' && (
@@ -326,18 +317,13 @@ export function PropertyDefinitionManager({
                 <label className="block text-sm font-medium text-gray-700">
                   Đơn vị
                 </label>
-                <select
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value as PropertyUnit | '')}
-                  className={selectClass}
-                >
-                  <option value="">Không</option>
-                  {Object.entries(UNIT_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                <GSelect
+                  options={UNIT_OPTIONS}
+                  value={unit || 'none'}
+                  onChange={(v) => setUnit(!v || v === 'none' ? '' : (v as PropertyUnit))}
+                  searchable={false}
+                  ariaLabel="Đơn vị"
+                />
               </div>
             )}
             {type === 'select' && (

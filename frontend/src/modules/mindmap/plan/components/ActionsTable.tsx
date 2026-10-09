@@ -6,6 +6,8 @@ import { useMemo, useState } from 'react';
 import { formatCompactVND } from '@/lib/money';
 import { growthRoutes } from '@/modules/mindmap/lib/routes';
 import { cn, formatMinutes, formatRating } from '@/modules/mindmap/lib/utils';
+import { GSelect } from '@/modules/mindmap/components/ui/GSelect';
+import { areaIcon } from '@/modules/mindmap/lib/areaIcon';
 import { PlanAction, PlanArea } from '../api';
 import { AddTodoButton, OptionBadge, StatusSelect } from './parts';
 
@@ -20,8 +22,6 @@ const sortValue: Record<SortKey, (a: PlanAction) => number | string> = {
   minutes: (a) => a.todos.minutes,
 };
 
-const filterClass =
-  'rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 outline-none focus:border-violet-500';
 
 /** Bảng mọi hành động: sắp xếp theo cột, lọc theo lĩnh vực / trạng thái. */
 export function ActionsTable({
@@ -86,29 +86,34 @@ export function ActionsTable({
           <span className="font-normal text-gray-400">({rows.length})</span>
         </h2>
         <div className="flex gap-2">
-          <select
-            value={areaId}
-            onChange={(e) =>
-              setAreaId(e.target.value === '' ? '' : Number(e.target.value))
-            }
-            className={filterClass}
-          >
-            <option value="">Mọi lĩnh vực</option>
-            {areas.map((a) => (
-              <option key={a.nodeId} value={a.nodeId}>
-                {a.title}
-              </option>
-            ))}
-          </select>
-          <select
+          <GSelect
+            size="sm"
+            auto
+            options={[
+              { value: 0, label: 'Mọi lĩnh vực' },
+              ...areas.map((a) => {
+                const Icon = areaIcon(a.title);
+                return { value: a.nodeId, label: a.title, icon: <Icon size={14} className="text-gray-400" /> };
+              }),
+            ]}
+            value={areaId === '' ? 0 : areaId}
+            onChange={(v) => setAreaId(v ? v : '')}
+            searchable={false}
+            ariaLabel="Lọc theo lĩnh vực"
+          />
+          <GSelect
+            size="sm"
+            auto
+            options={[
+              { value: 'open', label: 'Chưa xong' },
+              { value: 'done', label: 'Đã xong' },
+              { value: 'all', label: 'Tất cả' },
+            ]}
             value={status}
-            onChange={(e) => setStatus(e.target.value as StatusFilter)}
-            className={filterClass}
-          >
-            <option value="open">Chưa xong</option>
-            <option value="done">Đã xong</option>
-            <option value="all">Tất cả</option>
-          </select>
+            onChange={(v) => v && setStatus(v as StatusFilter)}
+            searchable={false}
+            ariaLabel="Lọc theo trạng thái"
+          />
         </div>
       </div>
 

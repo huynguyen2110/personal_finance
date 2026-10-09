@@ -1,46 +1,61 @@
 'use client';
 
-import { ChevronDown, KeyRound, ListPlus, Lock, PenLine, Plus, TrendingUp } from 'lucide-react';
-import { useState } from 'react';
+import { Clock, KeyRound, Link2, ListPlus, Lock, PenLine, Plus, TrendingUp } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { formatCompactVND } from '@/lib/money';
+import { Dot, GOption, GSelect } from '@/modules/mindmap/components/ui/GSelect';
 import { extractErrorMessage } from '@/modules/mindmap/lib/api';
+import { areaIcon } from '@/modules/mindmap/lib/areaIcon';
 import { cn } from '@/modules/mindmap/lib/utils';
 import { useCreateTodo } from '../hooks';
 import { GrowthLookup } from '../lookup';
 
-const DURATIONS: [number | '', string][] = [
-  ['', 'Chưa ước lượng thời gian'],
-  [15, '15 phút (khởi động)'],
-  [25, '25 phút (1 Pomodoro)'],
-  [45, '45 phút (khối sâu)'],
-  [60, '1 giờ'],
-  [90, '1 giờ 30 phút'],
-];
-
-const selectClass =
-  'w-full cursor-pointer appearance-none rounded-xl bg-[#f2f3ff] px-3 py-2 pr-8 text-[13px] text-gray-900 outline-none focus:ring-2 focus:ring-violet-300';
-
-function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <div className="relative">
-      <select {...props} className={selectClass}>
-        {children}
-      </select>
-      <ChevronDown size={15} className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-gray-400" />
-    </div>
-  );
-}
+const DURATION_OPTIONS: GOption<number>[] = [
+  { value: 15, label: '15 phút', meta: 'khởi động' },
+  { value: 25, label: '25 phút', meta: '1 Pomodoro' },
+  { value: 45, label: '45 phút', meta: 'khối sâu' },
+  { value: 60, label: '1 giờ' },
+  { value: 90, label: '1 giờ 30 phút' },
+  { value: 120, label: '2 giờ', meta: 'khối rất sâu' },
+].map((o) => ({ ...o, icon: <Clock size={14} className="text-gray-400" /> }));
 
 /** Thêm việc cho ngày đang xem, gắn thẳng vào lĩnh vực / hành động trên bản đồ. */
 export function SmartTodoForm({ dateKey, lookup }: { dateKey: string; lookup: GrowthLookup }) {
   const createTodo = useCreateTodo();
   const [title, setTitle] = useState('');
-  const [nodeId, setNodeId] = useState<number | ''>('');
-  const [minutes, setMinutes] = useState<number | ''>(25);
+  const [nodeId, setNodeId] = useState<number | null>(null);
+  const [minutes, setMinutes] = useState<number | null>(25);
 
-  const areas = lookup.plan?.areas ?? [];
-  const actions = lookup.plan?.actions ?? [];
-  const selected = nodeId === '' ? null : lookup.info.get(nodeId);
+  const selected = nodeId === null ? null : lookup.info.get(nodeId);
+
+  // Cây 2 cấp: lĩnh vực → hành động chưa xong (điểm cao trước), kèm điểm ở bên phải
+  const nodeOptions = useMemo<GOption<number>[]>(
+    () =>
+      (lookup.plan?.areas ?? []).flatMap((area) => {
+        const color = lookup.info.get(area.nodeId)?.color ?? '#7c3aed';
+        const Icon = areaIcon(area.title);
+        return [
+          {
+            value: area.nodeId,
+            label: area.title,
+            meta: 'cả lĩnh vực',
+            icon: <Icon size={15} style={{ color }} />,
+          },
+          ...(lookup.plan?.actions ?? [])
+            .filter((a) => a.areaId === area.nodeId && a.status !== 'done')
+            .sort((a, b) => b.score - a.score)
+            .map((a) => ({
+              value: a.nodeId,
+              label: a.title,
+              depth: 1 as const,
+              meta: `${a.score} điểm`,
+              keywords: area.title,
+              icon: <Dot color={color} />,
+            })),
+        ];
+      }),
+    [lookup.plan, lookup.info],
+  );
   const action = selected?.action ?? null;
 
   const submit = () => {
@@ -50,8 +65,8 @@ export function SmartTodoForm({ dateKey, lookup }: { dateKey: string; lookup: Gr
       {
         title: t,
         date: dateKey,
-        nodeIds: nodeId === '' ? [] : [nodeId],
-        durationMinutes: minutes === '' ? null : minutes,
+        nodeIds: nodeId === null ? [] : [nodeId],
+        durationMinutes: minutes,
       },
       { onSuccess: () => setTitle('') },
     );
@@ -78,37 +93,26 @@ export function SmartTodoForm({ dateKey, lookup }: { dateKey: string; lookup: Gr
       </div>
 
       <div className="grid gap-2 sm:grid-cols-[2fr_1fr]">
-        <Select
+        <GSelect
+          options={nodeOptions}
           value={nodeId}
-          onChange={(e) => setNodeId(e.target.value === '' ? '' : Number(e.target.value))}
-          aria-label="Gắn với nhánh"
-        >
-          <option value="">Không gắn nhánh nào</option>
-          {areas.map((area) => (
-            <optgroup key={area.nodeId} label={area.title}>
-              <option value={area.nodeId}>{area.title} (cả lĩnh vực)</option>
-              {actions
-                .filter((a) => a.areaId === area.nodeId && a.status !== 'done')
-                .sort((a, b) => b.score - a.score)
-                .map((a) => (
-                  <option key={a.nodeId} value={a.nodeId}>
-                    {area.title} › {a.title}
-                  </option>
-                ))}
-            </optgroup>
-          ))}
-        </Select>
-        <Select
+          onChange={setNodeId}
+          clearable
+          placeholder="Không gắn nhánh nào"
+          placeholderIcon={<Link2 size={15} className="text-gray-400" />}
+          searchPlaceholder="Tìm lĩnh vực / hành động…"
+          ariaLabel="Gắn với nhánh"
+        />
+        <GSelect
+          options={DURATION_OPTIONS}
           value={minutes}
-          onChange={(e) => setMinutes(e.target.value === '' ? '' : Number(e.target.value))}
-          aria-label="Thời lượng dự kiến"
-        >
-          {DURATIONS.map(([v, label]) => (
-            <option key={label} value={v}>
-              {label}
-            </option>
-          ))}
-        </Select>
+          onChange={setMinutes}
+          clearable
+          searchable={false}
+          placeholder="Chưa ước lượng thời gian"
+          placeholderIcon={<Clock size={14} className="text-gray-400" />}
+          ariaLabel="Thời lượng dự kiến"
+        />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">

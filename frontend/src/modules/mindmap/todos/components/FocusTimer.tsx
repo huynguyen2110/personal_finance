@@ -184,8 +184,8 @@ export function FocusTimer({
   return (
     <div className="relative flex flex-col items-center overflow-hidden rounded-xl bg-white p-6 text-center shadow-sm">
       <div className="mb-3 flex w-full items-center justify-between">
-        <span className="flex items-center gap-1.5 font-semibold text-violet-700">
-          <Timer size={19} /> Chế độ tập trung
+        <span className="flex min-w-0 items-center gap-1.5 font-semibold whitespace-nowrap text-violet-700">
+          <Timer size={19} className="shrink-0" /> Chế độ tập trung
         </span>
         <span className="flex items-center gap-1.5">
           <span className="rounded-md bg-violet-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">

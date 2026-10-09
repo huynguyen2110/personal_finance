@@ -440,7 +440,7 @@ function CanvasInner({ mindmapId }: { mindmapId: number }) {
       <MapToolbar
         title={mindmap?.title ?? ''}
         links={links ?? []}
-        areas={areas.map((a) => ({ id: a.id, title: a.title }))}
+        areas={areas.map((a) => ({ id: a.id, title: a.title, color: tree.colorOf.get(a.id) ?? '#7c3aed' }))}
         focusAreaId={focusId}
         onFocusChange={setFocusAreaId}
         linkMode={linkMode}

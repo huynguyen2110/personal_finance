@@ -6,9 +6,9 @@ import { formatMinutes, formatMinutesShort } from '@/modules/mindmap/lib/utils';
 import { Streak, Todo } from '../api';
 import { areaBreakdown, GrowthLookup } from '../lookup';
 
-// Ô số liệu: giãn đều trên màn hẹp, rộng cố định trên màn rộng
+// Ô số liệu: hàng riêng, giãn đều khi chưa đủ rộng; cùng hàng với lời nhắn (rộng cố định) từ 2xl
 const TILE =
-  'flex min-w-[180px] flex-1 items-center gap-3 rounded-xl bg-[#f2f3ff] p-3 lg:w-[220px] lg:flex-none';
+  'flex min-w-[180px] flex-1 items-center gap-3 rounded-xl bg-[#f2f3ff] p-3 2xl:w-[220px] 2xl:flex-none';
 
 const R = 30;
 const C = 2 * Math.PI * R;
@@ -59,7 +59,7 @@ export function TodoHero({
   return (
     <div className="relative overflow-hidden rounded-xl bg-white p-6 shadow-sm">
       <div className="pointer-events-none absolute -top-12 -right-12 h-64 w-64 rounded-full bg-violet-600/10 blur-3xl" />
-      <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center">
+      <div className="relative z-10 flex flex-col gap-6 2xl:flex-row 2xl:items-center">
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <div className="relative flex h-20 w-20 shrink-0 items-center justify-center">
             <svg className="h-20 w-20 -rotate-90" viewBox="0 0 72 72">
@@ -97,7 +97,7 @@ export function TodoHero({
           </div>
         </div>
 
-        <div className="flex w-full flex-wrap gap-3 lg:w-auto lg:shrink-0 lg:flex-nowrap lg:justify-end">
+        <div className="flex w-full flex-wrap gap-3 2xl:w-auto 2xl:shrink-0 2xl:flex-nowrap 2xl:justify-end">
           {areas.map((a) => {
             const Icon = areaIcon(a.title);
             return (

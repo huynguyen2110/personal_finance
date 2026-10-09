@@ -44,6 +44,9 @@ export interface TreeSelectProps<V extends string | number> {
   ariaLabel?: string;
   // Khi chọn 1 dòng con, nút hiển thị "Cha › Con"
   showParentInTrigger?: boolean;
+  // Class thêm cho khung dropdown (render qua portal, VD đổi tông màu theo module)
+  panelClassName?: string;
+  searchPlaceholder?: string;
 }
 
 // Chỉ số option kế tiếp theo hướng `dir` mà chọn được; không có thì giữ nguyên
@@ -68,6 +71,8 @@ export default function TreeSelect<V extends string | number>({
   className = '',
   ariaLabel,
   showParentInTrigger = true,
+  panelClassName = '',
+  searchPlaceholder = 'Tìm danh mục…',
 }: TreeSelectProps<V>) {
   const { open, setOpen, pos, panelStyle, triggerRef, panelRef } = usePopover({ minWidth: 260 });
   const [query, setQuery] = useState('');
@@ -231,7 +236,7 @@ export default function TreeSelect<V extends string | number>({
           <div
             ref={panelRef}
             tabIndex={-1}
-            className={`tsel-panel ${pos.up ? 'tsel-panel-up' : ''}`}
+            className={`tsel-panel ${pos.up ? 'tsel-panel-up' : ''} ${panelClassName}`}
             style={panelStyle}
             onKeyDown={onKey}
           >
@@ -245,7 +250,7 @@ export default function TreeSelect<V extends string | number>({
                     setQuery(e.target.value);
                     setActive(0);
                   }}
-                  placeholder="Tìm danh mục…"
+                  placeholder={searchPlaceholder}
                   aria-label="Tìm kiếm"
                   autoComplete="off"
                 />

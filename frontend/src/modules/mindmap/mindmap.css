@@ -223,3 +223,76 @@
     animation-delay: 0s;
   }
 }
+
+/* TreeSelect trong module Phát triển bản thân (GSelect): tông tím, nền mềm không viền, kiểu pill.
+   Dùng 2 class để thắng style gốc .tsel-* trong globals.css (CSS không layer thắng utility của Tailwind). */
+.tsel-trigger.tsel-violet {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.tsel-trigger.tsel-violet:focus-visible,
+.tsel-trigger.tsel-violet.tsel-open {
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+}
+.tsel-trigger.tsel-soft {
+  background-color: #f2f3ff;
+  border-color: transparent;
+}
+.tsel-trigger.tsel-soft:hover:not(:disabled) {
+  background-color: #eaedff;
+  border-color: transparent;
+}
+.tsel-trigger.tsel-soft.tsel-open {
+  background-color: #ffffff;
+}
+.tsel-trigger.tsel-auto {
+  width: auto;
+}
+.tsel-trigger.tsel-pill {
+  width: auto;
+  min-height: 1.625rem;
+  padding: 0.125rem 0.375rem 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.tsel-panel.tsel-violet {
+  border-color: #ede9fe;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.tsel-panel.tsel-violet .tsel-active {
+  background-color: #f5f3ff;
+}
+.tsel-panel.tsel-violet .tsel-selected {
+  color: #6d28d9;
+}
+.tsel-panel.tsel-violet .tsel-selected.tsel-active {
+  background-color: rgba(124, 58, 237, 0.1);
+}
+.tsel-panel.tsel-violet .tsel-check {
+  color: #7c3aed;
+}
+/* Đang lọc theo một lĩnh vực: nhấn mạnh ô chọn */
+.tsel-trigger.tsel-focused {
+  background-color: #ede9fe;
+  color: #5b21b6;
+}
+/* Trạng thái hành động (StatusSelect) */
+.tsel-trigger.tsel-st-none {
+  color: #9ca3af;
+}
+.tsel-trigger.tsel-st-todo {
+  background-color: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #4b5563;
+}
+.tsel-trigger.tsel-st-doing {
+  background-color: #fffbeb;
+  border-color: #fcd34d;
+  color: #b45309;
+}
+.tsel-trigger.tsel-st-done {
+  background-color: #f0fdf4;
+  border-color: #86efac;
+  color: #15803d;
+}
