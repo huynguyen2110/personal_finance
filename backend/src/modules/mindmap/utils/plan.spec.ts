@@ -99,6 +99,9 @@ describe('mindmap plan', () => {
 
   it('chặn / mở khóa / bổ trợ theo liên kết; liên kết "liên quan" không ảnh hưởng', () => {
     expect(action(12).blockedBy).toEqual([{ nodeId: 11, title: 'Học từ vựng' }]);
+    expect(action(12).prerequisiteTotal).toBe(1);
+    expect(action(11)).toMatchObject({ priorityLevel: 1, prerequisiteTotal: 0 });
+    expect(action(21).priorityLevel).toBe(0); // kế thừa "Thấp" của Sức khỏe
     expect(action(11).unlocks).toEqual([{ nodeId: 12, title: 'Luyện IELTS' }]);
     expect(action(11).supports).toEqual([{ nodeId: 21, title: 'Đọc sách y học' }]);
     expect(action(21).supportedBy).toEqual([{ nodeId: 11, title: 'Học từ vựng' }]);

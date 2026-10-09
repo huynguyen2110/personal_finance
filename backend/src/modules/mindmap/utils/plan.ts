@@ -71,10 +71,14 @@ export interface PlanAction {
   priority: OptionRef | null;
   // true = hành động chưa chọn ưu tiên, đang dùng ưu tiên của lĩnh vực
   priorityInherited: boolean;
+  // Mức ưu tiên chuẩn hóa 0–1 (1 = cao nhất); null = chưa có ưu tiên (kể cả lĩnh vực)
+  priorityLevel: number | null;
   difficulty: OptionRef | null;
   hours: number | null;
   cost: number | null;
   blockedBy: NodeRef[];
+  // Tổng số điều kiện trước (kể cả đã xong) — tiến độ mở khóa = (tổng − blockedBy) / tổng
+  prerequisiteTotal: number;
   unlocks: NodeRef[];
   supports: NodeRef[];
   supportedBy: NodeRef[];
@@ -259,10 +263,12 @@ export function buildPlan(input: {
       status: n.status,
       priority: priority?.option ?? null,
       priorityInherited: !!inherited,
+      priorityLevel: priority?.level ?? null,
       difficulty: difficulty?.option ?? null,
       hours,
       cost,
       blockedBy,
+      prerequisiteTotal: incoming(n.id, 'prerequisite').length,
       unlocks,
       supports,
       supportedBy,
