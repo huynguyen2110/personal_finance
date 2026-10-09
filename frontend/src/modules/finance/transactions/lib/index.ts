@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { downloadFile } from '@/lib/download';
 import type { Paged } from '@/types/common';
-import type { BulkUpdateInput, TransactionDTO, TransactionFilters, TransactionInput } from '../types';
+import type { BulkUpdateInput, SelfTransferAccount, TransactionDTO, TransactionFilters, TransactionInput } from '../types';
 
 const BASE_URL = '/api/transactions';
 
@@ -30,6 +30,18 @@ export const bulkUpdateTransactions = (payload: BulkUpdateInput) =>
 // "Không phải chuyển nội bộ": gỡ cặp chuyển khoản
 export const unpairTransaction = (id: number) =>
   apiClient<TransactionDTO>({ method: 'post', url: `${BASE_URL}/${id}/unpair` });
+
+// Các tài khoản của chính mình đã nhận tiền chuyển đi, kèm có đang "luôn tính chi tiêu" không
+export function useSelfTransferAccounts() {
+  return useQuery({
+    queryKey: ['transactions', 'self-transfer-accounts'] as const,
+    queryFn: () => apiClient<SelfTransferAccount[]>({ url: `${BASE_URL}/self-transfer-accounts` }),
+  });
+}
+
+// Luôn tính chi tiêu cho các lần chuyển sang một tài khoản của chính mình (áp cả cho giao dịch cũ)
+export const setAlwaysSpend = (payload: { accountNumber: string; enabled: boolean; name?: string | null; bank?: string | null }) =>
+  apiClient<{ updated: number }>({ method: 'post', url: `${BASE_URL}/always-spend`, payload });
 
 export const exportTransactions = (filters: TransactionFilters) =>
   downloadFile(`${BASE_URL}/export`, filters, 'giao-dich.xlsx');

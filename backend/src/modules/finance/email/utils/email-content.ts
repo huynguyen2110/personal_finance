@@ -1,3 +1,6 @@
+// Ghi chú gắn cho khoản chuyển giữa các tài khoản của chính mình (tự nhận diện từ email); frontend dựa vào tiền tố này
+export const SELF_TRANSFER_NOTE = 'Chuyển giữa các tài khoản của chính bạn (tự nhận diện từ email)';
+
 import { norm } from './tokens';
 import type { ParsedBankEmail } from '../types';
 

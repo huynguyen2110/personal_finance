@@ -10,10 +10,18 @@ export interface AppSettings {
   emailStartDate: string | null;
   // Có ghi nhận email báo tiền ĐẾN không; false = chỉ lấy email tiền đi (chi tiêu)
   emailIncoming: boolean;
+  // Tài khoản của chính mình (ở ngân hàng khác) mà chuyển tiền SANG vẫn tính là chi tiêu (VD tài khoản quỹ phòng)
+  alwaysSpendAccounts: SpendAccount[];
+}
+
+export interface SpendAccount {
+  accountNumber: string;
+  name: string | null; // tên chủ tài khoản trong email
+  bank: string | null;
 }
 
 const KEY = 'settings';
-export const DEFAULT_SETTINGS: AppSettings = { monthStartDay: DEFAULT_MONTH_START_DAY, emailStartDate: null, emailIncoming: true };
+export const DEFAULT_SETTINGS: AppSettings = { monthStartDay: DEFAULT_MONTH_START_DAY, emailStartDate: null, emailIncoming: true, alwaysSpendAccounts: [] };
 
 @Injectable()
 export class SettingsService {
@@ -40,6 +48,10 @@ export class SettingsService {
 
   async emailIncoming(): Promise<boolean> {
     return (await this.get()).emailIncoming;
+  }
+
+  async alwaysSpendAccountNumbers(): Promise<Set<string>> {
+    return new Set((await this.get()).alwaysSpendAccounts.map((a) => a.accountNumber));
   }
 
   async update(patch: Partial<AppSettings>): Promise<AppSettings> {
@@ -70,6 +82,13 @@ export class SettingsService {
       if (strict) throw new BadRequestException('Tùy chọn lấy email tiền đến không hợp lệ');
       out.emailIncoming = DEFAULT_SETTINGS.emailIncoming;
     }
+    // Danh sách lưu trực tiếp (không qua DTO cài đặt): chỉ giữ mục hợp lệ, bỏ trùng số tài khoản
+    const seen = new Set<string>();
+    out.alwaysSpendAccounts = (Array.isArray(s.alwaysSpendAccounts) ? s.alwaysSpendAccounts : []).filter((a): a is SpendAccount => {
+      if (!a || typeof a.accountNumber !== 'string' || !/^[A-Za-z0-9]{4,40}$/.test(a.accountNumber) || seen.has(a.accountNumber)) return false;
+      seen.add(a.accountNumber);
+      return true;
+    });
     return out;
   }
 }

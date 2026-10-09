@@ -115,6 +115,48 @@ describe('Personal Finance API (e2e)', () => {
     expect(r.headers['content-disposition']).toMatch(/attachment; filename=".+\.xlsx"/);
   });
 
+  it('luôn tính chi tiêu cho chuyển sang tài khoản của chính mình: áp cho giao dịch cũ, bật/tắt được', async () => {
+    const cp = '999000111222'; // số tài khoản giả, không trùng dữ liệu thật
+    const acc = await prisma.account.create({ data: { type: 'CASH', name: `${username} ví chuyển quỹ` } });
+    const txn = await prisma.transaction.create({
+      data: {
+        accountId: acc.id,
+        source: 'EMAIL',
+        direction: 'OUT',
+        amount: 250_000n,
+        content: 'e2e chuyen quy phong',
+        transactionDate: new Date(),
+        excludeFromStats: true,
+        note: 'Chuyển giữa các tài khoản của chính bạn (tự nhận diện từ email)',
+        rawPayload: { counterpartyAccount: cp, counterpartyName: 'E2E', counterpartyBank: 'E2E Bank' },
+      },
+    });
+    try {
+      const listed = (await authed('get', `/api/transactions?accountId=${acc.id}`).expect(200)).body.data.items;
+      expect(listed[0].selfTransferTo).toEqual({ accountNumber: cp, name: 'E2E', bank: 'E2E Bank' });
+      const accsBefore = (await authed('get', '/api/transactions/self-transfer-accounts').expect(200)).body.data;
+      expect(accsBefore.find((a: { accountNumber: string }) => a.accountNumber === cp)).toMatchObject({ count: 1, counted: 0, total: 250_000, alwaysSpend: false });
+
+      const on = await authed('post', '/api/transactions/always-spend').send({ accountNumber: cp, enabled: true, name: 'E2E', bank: 'E2E Bank' }).expect(200);
+      expect(on.body.data.updated).toBe(1);
+      expect((await prisma.transaction.findUniqueOrThrow({ where: { id: txn.id } })).excludeFromStats).toBe(false);
+      const settings = (await authed('get', '/api/settings').expect(200)).body.data;
+      expect(settings.alwaysSpendAccounts).toEqual(expect.arrayContaining([{ accountNumber: cp, name: 'E2E', bank: 'E2E Bank' }]));
+      const accsOn = (await authed('get', '/api/transactions/self-transfer-accounts').expect(200)).body.data;
+      expect(accsOn.find((a: { accountNumber: string }) => a.accountNumber === cp)).toMatchObject({ counted: 1, alwaysSpend: true });
+
+      const off = await authed('post', '/api/transactions/always-spend').send({ accountNumber: cp, enabled: false }).expect(200);
+      expect(off.body.data.updated).toBe(1);
+      expect((await prisma.transaction.findUniqueOrThrow({ where: { id: txn.id } })).excludeFromStats).toBe(true);
+      expect(off.body.data.alwaysSpendAccounts.some((a: { accountNumber: string }) => a.accountNumber === cp)).toBe(false);
+
+      await authed('post', '/api/transactions/always-spend').send({ accountNumber: 'abc', enabled: true }).expect(400);
+    } finally {
+      // Luôn gỡ số tài khoản giả khỏi cài đặt dù test lỗi giữa chừng
+      await authed('post', '/api/transactions/always-spend').send({ accountNumber: cp, enabled: false });
+    }
+  });
+
   it('kiểm tra tham số: khoảng ngày sai → 400', async () => {
     const r = await authed('get', '/api/stats/dashboard?from=2026-09-30&to=2026-09-01').expect(400);
     expect(r.body.message).toBe('Khoảng ngày không hợp lệ');

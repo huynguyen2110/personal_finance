@@ -8,7 +8,8 @@ import type { CategorizeContext } from '../../rules/services/categorize.service'
 import { TransfersService } from '../../transfers/services/transfers.service';
 import { AccountsService } from '../../accounts/services/accounts.service';
 import { TransactionsService } from '../../transactions/services/transactions.service';
-import { emailContent, isSelfTransfer } from '../utils/email-content';
+import { emailContent, isSelfTransfer, SELF_TRANSFER_NOTE } from '../utils/email-content';
+import { SettingsService } from '../../../../services/settings.service';
 import type { ParsedBankEmail } from '../types';
 
 export type EmailIngestStatus = 'created' | 'duplicate' | 'merged';
@@ -29,6 +30,7 @@ export class IngestEmailService {
     private readonly transfers: TransfersService,
     private readonly accounts: AccountsService,
     private readonly transactions: TransactionsService,
+    private readonly settings: SettingsService,
   ) {}
 
   // Email có báo số dư (VD ACB) → lưu làm số dư ngân hàng báo, chỉ khi mới hơn lần báo trước
@@ -90,11 +92,15 @@ export class IngestEmailService {
       ? !!(await this.prisma.account.findUnique({ where: { accountNumber: p.counterpartyAccount }, select: { id: true } }))
       : false;
     const internal = isSelfTransfer(p) || toOwnAccount;
+    // Chuyển sang tài khoản của chính mình nhưng người dùng muốn luôn tính chi tiêu (VD tài khoản quỹ phòng)
+    const alwaysSpend =
+      internal && p.direction === 'OUT' && !!p.counterpartyAccount && (await this.settings.alwaysSpendAccountNumbers()).has(p.counterpartyAccount);
+    const excluded = internal && !alwaysSpend;
     const cat = this.categorize.resolve(ctx ?? (await this.categorize.loadContext()), {
       content,
       direction: p.direction,
       accountId: account.id,
-      excludeFromStats: internal,
+      excludeFromStats: excluded,
     });
 
     let createdId: number;
@@ -111,8 +117,8 @@ export class IngestEmailService {
           transactionDate: p.transactionDate,
           categoryId: cat.categoryId,
           categorizedBy: cat.categorizedBy,
-          excludeFromStats: internal,
-          note: internal ? 'Chuyển giữa các tài khoản của chính bạn (tự nhận diện từ email)' : null,
+          excludeFromStats: excluded,
+          note: internal ? SELF_TRANSFER_NOTE : null,
           rawPayload: {
             ...p,
             transactionDate: p.transactionDate.toISOString(),
@@ -155,8 +161,11 @@ export class IngestEmailService {
         });
     }
 
-    // Phía bên kia (VD Cake nhận tiền từ VCB) cũng đã có trong app → ghép cặp chuyển nội bộ
-    await this.transfers.detectTransferFor(createdId).catch((e) => this.logger.error(`Ghép chuyển nội bộ lỗi: ${e}`));
+    // Phía bên kia (VD Cake nhận tiền từ VCB) cũng đã có trong app → ghép cặp chuyển nội bộ.
+    // Khoản "luôn tính chi tiêu" thì không ghép (ghép cặp sẽ loại nó khỏi thống kê).
+    if (!alwaysSpend) {
+      await this.transfers.detectTransferFor(createdId).catch((e) => this.logger.error(`Ghép chuyển nội bộ lỗi: ${e}`));
+    }
 
     return { status: 'created', id: createdId, internal };
   }
