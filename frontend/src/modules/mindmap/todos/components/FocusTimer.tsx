@@ -17,6 +17,12 @@ const MODE_LABELS: Record<Mode, string> = {
   long: 'Nghỉ dài (15p)',
   free: 'Vô hạn',
 };
+const SHORT_LABELS: Record<Mode, string> = {
+  focus: 'Focus 25p',
+  short: 'Nghỉ 5p',
+  long: 'Nghỉ 15p',
+  free: 'Vô hạn',
+};
 const CIRCUMFERENCE = 2 * Math.PI * 44;
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -271,22 +277,22 @@ export function FocusTimer({
             </button>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] font-semibold text-gray-500">
-          {(['focus', 'short', 'long', 'free'] as const).map((m, i) => (
-            <span key={m} className="flex items-center gap-3">
-              {i > 0 && <span>•</span>}
-              <button
-                type="button"
-                onClick={() => reset(m)}
-                className={cn(
-                  'flex items-center gap-0.5 transition hover:text-violet-700',
-                  mode === m && 'text-violet-700',
-                )}
-              >
-                {m === 'free' && <InfinityIcon size={13} />}
-                {MODE_LABELS[m]}
-              </button>
-            </span>
+        {/* Chọn chế độ: thanh 4 ô đều nhau (không xuống dòng ở cột hẹp) */}
+        <div className="grid grid-cols-4 gap-1 rounded-xl bg-[#f2f3ff] p-1 text-[11px] font-semibold">
+          {(['focus', 'short', 'long', 'free'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => reset(m)}
+              title={MODE_LABELS[m]}
+              className={cn(
+                'flex items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 whitespace-nowrap transition',
+                mode === m ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900',
+              )}
+            >
+              {m === 'free' && <InfinityIcon size={13} />}
+              {SHORT_LABELS[m]}
+            </button>
           ))}
         </div>
       </div>

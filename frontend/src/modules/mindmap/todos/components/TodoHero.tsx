@@ -6,6 +6,10 @@ import { formatMinutes, formatMinutesShort } from '@/modules/mindmap/lib/utils';
 import { Streak, Todo } from '../api';
 import { areaBreakdown, GrowthLookup } from '../lookup';
 
+// Ô số liệu: giãn đều trên màn hẹp, rộng cố định trên màn rộng
+const TILE =
+  'flex min-w-[180px] flex-1 items-center gap-3 rounded-xl bg-[#f2f3ff] p-3 lg:w-[220px] lg:flex-none';
+
 const R = 30;
 const C = 2 * Math.PI * R;
 
@@ -55,8 +59,8 @@ export function TodoHero({
   return (
     <div className="relative overflow-hidden rounded-xl bg-white p-6 shadow-sm">
       <div className="pointer-events-none absolute -top-12 -right-12 h-64 w-64 rounded-full bg-violet-600/10 blur-3xl" />
-      <div className="relative z-10 flex flex-col items-center justify-between gap-6 lg:flex-row">
-        <div className="flex w-full items-center gap-4 lg:w-auto">
+      <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center">
+        <div className="flex min-w-0 flex-1 items-center gap-4">
           <div className="relative flex h-20 w-20 shrink-0 items-center justify-center">
             <svg className="h-20 w-20 -rotate-90" viewBox="0 0 72 72">
               <circle cx="36" cy="36" r={R} fill="transparent" stroke="#e2e7ff" strokeWidth="6" />
@@ -80,8 +84,8 @@ export function TodoHero({
               </span>
             </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1.5">
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="flex items-center gap-1 rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-semibold text-teal-800">
                 <Zap size={13} />
                 {investedMinutes > 0 ? `${formatMinutes(investedMinutes)} đã đầu tư` : 'Chưa ghi phút'}
@@ -89,15 +93,15 @@ export function TodoHero({
               <span className="text-[11px] font-semibold text-gray-500">{periodLabel}</span>
             </div>
             <span className="text-lg font-semibold tracking-tight text-gray-900">{headline}</span>
-            <p className="text-[13px] text-gray-500">{message}</p>
+            <p className="max-w-2xl text-[13px] text-gray-500">{message}</p>
           </div>
         </div>
 
-        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 lg:w-auto lg:min-w-[460px]">
+        <div className="flex w-full flex-wrap gap-3 lg:w-auto lg:shrink-0 lg:flex-nowrap lg:justify-end">
           {areas.map((a) => {
             const Icon = areaIcon(a.title);
             return (
-              <div key={a.areaId} className="flex items-center gap-3 rounded-xl bg-[#f2f3ff] p-3">
+              <div key={a.areaId} className={TILE}>
                 <div
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
                   style={{ backgroundColor: `${a.color}1f`, color: a.color }}
@@ -122,14 +126,14 @@ export function TodoHero({
               </div>
             );
           })}
-          <div className="flex items-center gap-3 rounded-xl bg-[#f2f3ff] p-3 sm:col-start-3">
+          <div className={TILE}>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
               <Flame size={20} />
             </div>
             <div className="flex min-w-0 flex-col">
               <span className="truncate text-[11px] font-semibold text-gray-500">Kỷ luật liên tục</span>
               <span className="font-bold text-gray-900">{streak ? `${streak.current} ngày` : '—'}</span>
-              <span className="truncate text-[11px] font-semibold text-amber-700">{streakNote}</span>
+              <span className="text-[11px] leading-tight font-semibold text-amber-700">{streakNote}</span>
             </div>
           </div>
         </div>
