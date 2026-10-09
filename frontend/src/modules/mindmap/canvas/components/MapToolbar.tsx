@@ -2,7 +2,6 @@
 
 import { useReactFlow, useViewport } from '@xyflow/react';
 import {
-  ChevronDown,
   GitBranch,
   Network,
   PanelRight,
@@ -12,6 +11,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
+import { Dot, GSelect } from '@/modules/mindmap/components/ui/GSelect';
 import { NodeLink } from '@/modules/mindmap/links/api';
 import { FIT_VIEW } from '../layout';
 import { cn } from '@/modules/mindmap/lib/utils';
@@ -41,7 +41,7 @@ export function MapToolbar({
 }: {
   title: string;
   links: NodeLink[];
-  areas: { id: number; title: string }[];
+  areas: { id: number; title: string; color: string }[];
   focusAreaId: number | null;
   onFocusChange: (areaId: number | null) => void;
   linkMode: LinkMode;
@@ -79,30 +79,19 @@ export function MapToolbar({
 
         <div className="hidden h-6 w-px bg-gray-200 md:block" />
 
-        <div className="relative hidden md:block">
-          <select
-            value={focusAreaId ?? ''}
-            onChange={(e) =>
-              onFocusChange(e.target.value === '' ? null : Number(e.target.value))
-            }
-            title="Chỉ hiện một lĩnh vực"
-            className={cn(
-              'cursor-pointer appearance-none rounded-xl py-1.5 pr-8 pl-3 text-xs font-semibold outline-none transition',
-              focusAreaId !== null
-                ? 'bg-violet-100 text-violet-800'
-                : 'bg-[#f2f3ff] text-gray-800 hover:bg-[#eaedff]',
-            )}
-          >
-            <option value="">Tất cả nhánh ({areas.length} lĩnh vực)</option>
-            {areas.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.title}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            size={15}
-            className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-gray-500"
+        <div className="hidden md:block">
+          <GSelect
+            size="sm"
+            auto
+            options={[
+              { value: 0, label: `Tất cả nhánh (${areas.length} lĩnh vực)`, icon: <Network size={14} className="text-gray-400" /> },
+              ...areas.map((a) => ({ value: a.id, label: a.title, icon: <Dot color={a.color} /> })),
+            ]}
+            value={focusAreaId ?? 0}
+            onChange={(v) => onFocusChange(v ? v : null)}
+            searchable={false}
+            ariaLabel="Chỉ hiện một lĩnh vực"
+            className={focusAreaId !== null ? 'tsel-focused' : undefined}
           />
         </div>
 

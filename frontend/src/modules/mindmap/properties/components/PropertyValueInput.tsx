@@ -1,5 +1,6 @@
 'use client';
 
+import { Dot, GSelect } from '@/modules/mindmap/components/ui/GSelect';
 import { PropertyDefinition } from '../api';
 import { formatPropertyNumber } from '../format';
 
@@ -59,30 +60,22 @@ export function PropertyValueInput({
           onChange={(e) => onChange(e.target.value || null)}
         />
       );
-    case 'select': {
-      const selected = definition.options?.find((o) => o.id === value);
+    case 'select':
       return (
-        <div className="flex items-center gap-2">
-          <select
-            className={base}
-            value={typeof value === 'string' ? value : ''}
-            onChange={(e) => onChange(e.target.value || null)}
-            style={
-              selected
-                ? { borderColor: selected.color, color: selected.color }
-                : undefined
-            }
-          >
-            <option value="">— Chưa chọn —</option>
-            {(definition.options ?? []).map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <GSelect
+          options={(definition.options ?? []).map((opt) => ({
+            value: opt.id,
+            label: opt.label,
+            icon: <Dot color={opt.color} />,
+          }))}
+          value={typeof value === 'string' ? value : null}
+          onChange={(v) => onChange(v)}
+          clearable
+          size="sm"
+          placeholder="— Chưa chọn —"
+          ariaLabel={definition.name}
+        />
       );
-    }
     default:
       return (
         <input

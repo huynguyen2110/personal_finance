@@ -15,7 +15,7 @@ function useInvalidateTodoRelated() {
     qc.invalidateQueries({ queryKey: ['todos'] });
     qc.invalidateQueries({ queryKey: ['node-todos'] });
     qc.invalidateQueries({ queryKey: ['nodes'] });
-    qc.invalidateQueries({ queryKey: ['weekly-stats'] });
+    qc.invalidateQueries({ queryKey: ['range-stats'] });
     qc.invalidateQueries({ queryKey: ['plan'] });
     qc.invalidateQueries({ queryKey: ['todo-streak'] });
   };

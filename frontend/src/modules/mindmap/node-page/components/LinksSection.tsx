@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { Button } from '@/modules/mindmap/components/ui/Button';
+import { GOption, GSelect } from '@/modules/mindmap/components/ui/GSelect';
 import { LINK_KINDS, LinkKind } from '@/modules/mindmap/links/api';
 import {
   useCreateLink,
@@ -15,8 +16,6 @@ import { growthRoutes } from '@/modules/mindmap/lib/routes';
 import { useNodes } from '@/modules/mindmap/mindmaps/hooks';
 import { TreeNode } from '@/modules/mindmap/mindmaps/types';
 
-const selectClass =
-  'rounded-lg border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-violet-500';
 
 /** Các nhánh theo thứ tự cây, kèm độ sâu để thụt lề trong ô chọn. */
 function flattenTree(nodes: TreeNode[]): { node: TreeNode; depth: number }[] {
@@ -39,6 +38,20 @@ function flattenTree(nodes: TreeNode[]): { node: TreeNode; depth: number }[] {
   visit(null, 0);
   return out;
 }
+
+/** "Nhánh này [bổ trợ cho / được bổ trợ bởi / …]" — mỗi loại liên kết theo hai chiều, kèm nét vẽ minh họa. */
+const KIND_OPTIONS: GOption<string>[] = (Object.keys(LINK_KINDS) as LinkKind[]).flatMap((k) => {
+  const meta = LINK_KINDS[k];
+  const icon = (
+    <svg width="18" height="8" aria-hidden>
+      <line x1="1" y1="4" x2="17" y2="4" stroke={meta.color} strokeWidth="2" strokeDasharray={meta.dash} />
+    </svg>
+  );
+  const out = { value: `out:${k}`, label: meta.outPhrase.toLowerCase(), icon, group: meta.label };
+  return meta.inPhrase !== meta.outPhrase
+    ? [out, { value: `in:${k}`, label: meta.inPhrase.toLowerCase(), icon, group: meta.label }]
+    : [out];
+});
 
 export function LinksSection({
   mindmapId,
@@ -63,10 +76,21 @@ export function LinksSection({
     const map = new Map((nodes ?? []).map((n) => [n.id, n.title]));
     return (id: number) => map.get(id) ?? `#${id}`;
   }, [nodes]);
-  const options = useMemo(
-    () => flattenTree(nodes ?? []).filter((o) => o.node.id !== nodeId),
-    [nodes, nodeId],
-  );
+  // Gom theo lĩnh vực (nhánh cấp 1): lĩnh vực là dòng cha, mọi nhánh bên dưới là dòng con
+  const nodeOptions = useMemo(() => {
+    const out: GOption<number>[] = [];
+    let area = '';
+    for (const { node, depth } of flattenTree(nodes ?? [])) {
+      if (depth === 1) area = node.title;
+      if (node.id === nodeId) continue;
+      out.push(
+        depth === 0
+          ? { value: node.id, label: node.title, meta: 'nút gốc' }
+          : { value: node.id, label: node.title, depth: depth === 1 ? 0 : 1, group: area, keywords: area },
+      );
+    }
+    return out;
+  }, [nodes, nodeId]);
 
   const mine = (links ?? []).filter(
     (l) => l.sourceNodeId === nodeId || l.targetNodeId === nodeId,
@@ -154,46 +178,31 @@ export function LinksSection({
         <div className="mt-3 space-y-2 rounded-lg border border-violet-200 bg-violet-50/50 p-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-gray-500">Nhánh này</span>
-            <select
+            <GSelect
+              size="sm"
+              auto
+              options={KIND_OPTIONS}
               value={`${direction}:${kind}`}
-              onChange={(e) => {
-                const [d, k] = e.target.value.split(':');
+              onChange={(v) => {
+                if (!v) return;
+                const [d, k] = v.split(':');
                 setDirection(d as 'out' | 'in');
                 setKind(k as LinkKind);
               }}
-              className={selectClass}
-            >
-              {(Object.keys(LINK_KINDS) as LinkKind[]).flatMap((k) => {
-                const meta = LINK_KINDS[k];
-                const both = [
-                  <option key={`out:${k}`} value={`out:${k}`}>
-                    {meta.outPhrase.toLowerCase()}
-                  </option>,
-                ];
-                if (meta.inPhrase !== meta.outPhrase) {
-                  both.push(
-                    <option key={`in:${k}`} value={`in:${k}`}>
-                      {meta.inPhrase.toLowerCase()}
-                    </option>,
-                  );
-                }
-                return both;
-              })}
-            </select>
-            <select
-              value={otherId}
-              onChange={(e) =>
-                setOtherId(e.target.value === '' ? '' : Number(e.target.value))
-              }
-              className={`${selectClass} min-w-0 flex-1`}
-            >
-              <option value="">— Chọn nhánh —</option>
-              {options.map(({ node, depth }) => (
-                <option key={node.id} value={node.id}>
-                  {`${'  '.repeat(depth)}${node.title}`}
-                </option>
-              ))}
-            </select>
+              searchable={false}
+              ariaLabel="Loại liên kết"
+            />
+            <div className="min-w-48 flex-1">
+              <GSelect
+                size="sm"
+                options={nodeOptions}
+                value={otherId === '' ? null : otherId}
+                onChange={(v) => setOtherId(v ?? '')}
+                placeholder="— Chọn nhánh —"
+                searchPlaceholder="Tìm nhánh…"
+                ariaLabel="Nhánh cần nối"
+              />
+            </div>
           </div>
           <input
             value={note}

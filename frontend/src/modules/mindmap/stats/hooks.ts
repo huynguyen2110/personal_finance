@@ -3,9 +3,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { statsApi } from './api';
 
-export function useWeeklyStats(start: string) {
+export function useRangeStats(from: string, to: string) {
   return useQuery({
-    queryKey: ['weekly-stats', start],
-    queryFn: () => statsApi.weekly(start),
+    queryKey: ['range-stats', from, to],
+    queryFn: () => statsApi.range(from, to),
   });
 }

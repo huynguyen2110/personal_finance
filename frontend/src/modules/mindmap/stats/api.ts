@@ -4,6 +4,8 @@ export interface DayStat {
   date: string;
   total: number;
   done: number;
+  /** Tổng phút ghi nhận trong ngày (mọi todo). */
+  minutes: number;
 }
 
 export interface AreaStat {
@@ -13,21 +15,42 @@ export interface AreaStat {
   mindmapTitle: string;
   total: number;
   done: number;
-  /** Phút tuần này (todo gắn nhiều lĩnh vực được chia đều). */
+  /** Phút trong kỳ (todo gắn nhiều lĩnh vực được chia đều). */
   minutes: number;
+  /** Phút kỳ trước cùng độ dài. */
   prevMinutes: number;
   avgEffectiveness: number | null;
 }
 
-export interface WeeklyStats {
-  start: string;
-  end: string;
+/** Việc gắn ≥ 2 lĩnh vực trong kỳ (một việc, nhiều tác động). */
+export interface SynergyStat {
+  title: string;
+  nodeIds: number[];
+  count: number;
+  done: number;
+  minutes: number;
+  avgEffectiveness: number | null;
+  areas: { areaId: number; title: string; minutes: number }[];
+}
+
+export interface Totals {
+  total: number;
+  done: number;
+  minutes: number;
+}
+
+export interface RangeStats {
+  from: string;
+  to: string;
   days: DayStat[];
-  totals: { total: number; done: number; minutes: number };
+  totals: Totals;
+  /** Kỳ liền trước, cùng số ngày. */
+  prevTotals: Totals;
   byArea: AreaStat[];
+  synergy: SynergyStat[];
 }
 
 export const statsApi = {
-  weekly: (start: string) =>
-    api.get<WeeklyStats>('/todos/stats/weekly', { params: { start } }),
+  range: (from: string, to: string) =>
+    api.get<RangeStats>('/todos/stats/range', { params: { from, to } }),
 };

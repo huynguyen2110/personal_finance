@@ -1,14 +1,16 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
-import { addDaysStr, todayVN } from '../../../common/utils/dates.util';
+import { addDaysStr, daysBetween, todayVN } from '../../../common/utils/dates.util';
 import type { CreateTodoDto, UpdateTodoDto } from '../dto/todo.dto';
-import { aggregateByArea } from '../utils/plan';
+import { aggregateByArea, synergyHighlights } from '../utils/plan';
 import { computeStreak } from '../utils/streak';
 
 const todoInclude = {
   nodes: { include: { node: { select: { id: true, title: true, mindmapId: true, mindmap: { select: { title: true } } } } } },
 } satisfies Prisma.TodoInclude;
+
+const MAX_RANGE_DAYS = 120;
 
 type TodoWithNodes = Prisma.TodoGetPayload<{ include: typeof todoInclude }>;
 
@@ -35,28 +37,29 @@ export class TodosService {
     return todos.map((t) => this.serialize(t));
   }
 
-  // Tiến độ một tuần [start, start+6]: số todo theo ngày và theo lĩnh vực
+  // Tiến độ một tuần [start, start+6] — giữ định dạng cũ (ngày không kèm phút)
   async weeklyStats(userId: number, start: string) {
-    const end = addDaysStr(start, 6);
-    const where = { userId, date: { gte: start, lte: end } };
-
-    const rows = await this.prisma.todo.findMany({ where, select: { date: true, completed: true, durationMinutes: true } });
-    const days = Array.from({ length: 7 }, (_, i) => {
-      const date = addDaysStr(start, i);
-      const ofDay = rows.filter((r) => r.date === date);
-      return { date, total: ofDay.length, done: ofDay.filter((r) => r.completed).length };
-    });
-
-    const total = days.reduce((s, d) => s + d.total, 0);
-    const done = days.reduce((s, d) => s + d.done, 0);
-    const minutes = rows.reduce((s, r) => s + (r.durationMinutes ?? 0), 0);
-    const byArea = await this.weeklyByArea(userId, start, end);
-    return { start, end, days, totals: { total, done, minutes }, byArea };
+    const r = await this.rangeStats(userId, start, addDaysStr(start, 6));
+    return {
+      start: r.from,
+      end: r.to,
+      days: r.days.map(({ date, total, done }) => ({ date, total, done })),
+      totals: r.totals,
+      byArea: r.byArea,
+    };
   }
 
-  // Theo lĩnh vực (nhánh cấp 1) trên mọi mindmap, so phút với tuần trước
-  private async weeklyByArea(userId: number, start: string, end: string) {
+  // Thống kê một khoảng ngày bất kỳ (tuần / tháng / quý): theo ngày, tổng + kỳ trước cùng độ dài,
+  // theo lĩnh vực (so phút với kỳ trước) và các việc "cộng hưởng" gắn ≥ 2 lĩnh vực
+  async rangeStats(userId: number, from: string, to: string) {
+    const length = daysBetween(from, to);
+    if (length < 1 || length > MAX_RANGE_DAYS) {
+      throw new BadRequestException(`Khoảng thời gian phải từ 1 đến ${MAX_RANGE_DAYS} ngày`);
+    }
+    const prevFrom = addDaysStr(from, -length);
+    const prevTo = addDaysStr(from, -1);
     const select = {
+      title: true,
       date: true,
       completed: true,
       durationMinutes: true,
@@ -64,22 +67,48 @@ export class TodosService {
       nodes: { select: { nodeId: true, node: { select: { mindmapId: true } } } },
     } as const;
     const [current, prev] = await Promise.all([
-      this.prisma.todo.findMany({ where: { userId, date: { gte: start, lte: end }, nodes: { some: {} } }, select }),
-      this.prisma.todo.findMany({ where: { userId, date: { gte: addDaysStr(start, -7), lte: addDaysStr(start, -1) }, nodes: { some: {} } }, select }),
+      this.prisma.todo.findMany({ where: { userId, date: { gte: from, lte: to } }, select }),
+      this.prisma.todo.findMany({ where: { userId, date: { gte: prevFrom, lte: prevTo } }, select }),
     ]);
-    const mindmapIds = [...new Set([...current, ...prev].flatMap((t) => t.nodes.map((n) => n.node.mindmapId)))];
-    if (!mindmapIds.length) return [];
 
-    const nodes = await this.prisma.mindmapNode.findMany({
-      where: { mindmapId: { in: mindmapIds } },
-      select: { id: true, parentId: true, title: true, mindmapId: true, mindmap: { select: { title: true } } },
+    const days = Array.from({ length }, (_, i) => {
+      const date = addDaysStr(from, i);
+      const ofDay = current.filter((r) => r.date === date);
+      return {
+        date,
+        total: ofDay.length,
+        done: ofDay.filter((r) => r.completed).length,
+        minutes: ofDay.reduce((s, r) => s + (r.durationMinutes ?? 0), 0),
+      };
     });
+    const sum = (rows: typeof current) => ({
+      total: rows.length,
+      done: rows.filter((r) => r.completed).length,
+      minutes: rows.reduce((s, r) => s + (r.durationMinutes ?? 0), 0),
+    });
+
     const toPlanTodo = ({ nodes: links, ...t }: (typeof current)[number]) => ({ ...t, nodeIds: links.map((l) => l.nodeId) });
-    return aggregateByArea(
-      nodes.map(({ mindmap, ...n }) => ({ ...n, mindmapTitle: mindmap.title })),
-      current.map(toPlanTodo),
-      prev.map(toPlanTodo),
-    );
+    const linkedCurrent = current.filter((t) => t.nodes.length).map(toPlanTodo);
+    const linkedPrev = prev.filter((t) => t.nodes.length).map(toPlanTodo);
+    const mindmapIds = [...new Set([...current, ...prev].flatMap((t) => t.nodes.map((n) => n.node.mindmapId)))];
+    const nodes = mindmapIds.length
+      ? (
+          await this.prisma.mindmapNode.findMany({
+            where: { mindmapId: { in: mindmapIds } },
+            select: { id: true, parentId: true, title: true, mindmapId: true, mindmap: { select: { title: true } } },
+          })
+        ).map(({ mindmap, ...n }) => ({ ...n, mindmapTitle: mindmap.title }))
+      : [];
+
+    return {
+      from,
+      to,
+      days,
+      totals: sum(current),
+      prevTotals: sum(prev),
+      byArea: nodes.length ? aggregateByArea(nodes, linkedCurrent, linkedPrev) : [],
+      synergy: nodes.length ? synergyHighlights(nodes, linkedCurrent) : [],
+    };
   }
 
   // Chuỗi ngày liên tục có todo hoàn thành ("Kỷ luật liên tục")

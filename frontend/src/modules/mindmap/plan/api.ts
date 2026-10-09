@@ -30,10 +30,14 @@ export interface PlanAction {
   priority: OptionRef | null;
   /** Hành động chưa chọn ưu tiên → dùng ưu tiên của lĩnh vực. */
   priorityInherited: boolean;
+  /** Mức ưu tiên 0–1 (1 = cao nhất); null = chưa có ưu tiên. */
+  priorityLevel: number | null;
   difficulty: OptionRef | null;
   hours: number | null;
   cost: number | null;
   blockedBy: NodeRef[];
+  /** Tổng số điều kiện trước (kể cả đã xong). */
+  prerequisiteTotal: number;
   unlocks: NodeRef[];
   supports: NodeRef[];
   supportedBy: NodeRef[];
@@ -48,6 +52,8 @@ export interface PlanArea {
   title: string;
   status: NodeStatus | null;
   priority: OptionRef | null;
+  /** Mức ưu tiên 0–1 của lĩnh vực; null = chưa đặt. */
+  priorityLevel: number | null;
   actionsTotal: number;
   actionsDone: number;
   remainingHours: number;
