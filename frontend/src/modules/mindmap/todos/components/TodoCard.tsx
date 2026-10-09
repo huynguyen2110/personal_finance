@@ -8,6 +8,7 @@ import {
   KeyRound,
   Link2,
   LockOpen,
+  Pencil,
   PenLine,
   Share2,
   Star,
@@ -18,6 +19,7 @@ import {
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { formatCompactVND } from '@/lib/money';
+import { ConfirmDialog } from '@/modules/mindmap/components/ui/ConfirmDialog';
 import { GOption, GSelect } from '@/modules/mindmap/components/ui/GSelect';
 import { areaIcon } from '@/modules/mindmap/lib/areaIcon';
 import { growthRoutes } from '@/modules/mindmap/lib/routes';
@@ -226,6 +228,41 @@ function Rating({ todo }: { todo: Todo }) {
   );
 }
 
+/** Ô sửa tên todo: Enter / bỏ focus để lưu, Esc để hủy; tên rỗng thì giữ tên cũ. */
+function TitleInput({ todo, onDone }: { todo: Todo; onDone: () => void }) {
+  const updateTodo = useUpdateTodo();
+  const [value, setValue] = useState(todo.title);
+  const cancelled = useRef(false);
+
+  const commit = () => {
+    if (cancelled.current) return onDone();
+    const title = value.trim();
+    if (title && title !== todo.title) updateTodo.mutate({ id: todo.id, title });
+    onDone();
+  };
+
+  return (
+    <input
+      autoFocus
+      value={value}
+      maxLength={500}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') {
+          cancelled.current = true;
+          e.currentTarget.blur();
+        }
+      }}
+      aria-label="Tên todo"
+      className="min-w-0 flex-1 rounded-lg bg-[#f2f3ff] px-2 py-0.5 text-[15px] font-semibold text-gray-900 ring-2 ring-violet-300 outline-none"
+      style={{ width: `${Math.max(value.length, 12) + 2}ch` }}
+    />
+  );
+}
+
 /** Lựa chọn nhánh để gắn nhanh: Lĩnh vực, rồi các hành động bên dưới (xếp theo điểm). */
 function nodeOptions(lookup: GrowthLookup): GOption<number>[] {
   const plan = lookup.plan;
@@ -270,6 +307,8 @@ export function TodoCard({
 }) {
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const nodes = lookup.nodesOf(todo);
   const actions = nodes.flatMap((n) => (n.action ? [n.action] : []));
   const main = actions[0] ?? null;
@@ -311,9 +350,20 @@ export function TodoCard({
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span className={cn('text-[15px] font-semibold text-gray-900', done && 'text-gray-500 line-through')}>
-              {todo.title}
-            </span>
+            {editingTitle ? (
+              <TitleInput todo={todo} onDone={() => setEditingTitle(false)} />
+            ) : (
+              <span
+                onDoubleClick={() => setEditingTitle(true)}
+                title="Nhấp đúp để sửa tên"
+                className={cn(
+                  'cursor-text text-[15px] font-semibold text-gray-900',
+                  done && 'text-gray-500 line-through',
+                )}
+              >
+                {todo.title}
+              </span>
+            )}
             {!done && areas.length >= 2 && (
               <span className="flex items-center gap-1 rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-semibold text-teal-800">
                 <Share2 size={12} /> Tác động kép
@@ -414,9 +464,18 @@ export function TodoCard({
       <div className="flex shrink-0 items-center gap-0.5">
         <button
           type="button"
+          aria-label="Sửa tên todo"
+          title="Sửa tên (hoặc nhấp đúp vào tên)"
+          onClick={() => setEditingTitle(true)}
+          className="rounded-lg p-1.5 text-gray-300 opacity-0 transition group-hover:opacity-100 hover:bg-[#eaedff] hover:text-violet-700 focus:opacity-100"
+        >
+          <Pencil size={15} />
+        </button>
+        <button
+          type="button"
           aria-label="Xóa todo"
           title="Xóa"
-          onClick={() => deleteTodo.mutate(todo.id)}
+          onClick={() => setConfirmDelete(true)}
           className="rounded-lg p-1.5 text-gray-300 opacity-0 transition group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 focus:opacity-100"
         >
           <Trash2 size={15} />
@@ -436,6 +495,19 @@ export function TodoCard({
           </button>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Xóa todo?"
+        confirmLabel="Xóa"
+        danger
+        pending={deleteTodo.isPending}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() => deleteTodo.mutate(todo.id, { onSuccess: () => setConfirmDelete(false) })}
+      >
+        Xóa <b className="text-gray-900">“{todo.title}”</b>
+        {todo.completed && todo.durationMinutes ? ` (${formatMinutes(todo.durationMinutes)} đã ghi)` : ''}? Thao tác này không hoàn tác
+        được.
+      </ConfirmDialog>
     </div>
   );
 }

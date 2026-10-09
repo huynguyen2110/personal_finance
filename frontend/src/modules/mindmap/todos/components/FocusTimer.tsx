@@ -1,7 +1,7 @@
 'use client';
 
 import { Infinity as InfinityIcon, Maximize2, Network, Pause, Play, Square, Timer } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { cn } from '@/modules/mindmap/lib/utils';
 import { Todo } from '../api';
 import { useUpdateTodo } from '../hooks';
@@ -110,6 +110,15 @@ function FocusDurationPicker({ value, onChange }: { value: number; onChange: (mi
   );
 }
 
+export interface FocusTimerHandle {
+  /** Đang có phiên Focus / Vô hạn đã bắt đầu (đang chạy hoặc tạm dừng giữa chừng). */
+  isActive: () => boolean;
+  /** Số phút đã tập trung của phiên hiện tại. */
+  elapsedMinutes: () => number;
+  /** Kết thúc phiên hiện tại và ghi nhận số phút vào việc đang tập trung. */
+  stopAndLog: () => void;
+}
+
 /**
  * Pomodoro: phiên Focus (mặc định 25 phút, chọn được 1–180), nghỉ ngắn 5, nghỉ dài 15, hoặc "Vô hạn" (đếm lên tới khi bấm dừng).
  * Hết phiên Focus / bấm "Kết thúc & ghi nhận" thì cộng số phút đã tập trung vào todo đang chọn →
@@ -119,9 +128,11 @@ function FocusDurationPicker({ value, onChange }: { value: number; onChange: (mi
 export function FocusTimer({
   target,
   startToken,
+  ref,
 }: {
   target: Todo | null;
   startToken: number;
+  ref?: React.Ref<FocusTimerHandle>;
 }) {
   const updateTodo = useUpdateTodo();
   const [mode, setMode] = useState<Mode>('focus');
@@ -254,11 +265,22 @@ export function FocusTimer({
     }
   };
 
+  // Số giây đã tập trung của phiên Focus đếm ngược (chính xác tại lúc gọi)
+  const focusElapsed = () =>
+    total - (running ? Math.max(0, Math.round((endAtRef.current - Date.now()) / 1000)) : remaining);
+  const elapsedMinutes = () =>
+    free ? Math.floor(freeNow() / 60) : mode === 'focus' ? Math.floor(focusElapsed() / 60) : 0;
+
   const stopAndLog = () => {
-    if (free) logMinutes(Math.floor(freeNow() / 60));
-    else if (mode === 'focus') logMinutes(Math.floor((total - remaining) / 60));
+    logMinutes(elapsedMinutes());
     reset(free ? 'free' : 'focus');
   };
+
+  useImperativeHandle(ref, () => ({
+    isActive: () => (free || mode === 'focus') && (running || started),
+    elapsedMinutes,
+    stopAndLog,
+  }));
 
   const label = running
     ? free

@@ -1,14 +1,15 @@
 'use client';
 
 import { Network } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { EmptyState } from '@/modules/mindmap/components/ui/EmptyState';
 import { Spinner } from '@/modules/mindmap/components/ui/Spinner';
 import { addDays, formatDateVi, startOfWeek, toDateKey } from '@/modules/mindmap/lib/utils';
 import { Todo } from '../api';
 import { useStreak, useTodosOfDays } from '../hooks';
 import { GrowthLookup, useGrowthLookup } from '../lookup';
-import { FocusTimer } from './FocusTimer';
+import { ConfirmDialog } from '@/modules/mindmap/components/ui/ConfirmDialog';
+import { FocusTimer, FocusTimerHandle } from './FocusTimer';
 import { PeriodMode, PeriodNav } from './PeriodNav';
 import { SmartTodoForm } from './SmartTodoForm';
 import { TodayImpact } from './TodayImpact';
@@ -44,7 +45,19 @@ export function TodosView({ mindmapId }: { mindmapId: number }) {
   // Việc đang gắn với đồng hồ Focus (giữ bản mới nhất từ danh sách để cộng phút cho đúng)
   const [focus, setFocus] = useState<{ todo: Todo; token: number } | null>(null);
   const focusTodo = focus ? (all.find((t) => t.id === focus.todo.id) ?? focus.todo) : null;
-  const startFocus = (todo: Todo) => setFocus((f) => ({ todo, token: (f?.token ?? 0) + 1 }));
+  const timerRef = useRef<FocusTimerHandle>(null);
+  // Đang có phiên chạy cho việc khác → hỏi trước khi chuyển (phút đã tập trung được ghi cho việc cũ)
+  const [switchTo, setSwitchTo] = useState<{ todo: Todo; minutes: number } | null>(null);
+  const beginFocus = (todo: Todo) => setFocus((f) => ({ todo, token: (f?.token ?? 0) + 1 }));
+  const startFocus = (todo: Todo) => {
+    const timer = timerRef.current;
+    if (timer?.isActive()) {
+      if (focusTodo?.id === todo.id) return; // đang tập trung đúng việc này
+      setSwitchTo({ todo, minutes: timer.elapsedMinutes() });
+      return;
+    }
+    beginFocus(todo);
+  };
 
   const periodLabel =
     mode === 'day'
@@ -139,10 +152,30 @@ export function TodosView({ mindmapId }: { mindmapId: number }) {
         </div>
 
         <div className="flex flex-col gap-6 lg:col-span-4">
-          <FocusTimer target={focusTodo} startToken={focus?.token ?? 0} />
+          <FocusTimer ref={timerRef} target={focusTodo} startToken={focus?.token ?? 0} />
           <TodayImpact todos={all} lookup={lookup} dateKey={formDate} periodLabel={periodLabel} />
         </div>
       </div>
+      <ConfirmDialog
+        open={switchTo !== null}
+        title="Chuyển phiên Focus?"
+        confirmLabel="Ghi nhận & chuyển"
+        onClose={() => setSwitchTo(null)}
+        onConfirm={() => {
+          if (!switchTo) return;
+          timerRef.current?.stopAndLog();
+          beginFocus(switchTo.todo);
+          setSwitchTo(null);
+        }}
+      >
+        Đang có phiên tập trung cho <b className="text-gray-900">“{focusTodo?.title ?? 'việc hiện tại'}”</b>
+        {switchTo && switchTo.minutes > 0 ? ` (${switchTo.minutes} phút)` : ''}. Chuyển sang{' '}
+        <b className="text-gray-900">“{switchTo?.todo.title}”</b>?
+        <br />
+        {switchTo && switchTo.minutes > 0
+          ? `${switchTo.minutes} phút đã tập trung sẽ được ghi nhận cho việc cũ, rồi bắt đầu phiên mới.`
+          : 'Phiên hiện tại chưa đủ 1 phút nên không có gì để ghi nhận.'}
+      </ConfirmDialog>
     </div>
   );
 }
