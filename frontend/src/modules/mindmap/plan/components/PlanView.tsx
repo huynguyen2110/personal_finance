@@ -22,7 +22,7 @@ export function PlanView({ mindmapId }: { mindmapId: number }) {
     : [];
 
   return (
-    <div className="page-in mx-auto max-w-5xl space-y-5 p-6 md:p-8">
+    <div className="page-in w-full space-y-5 p-6 md:p-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Kế hoạch</h1>
@@ -71,7 +71,7 @@ export function PlanView({ mindmapId }: { mindmapId: number }) {
             windowDays={plan.windowDays}
           />
 
-          <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+          <div className="grid gap-5 lg:grid-cols-[1fr_320px] 2xl:grid-cols-[1fr_380px]">
             <NextActions mindmapId={mindmapId} actions={plan.next} />
             <div className="space-y-5">
               <BlockedList actions={plan.blocked} />

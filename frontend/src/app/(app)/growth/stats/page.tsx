@@ -35,7 +35,7 @@ export default function StatsPage() {
   const percent = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
-    <div className="page-in mx-auto max-w-3xl space-y-4 p-6 md:p-8">
+    <div className="page-in w-full space-y-4 p-6 md:p-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Thống kê tuần</h1>
         <p className="mt-0.5 text-sm text-gray-500">
@@ -65,8 +65,11 @@ export default function StatsPage() {
             />
           </div>
 
-          <WeeklyBarChart days={data.days} />
-          <AreaTimeList areas={data.byArea} />
+          {/* Màn rộng: biểu đồ theo ngày và danh sách theo lĩnh vực nằm cạnh nhau */}
+          <div className="grid items-start gap-4 xl:grid-cols-2">
+            <WeeklyBarChart days={data.days} />
+            <AreaTimeList areas={data.byArea} />
+          </div>
         </>
       )}
     </div>
