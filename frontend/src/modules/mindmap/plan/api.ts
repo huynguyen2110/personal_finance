@@ -52,6 +52,8 @@ export interface PlanArea {
   title: string;
   status: NodeStatus | null;
   priority: OptionRef | null;
+  /** Mức ưu tiên 0–1 của lĩnh vực; null = chưa đặt. */
+  priorityLevel: number | null;
   actionsTotal: number;
   actionsDone: number;
   remainingHours: number;

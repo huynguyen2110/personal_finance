@@ -55,3 +55,12 @@ export class WeeklyStatsDto {
   @Matches(DATE, { message: 'start phải là YYYY-MM-DD' })
   start: string;
 }
+
+export class RangeStatsDto {
+  // Khoảng ngày [from, to] "YYYY-MM-DD" (tối đa 120 ngày)
+  @Matches(DATE, { message: 'from phải là YYYY-MM-DD' })
+  from: string;
+
+  @Matches(DATE, { message: 'to phải là YYYY-MM-DD' })
+  to: string;
+}

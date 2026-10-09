@@ -1,4 +1,4 @@
-import { aggregateByArea, buildPlan, optionLevels, type PlanDefinition, type PlanNode, type PlanTodo } from './plan';
+import { aggregateByArea, buildPlan, optionLevels, synergyHighlights, type PlanDefinition, type PlanNode, type PlanTodo } from './plan';
 
 // 1 Gốc
 // ├─ 10 Tiếng Anh (ưu tiên cao)
@@ -132,7 +132,7 @@ describe('mindmap plan', () => {
   it('todo cộng dồn lên tổ tiên; lĩnh vực: tiến độ, thời gian/chi phí còn lại, cờ bỏ quên', () => {
     expect(action(21).todos).toEqual({ total: 1, done: 1, minutes: 20, avgEffectiveness: 2, lastDate: '2026-10-01' });
     const [english, health] = plan.areas;
-    expect(english).toMatchObject({ nodeId: 10, actionsTotal: 2, actionsDone: 0, remainingHours: 101, remainingCost: 5_000_000, neglected: false });
+    expect(english).toMatchObject({ nodeId: 10, priorityLevel: 1, actionsTotal: 2, actionsDone: 0, remainingHours: 101, remainingCost: 5_000_000, neglected: false });
     expect(english.todos).toMatchObject({ minutes: 30, avgEffectiveness: 4 });
     expect(health).toMatchObject({ actionsTotal: 3, actionsDone: 1, remainingCost: 200_000, neglected: false });
 
@@ -176,6 +176,59 @@ describe('aggregateByArea', () => {
       { areaId: 10, title: 'Tiếng Anh', mindmapId: 1, mindmapTitle: 'A', total: 2, done: 1, minutes: 60, prevMinutes: 40, avgEffectiveness: 5 },
       { areaId: 20, title: 'Sức khỏe', mindmapId: 1, mindmapTitle: 'A', total: 1, done: 0, minutes: 30, prevMinutes: 0, avgEffectiveness: null },
       { areaId: 101, title: 'Code', mindmapId: 2, mindmapTitle: 'B', total: 1, done: 1, minutes: 15, prevMinutes: 0, avgEffectiveness: 3 },
+    ]);
+  });
+});
+
+describe('synergyHighlights', () => {
+  const nodes = [
+    { id: 1, parentId: null, title: 'Gốc', mindmapId: 1, mindmapTitle: 'A' },
+    { id: 10, parentId: 1, title: 'Tiếng Anh', mindmapId: 1, mindmapTitle: 'A' },
+    { id: 11, parentId: 10, title: 'Podcast', mindmapId: 1, mindmapTitle: 'A' },
+    { id: 20, parentId: 1, title: 'Sức khỏe', mindmapId: 1, mindmapTitle: 'A' },
+    { id: 21, parentId: 20, title: 'Chạy bộ', mindmapId: 1, mindmapTitle: 'A' },
+  ];
+  const t = (title: string, nodeIds: number[], minutes: number, eff: number | null, completed = true) => ({
+    title,
+    date: '2026-10-05',
+    completed,
+    durationMinutes: minutes,
+    effectiveness: eff,
+    nodeIds,
+  });
+
+  it('chỉ lấy việc gắn ≥ 2 lĩnh vực, gom theo tên (không phân biệt hoa thường), phút tính đủ cho từng lĩnh vực', () => {
+    const rows = synergyHighlights(nodes, [
+      t('Nghe podcast khi chạy', [21, 11], 30, 4),
+      t('nghe podcast khi chạy ', [11, 21], 40, 5, false),
+      t('Chạy bộ', [21], 50, 3),
+      t('Ôn từ khi đi bộ', [11, 20], 10, null),
+    ]);
+    expect(rows).toEqual([
+      {
+        title: 'Nghe podcast khi chạy',
+        nodeIds: [21, 11],
+        count: 2,
+        done: 1,
+        minutes: 70,
+        avgEffectiveness: 4.5,
+        areas: [
+          { areaId: 10, title: 'Tiếng Anh', minutes: 70 },
+          { areaId: 20, title: 'Sức khỏe', minutes: 70 },
+        ],
+      },
+      {
+        title: 'Ôn từ khi đi bộ',
+        nodeIds: [11, 20],
+        count: 1,
+        done: 1,
+        minutes: 10,
+        avgEffectiveness: null,
+        areas: [
+          { areaId: 10, title: 'Tiếng Anh', minutes: 10 },
+          { areaId: 20, title: 'Sức khỏe', minutes: 10 },
+        ],
+      },
     ]);
   });
 });

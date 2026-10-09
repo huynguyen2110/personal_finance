@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, type JwtUser } from '../../../common/decorators/current-user.decorator';
-import { CreateTodoDto, QueryTodosDto, UpdateTodoDto, WeeklyStatsDto } from '../dto/todo.dto';
+import { CreateTodoDto, QueryTodosDto, RangeStatsDto, UpdateTodoDto, WeeklyStatsDto } from '../dto/todo.dto';
 import { TodosService } from '../services/todos.service';
 
 @ApiTags('Mindmap')
@@ -24,6 +24,11 @@ export class TodosController {
   @Get('streak')
   streak(@CurrentUser() user: JwtUser) {
     return this.todos.streak(user.sub);
+  }
+
+  @Get('stats/range')
+  rangeStats(@CurrentUser() user: JwtUser, @Query() query: RangeStatsDto) {
+    return this.todos.rangeStats(user.sub, query.from, query.to);
   }
 
   @Get('stats/weekly')

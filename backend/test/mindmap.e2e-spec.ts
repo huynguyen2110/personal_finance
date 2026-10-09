@@ -268,6 +268,17 @@ describe('Mindmap API (e2e)', () => {
       const stats = (await authed('get', `/api/mindmap/todos/stats/weekly?start=${today}`).expect(200)).body.data;
       expect(stats.totals.minutes).toBeGreaterThanOrEqual(45);
       expect(stats.byArea.find((r: { areaId: number }) => r.areaId === area)).toMatchObject({ title: 'Kỹ năng số', mindmapId: gid, total: 1, done: 1, minutes: 45, prevMinutes: 0, avgEffectiveness: 5 });
+
+      // Khoảng ngày bất kỳ: theo ngày kèm phút, kỳ trước cùng độ dài; khoảng sai → 400
+      const range = (await authed('get', `/api/mindmap/todos/stats/range?from=${addDaysStr(today, -2)}&to=${today}`).expect(200)).body.data;
+      expect(range.days).toHaveLength(3);
+      expect(range.days[2].date).toBe(today);
+      expect(range.days[2].done).toBeGreaterThanOrEqual(1); // kèm todo xong hôm nay từ test trước
+      expect(range.days[2].minutes).toBeGreaterThanOrEqual(45);
+      expect(range.prevTotals).toEqual(expect.objectContaining({ total: expect.any(Number), minutes: expect.any(Number) }));
+      expect(range.synergy).toEqual([]);
+      await authed('get', `/api/mindmap/todos/stats/range?from=${today}&to=${addDaysStr(today, -1)}`).expect(400);
+      await authed('get', `/api/mindmap/todos/stats/range?from=${addDaysStr(today, -200)}&to=${today}`).expect(400);
     });
   });
 

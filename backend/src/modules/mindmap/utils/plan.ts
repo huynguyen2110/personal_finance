@@ -93,6 +93,8 @@ export interface PlanArea {
   title: string;
   status: string | null;
   priority: OptionRef | null;
+  // Mức ưu tiên 0–1 của lĩnh vực; null = chưa đặt
+  priorityLevel: number | null;
   actionsTotal: number;
   actionsDone: number;
   remainingHours: number;
@@ -299,6 +301,7 @@ export function buildPlan(input: {
         title: n.title,
         status: n.status,
         priority: priority?.option ?? null,
+        priorityLevel: priority?.level ?? null,
         actionsTotal: mine.length,
         actionsDone: mine.length - left.length,
         remainingHours: round1(left.reduce((s, a) => s + (a.hours ?? 0), 0)),
@@ -386,4 +389,54 @@ export function aggregateByArea(nodes: AreaNode[], current: PlanTodo[], prev: Pl
       avgEffectiveness: effCount ? round1(effSum / effCount) : null,
     }))
     .sort((a, b) => b.minutes - a.minutes || b.done - a.done || b.total - a.total);
+}
+
+export interface SynergyRow {
+  title: string;
+  nodeIds: number[];
+  count: number;
+  done: number;
+  minutes: number;
+  avgEffectiveness: number | null;
+  // Số phút đóng góp cho từng lĩnh vực (tính đủ cho mỗi lĩnh vực — một việc, nhiều tác động)
+  areas: { areaId: number; title: string; minutes: number }[];
+}
+
+// "Cộng hưởng": việc gắn với ≥ 2 lĩnh vực trong kỳ, gom theo tên việc + bộ lĩnh vực, nhiều phút nhất trước
+export function synergyHighlights(nodes: AreaNode[], todos: (PlanTodo & { title: string })[], limit = 3): SynergyRow[] {
+  const info = depthAndArea(nodes);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const groups = new Map<string, SynergyRow & { effSum: number; effCount: number }>();
+  for (const t of todos) {
+    const areaIds = [...new Set(t.nodeIds.map((id) => info.get(id)?.areaId).filter((a): a is number => a != null))].sort(
+      (a, b) => a - b,
+    );
+    if (areaIds.length < 2) continue;
+    const key = `${t.title.trim().toLowerCase()}|${areaIds.join(',')}`;
+    const g = groups.get(key) ?? {
+      title: t.title.trim(),
+      nodeIds: [...new Set(t.nodeIds)],
+      count: 0,
+      done: 0,
+      minutes: 0,
+      avgEffectiveness: null,
+      areas: areaIds.map((areaId) => ({ areaId, title: byId.get(areaId)?.title ?? '', minutes: 0 })),
+      effSum: 0,
+      effCount: 0,
+    };
+    const m = t.durationMinutes ?? 0;
+    g.count++;
+    if (t.completed) g.done++;
+    g.minutes += m;
+    for (const a of g.areas) a.minutes += m;
+    if (t.effectiveness !== null) {
+      g.effSum += t.effectiveness;
+      g.effCount++;
+    }
+    groups.set(key, g);
+  }
+  return [...groups.values()]
+    .map(({ effSum, effCount, ...g }) => ({ ...g, avgEffectiveness: effCount ? round1(effSum / effCount) : null }))
+    .sort((a, b) => b.minutes - a.minutes || b.done - a.done || b.count - a.count)
+    .slice(0, limit);
 }
