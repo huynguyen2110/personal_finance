@@ -2,18 +2,21 @@
 
 import {
   Check,
+  ChevronDown,
   Clock,
   GitMerge,
   KeyRound,
   Link2,
   LockOpen,
+  PenLine,
   Share2,
   Star,
   Timer,
   Trash2,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatCompactVND } from '@/lib/money';
 import { GOption, GSelect } from '@/modules/mindmap/components/ui/GSelect';
 import { areaIcon } from '@/modules/mindmap/lib/areaIcon';
@@ -22,6 +25,7 @@ import { cn, formatMinutes } from '@/modules/mindmap/lib/utils';
 import { Todo } from '../api';
 import { useDeleteTodo, useUpdateTodo } from '../hooks';
 import { GrowthLookup } from '../lookup';
+import { parseDuration } from './DurationPicker';
 
 function Strip({
   icon,
@@ -50,68 +54,144 @@ function Strip({
 
 const chip = 'flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold';
 
-/** Thời lượng dạng chip; bấm để sửa (Enter / bỏ focus để lưu, Esc để hủy). */
+const PRESETS = [15, 25, 45, 60, 90, 120];
+const presetLabel = (m: number) => (m < 60 ? `${m}p` : m % 60 ? `${Math.floor(m / 60)}g${m % 60}` : `${m / 60} giờ`);
+
+/**
+ * Thời lượng dạng chip; bấm mở popover: mức có sẵn, tự nhập ("40", "1:30", "1h30"), bỏ thời lượng.
+ * Esc / bấm ra ngoài để đóng.
+ */
 function MinutesChip({ todo }: { todo: Todo }) {
   const updateTodo = useUpdateTodo();
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState('');
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState('');
+  const rootRef = useRef<HTMLDivElement>(null);
   const done = todo.completed;
+  const current = todo.durationMinutes;
 
-  const start = () => {
-    setValue(todo.durationMinutes === null ? '' : String(todo.durationMinutes));
-    setEditing(true);
-  };
-  const commit = () => {
-    setEditing(false);
-    const parsed = value.trim() === '' ? null : Math.min(1440, Math.max(0, Math.round(Number(value))));
-    if (parsed !== null && Number.isNaN(parsed)) return;
-    if (parsed !== todo.durationMinutes) updateTodo.mutate({ id: todo.id, durationMinutes: parsed });
-  };
+  // Đóng khi bấm ra ngoài hoặc nhấn Esc
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
-  if (editing) {
-    return (
-      <span className={cn(chip, 'bg-white ring-2 ring-violet-300')}>
-        <Clock size={12} className="text-violet-600" />
-        <input
-          autoFocus
-          type="number"
-          min={0}
-          max={1440}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur();
-            if (e.key === 'Escape') setEditing(false);
-          }}
-          className="w-12 bg-transparent text-right outline-none"
-        />
-        phút
-      </span>
-    );
-  }
+  const save = (minutes: number | null) => {
+    setOpen(false);
+    if (minutes !== current) updateTodo.mutate({ id: todo.id, durationMinutes: minutes });
+  };
+  const parsed = parseDuration(text);
+  const invalid = Number.isNaN(parsed);
+
   return (
-    <button
-      type="button"
-      onClick={start}
-      title={done ? 'Sửa số phút đã đầu tư' : 'Sửa thời lượng dự kiến'}
-      className={cn(
-        chip,
-        'transition',
-        todo.durationMinutes === null
-          ? 'border border-dashed border-[#ccc3d8] text-gray-400 hover:border-violet-400 hover:text-violet-700'
-          : done
-            ? 'bg-teal-50 text-teal-800 hover:bg-teal-100'
-            : 'bg-[#f2f3ff] text-gray-600 hover:bg-[#eaedff]',
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => {
+          setText(current !== null && !PRESETS.includes(current) ? String(current) : '');
+          setOpen((v) => !v);
+        }}
+        title={done ? 'Sửa số phút đã đầu tư' : 'Sửa thời lượng dự kiến'}
+        aria-expanded={open}
+        className={cn(
+          chip,
+          'transition',
+          open && 'ring-2 ring-violet-300',
+          current === null
+            ? 'border border-dashed border-[#ccc3d8] text-gray-400 hover:border-violet-400 hover:text-violet-700'
+            : done
+              ? 'bg-teal-50 text-teal-800 hover:bg-teal-100'
+              : 'bg-[#f2f3ff] text-gray-600 hover:bg-[#eaedff]',
+        )}
+      >
+        <Clock size={12} />
+        {current === null ? 'Thời lượng' : done ? `Đã đầu tư ${formatMinutes(current)}` : formatMinutes(current)}
+        <ChevronDown size={12} className={cn('opacity-60 transition', open && 'rotate-180')} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 z-30 mt-1.5 w-64 rounded-xl bg-white p-3 shadow-[0_12px_32px_rgba(19,27,46,0.16)] ring-1 ring-[#e2e7ff]">
+          <p className="mb-2 text-[11px] font-semibold tracking-wide text-gray-500 uppercase">
+            {done ? 'Số phút đã đầu tư' : 'Thời lượng dự kiến'}
+          </p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {PRESETS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => save(m)}
+                className={cn(
+                  'rounded-lg py-1.5 text-xs font-semibold transition',
+                  current === m
+                    ? 'bg-violet-600 text-white shadow-sm'
+                    : 'bg-[#f2f3ff] text-gray-700 hover:bg-[#eaedff] hover:text-violet-700',
+                )}
+              >
+                {presetLabel(m)}
+              </button>
+            ))}
+          </div>
+
+          <form
+            className="mt-2.5 flex flex-col gap-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (parsed !== null && !invalid) save(parsed);
+            }}
+          >
+            <div
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg bg-[#f2f3ff] py-1 pr-1 pl-2.5 transition focus-within:bg-white focus-within:ring-2',
+                invalid ? 'ring-2 ring-red-300 focus-within:ring-red-300' : 'focus-within:ring-violet-300',
+              )}
+            >
+              <PenLine size={13} className="shrink-0 text-gray-400" />
+              <input
+                autoFocus
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Tự nhập: 40 hoặc 1:30"
+                aria-label="Tự nhập thời lượng"
+                aria-invalid={invalid}
+                className="w-full min-w-0 bg-transparent text-xs text-gray-900 outline-none placeholder:text-gray-400"
+              />
+              <button
+                type="submit"
+                disabled={parsed === null || invalid}
+                className="shrink-0 rounded-md bg-violet-600 px-2 py-1 text-[11px] font-semibold text-white transition hover:bg-violet-700 disabled:opacity-40"
+              >
+                Lưu
+              </button>
+            </div>
+            <span className={cn('px-0.5 text-[11px] font-semibold', invalid ? 'text-red-500' : 'text-gray-400')}>
+              {invalid
+                ? 'Sai định dạng — VD: 40 hoặc 1:30'
+                : parsed !== null
+                  ? `= ${formatMinutes(parsed)} — Enter để lưu`
+                  : 'Số phút, hoặc giờ:phút'}
+            </span>
+          </form>
+
+          {current !== null && (
+            <button
+              type="button"
+              onClick={() => save(null)}
+              className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-gray-400 transition hover:text-red-600"
+            >
+              <X size={12} /> Bỏ thời lượng
+            </button>
+          )}
+        </div>
       )}
-    >
-      <Clock size={12} />
-      {todo.durationMinutes === null
-        ? 'Thời lượng'
-        : done
-          ? `Đã đầu tư ${formatMinutes(todo.durationMinutes)}`
-          : formatMinutes(todo.durationMinutes)}
-    </button>
+    </div>
   );
 }
 
@@ -207,12 +287,12 @@ export function TodoCard({
   return (
     <div
       className={cn(
-        'group relative flex items-start gap-3 overflow-hidden rounded-xl bg-white py-3.5 pr-3 pl-5 shadow-sm transition-shadow hover:shadow-md',
+        'group relative flex items-start gap-3 rounded-xl bg-white py-3.5 pr-3 pl-5 shadow-sm transition-shadow hover:shadow-md',
         done && 'bg-white/80',
         focused && 'ring-2 ring-violet-400',
       )}
     >
-      <span className="absolute top-0 bottom-0 left-0 w-1" style={{ backgroundColor: accent }} />
+      <span className="absolute top-0 bottom-0 left-0 w-1 rounded-l-xl" style={{ backgroundColor: accent }} />
 
       <button
         type="button"
