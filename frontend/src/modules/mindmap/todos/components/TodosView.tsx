@@ -68,7 +68,7 @@ export function TodosView({ mindmapId }: { mindmapId: number }) {
   );
 
   return (
-    <div className="page-in mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 md:p-8" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div className="page-in flex w-full flex-col gap-6 p-6 md:p-8" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1 text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
