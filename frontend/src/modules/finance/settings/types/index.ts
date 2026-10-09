@@ -6,6 +6,8 @@ export interface AppSettings {
   emailStartDate: string | null;
   // Có ghi nhận email báo tiền đến không; false = chỉ lấy email tiền đi (chi tiêu)
   emailIncoming: boolean;
+  // Tài khoản của chính mình (ngân hàng khác) mà chuyển SANG vẫn luôn tính chi tiêu (VD quỹ phòng)
+  alwaysSpendAccounts: { accountNumber: string; name: string | null; bank: string | null }[];
   // Do server tính kèm để hiển thị: hôm nay, tháng tài chính hiện tại và khoảng ngày của nó
   today: string;
   currentMonth: string;

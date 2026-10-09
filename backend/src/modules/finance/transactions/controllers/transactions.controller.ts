@@ -6,6 +6,7 @@ import { xlsxFile } from '../../../../common/utils/excel.util';
 import { TransactionsService } from '../services/transactions.service';
 import { TransactionsExportService } from '../services/transactions-export.service';
 import {
+  AlwaysSpendDto,
   BulkUpdateTransactionsDto,
   CreateTransactionDto,
   TransactionFilterDto,
@@ -33,9 +34,22 @@ export class TransactionsController {
     return xlsxFile(workbook, filename, res);
   }
 
+  // Các tài khoản của chính mình đã nhận tiền chuyển đi (mục Cài đặt → Chuyển cho chính bạn)
+  @Get('self-transfer-accounts')
+  selfTransferAccounts() {
+    return this.transactions.selfTransferAccounts();
+  }
+
   @Patch('bulk')
   bulk(@Body() dto: BulkUpdateTransactionsDto) {
     return this.transactions.bulkUpdate(dto);
+  }
+
+  // Luôn tính chi tiêu cho các lần chuyển sang một tài khoản của chính mình (khai báo trước các route ':id')
+  @Post('always-spend')
+  @HttpCode(200)
+  alwaysSpend(@Body() dto: AlwaysSpendDto) {
+    return this.transactions.setAlwaysSpend(dto);
   }
 
   @Post()

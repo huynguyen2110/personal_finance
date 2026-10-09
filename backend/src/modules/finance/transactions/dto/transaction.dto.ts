@@ -11,6 +11,7 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  Matches,
   Max,
   MaxLength,
   ValidateIf,
@@ -84,4 +85,16 @@ export class BulkUpdateTransactionsDto {
   @IsOptional() @ValidateIf((o) => o.categoryId !== null) @IsInt() @IsPositive() categoryId?: number | null;
 
   @IsOptional() @IsBoolean() excludeFromStats?: boolean;
+}
+
+// Bật/tắt "luôn tính chi tiêu" cho các lần chuyển SANG một tài khoản của chính mình (VD tài khoản quỹ phòng)
+export class AlwaysSpendDto {
+  @Matches(/^[A-Za-z0-9]{4,40}$/, { message: 'Số tài khoản không hợp lệ' })
+  accountNumber: string;
+
+  @IsBoolean()
+  enabled: boolean;
+
+  @IsOptional() @ValidateIf((o) => o.name !== null) @IsString() @MaxLength(200) name?: string | null;
+  @IsOptional() @ValidateIf((o) => o.bank !== null) @IsString() @MaxLength(200) bank?: string | null;
 }

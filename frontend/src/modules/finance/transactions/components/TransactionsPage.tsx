@@ -45,10 +45,10 @@ import { useCategories } from '@/modules/finance/categories/lib';
 import { suggestionFor } from '@/modules/finance/categories/utils/groups';
 import { errorMessage } from '@/lib/api-client';
 import { invalidateFinanceData } from '@/lib/query-client';
-import { bulkUpdateTransactions, deleteTransaction, exportTransactions, updateTransaction, useTransactions } from '../lib';
+import { bulkUpdateTransactions, deleteTransaction, exportTransactions, updateTransaction, useTransactions, setAlwaysSpend } from '../lib';
 import { formatVND } from '@/lib/money';
 import { addMonths, currentMonthVN, formatMonthLabel, formatVNDate, formatVNDateTime, monthRange } from '@/lib/dates';
-import { useMonthStartDay } from '@/modules/finance/settings/lib';
+import { useMonthStartDay, useSettings } from '@/modules/finance/settings/lib';
 import type { TransactionDTO } from '../types';
 
 const FILTER_KEYS = ['from', 'to', 'accountId', 'direction', 'categoryId', 'q', 'source', 'excluded', 'transfer', 'min', 'max', 'sort'] as const;
@@ -60,6 +60,9 @@ type ParamPatch = Partial<Record<FilterKey | 'page' | 'pageSize', string | undef
 // Các khóa do hàng "chip" nhanh điều khiển (không tính vào số đếm của chip)
 const CHIP_KEYS = ['transfer', 'source', 'min', 'excluded'] as const;
 const BIG_AMOUNT = '1000000';
+
+// Ghi chú backend gắn cho khoản chuyển cho chính mình tự nhận diện từ email (ingest-email.service.ts)
+const SELF_TRANSFER_NOTE = 'Chuyển giữa các tài khoản của chính bạn';
 
 const SOURCE_LABEL = { EMAIL: 'Email ngân hàng', MANUAL: 'Nhập tay', IMPORT: 'Nhập dữ liệu' } as const;
 const PAGE_SIZES = [10, 25, 50, 100] as const;
@@ -391,6 +394,9 @@ export default function TransactionsPage() {
   }, [filters, page, pageSize]);
 
   const reload = () => invalidateFinanceData(qc);
+  // Tài khoản của chính mình mà chuyển sang luôn tính chi tiêu (Cài đặt)
+  const { data: appSettings } = useSettings();
+  const alwaysSpend = new Set((appSettings?.alwaysSpendAccounts ?? []).map((a) => a.accountNumber));
 
   async function onExport() {
     setExporting(true);
@@ -407,6 +413,36 @@ export default function TransactionsPage() {
     try {
       await updateTransaction(t.id, { categoryId });
       toast.success('Đã đổi danh mục');
+      reload();
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  }
+
+  // Chuyển cho chính mình (tự nhận diện từ email): bật/tắt tính vào thống kê (VD chuyển sang tài khoản quỹ phòng vẫn muốn tính chi tiêu)
+  async function toggleStats(t: TransactionDTO) {
+    const include = t.excludeFromStats;
+    try {
+      await updateTransaction(t.id, { excludeFromStats: !include });
+      toast.success(include ? `Đã tính vào ${t.direction === 'OUT' ? 'chi tiêu' : 'thu nhập'}` : 'Đã loại khỏi thống kê');
+      reload();
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  }
+
+  // Bật/tắt "luôn tính chi tiêu" cho mọi lần chuyển sang tài khoản bên kia của giao dịch này (áp cả giao dịch cũ)
+  async function toggleAlwaysSpend(t: TransactionDTO, enabled: boolean) {
+    const to = t.selfTransferTo;
+    if (!to) return;
+    const label = `${to.bank ?? 'tài khoản'} ••${to.accountNumber.slice(-4)}`;
+    try {
+      const r = await setAlwaysSpend({ accountNumber: to.accountNumber, enabled, name: to.name, bank: to.bank });
+      toast.success(
+        enabled
+          ? `Luôn tính chi tiêu khi chuyển sang ${label} (cập nhật ${r.updated} giao dịch)`
+          : `Bỏ luôn tính chi tiêu cho ${label} (cập nhật ${r.updated} giao dịch)`,
+      );
       reload();
     } catch (e) {
       toast.error(errorMessage(e));
@@ -868,7 +904,10 @@ export default function TransactionsPage() {
                 )}
                 {data?.items.map((t) => {
                   const isTransfer = !!t.transferPair;
-                  const uncategorized = !isTransfer && t.categoryId === null;
+                  // Chuyển cho chính mình (tự nhận diện từ email, chưa ghép cặp): cho chọn tính / không tính vào thống kê
+                  const selfTransfer = !isTransfer && !!t.note?.startsWith(SELF_TRANSFER_NOTE);
+                  // Khoản đang loại khỏi thống kê thì không cần danh mục
+                  const uncategorized = !isTransfer && t.categoryId === null && !(selfTransfer && t.excludeFromStats);
                   const [datePart, timePart] = formatVNDateTime(t.transactionDate).split(' ');
                   return (
                     <tr
@@ -929,6 +968,45 @@ export default function TransactionsPage() {
                                 <Link2 className="w-3.5 h-3.5 shrink-0" aria-hidden />
                                 {t.direction === 'OUT' ? 'Sang' : 'Từ'} {t.transferPair.account.name}
                               </span>
+                            ) : selfTransfer ? (
+                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                                <span
+                                  className={`inline-flex items-center gap-1 ${t.excludeFromStats ? 'text-slate-500' : 'text-teal-700 font-medium'}`}
+                                  title="Chuyển giữa các tài khoản của chính bạn (tự nhận diện từ email)"
+                                >
+                                  <ArrowLeftRight className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                                  {t.excludeFromStats ? 'Chuyển cho chính bạn · không tính' : `Chuyển cho chính bạn · tính ${t.direction === 'OUT' ? 'chi tiêu' : 'thu nhập'}`}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleStats(t)}
+                                  className={`px-1.5 py-0.5 rounded-md border text-[11px] font-semibold transition-colors ${
+                                    t.excludeFromStats
+                                      ? 'border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100'
+                                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  {t.excludeFromStats ? `Tính vào ${t.direction === 'OUT' ? 'chi tiêu' : 'thu nhập'}` : 'Không tính'}
+                                </button>
+                                {/* Áp cho mọi lần chuyển sang cùng tài khoản này, cả sau này */}
+                                {t.direction === 'OUT' && t.selfTransferTo && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleAlwaysSpend(t, !alwaysSpend.has(t.selfTransferTo!.accountNumber))}
+                                    title={`${t.selfTransferTo.bank ?? ''} ${t.selfTransferTo.accountNumber}${t.selfTransferTo.name ? ` · ${t.selfTransferTo.name}` : ''}`}
+                                    className="px-1.5 py-0.5 rounded-md text-[11px] font-semibold text-teal-700 hover:bg-teal-50 hover:underline"
+                                  >
+                                    {alwaysSpend.has(t.selfTransferTo.accountNumber)
+                                      ? `Bỏ luôn tính ••${t.selfTransferTo.accountNumber.slice(-4)}`
+                                      : `Luôn tính ••${t.selfTransferTo.accountNumber.slice(-4)}`}
+                                  </button>
+                                )}
+                                {!t.excludeFromStats && t.categoryId === null && (
+                                  <span className="inline-flex items-center gap-1 text-amber-700 font-medium">
+                                    <TriangleAlert className="w-3.5 h-3.5 shrink-0" aria-hidden /> Chưa phân loại
+                                  </span>
+                                )}
+                              </span>
                             ) : uncategorized ? (
                               <span className="inline-flex items-center gap-1 text-amber-700 font-medium whitespace-nowrap shrink-0">
                                 <TriangleAlert className="w-3.5 h-3.5 shrink-0" aria-hidden /> Chưa phân loại
@@ -939,7 +1017,8 @@ export default function TransactionsPage() {
                               </span>
                             ) : null}
                             {t.referenceCode && <span className="fin-num truncate">Ref {t.referenceCode}</span>}
-                            {t.note && (
+                            {/* Ghi chú tự nhận diện đã thể hiện bằng nhãn ở trên */}
+                            {t.note && !selfTransfer && (
                               <span className="italic truncate" title={t.note}>
                                 {t.note}
                               </span>

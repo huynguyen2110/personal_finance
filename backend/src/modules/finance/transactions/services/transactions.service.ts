@@ -5,7 +5,9 @@ import { TransfersService } from '../../transfers/services/transfers.service';
 import { kindForDirection } from '../../rules/utils/rule-engine';
 import { buildTxnWhere } from '../utils/txn-filter';
 import { SORTS, txnSelect } from '../utils/txn-query';
-import { BulkUpdateTransactionsDto, CreateTransactionDto, UpdateTransactionDto } from '../dto/transaction.dto';
+import { AlwaysSpendDto, BulkUpdateTransactionsDto, CreateTransactionDto, UpdateTransactionDto } from '../dto/transaction.dto';
+import { SELF_TRANSFER_NOTE } from '../../email/utils/email-content';
+import { SettingsService } from '../../../../services/settings.service';
 
 const MANUAL_ONLY = ['amount', 'content', 'transactionDate', 'direction', 'accountId'] as const;
 
@@ -18,6 +20,7 @@ export class TransactionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly transfers: TransfersService,
+    private readonly settings: SettingsService,
   ) {}
 
   async list(sp: URLSearchParams) {
@@ -37,7 +40,72 @@ export class TransactionsService {
     ]);
 
     const sumOf = (d: 'IN' | 'OUT') => Number(sums.find((s) => s.direction === d)?._sum.amount ?? 0);
-    return { items, total, page, pageSize, sumIn: sumOf('IN'), sumOut: sumOf('OUT'), statsCount, statsUncategorized };
+    return { items: await this.withSelfTransferTo(items), total, page, pageSize, sumIn: sumOf('IN'), sumOut: sumOf('OUT'), statsCount, statsUncategorized };
+  }
+
+  // Khoản chuyển cho chính mình (tự nhận diện từ email): kèm tài khoản bên nhận/bên gửi lấy từ email gốc
+  private async withSelfTransferTo<T extends { id: number; note: string | null }>(items: T[]) {
+    const ids = items.filter((t) => t.note?.startsWith(SELF_TRANSFER_NOTE)).map((t) => t.id);
+    const raw = ids.length ? await this.prisma.transaction.findMany({ where: { id: { in: ids } }, select: { id: true, rawPayload: true } }) : [];
+    const byId = new Map(
+      raw.map((r) => {
+        const p = (r.rawPayload ?? {}) as { counterpartyAccount?: string | null; counterpartyName?: string | null; counterpartyBank?: string | null };
+        return [r.id, p.counterpartyAccount ? { accountNumber: p.counterpartyAccount, name: p.counterpartyName ?? null, bank: p.counterpartyBank ?? null } : null];
+      }),
+    );
+    return items.map((t) => ({ ...t, selfTransferTo: byId.get(t.id) ?? null }));
+  }
+
+  // Các tài khoản của chính mình đã nhận tiền chuyển đi (tự nhận diện từ email), kèm có đang "luôn tính chi tiêu" không.
+  // Dùng cho mục Cài đặt → Chuyển cho chính bạn.
+  async selfTransferAccounts() {
+    const rows = await this.prisma.$queryRaw<
+      { accountNumber: string; name: string | null; bank: string | null; count: number; counted: number; total: bigint; lastDate: Date }[]
+    >`
+      SELECT t."rawPayload"->>'counterpartyAccount' AS "accountNumber",
+             MAX(t."rawPayload"->>'counterpartyName') AS name,
+             MAX(t."rawPayload"->>'counterpartyBank') AS bank,
+             COUNT(*)::int AS count,
+             SUM(CASE WHEN t."excludeFromStats" THEN 0 ELSE 1 END)::int AS counted,
+             SUM(t.amount)::bigint AS total,
+             MAX(t."transactionDate") AS "lastDate"
+      FROM "Transaction" t
+      WHERE t.direction = 'OUT'
+        AND t."transferPairId" IS NULL
+        AND t.note LIKE ${SELF_TRANSFER_NOTE + '%'}
+        AND t."rawPayload"->>'counterpartyAccount' IS NOT NULL
+      GROUP BY 1
+      ORDER BY MAX(t."transactionDate") DESC`;
+    const always = (await this.settings.get()).alwaysSpendAccounts;
+    const seen = new Set(rows.map((r) => r.accountNumber));
+    return [
+      ...rows.map((r) => ({ ...r, total: Number(r.total), alwaysSpend: always.some((a) => a.accountNumber === r.accountNumber) })),
+      // Đã bật "luôn tính" nhưng chưa có giao dịch nào (hoặc giao dịch đã bị xóa)
+      ...always
+        .filter((a) => !seen.has(a.accountNumber))
+        .map((a) => ({ ...a, count: 0, counted: 0, total: 0, lastDate: null, alwaysSpend: true })),
+    ];
+  }
+
+  // Chuyển SANG một tài khoản của chính mình nhưng vẫn tính chi tiêu (VD quỹ phòng): lưu vào cài đặt để áp cho email sau này,
+  // đồng thời áp ngay cho các khoản chuyển đi cũ tới tài khoản đó (khoản chưa ghép cặp chuyển nội bộ).
+  async setAlwaysSpend(dto: AlwaysSpendDto) {
+    const current = (await this.settings.get()).alwaysSpendAccounts.filter((a) => a.accountNumber !== dto.accountNumber);
+    const alwaysSpendAccounts = dto.enabled
+      ? [...current, { accountNumber: dto.accountNumber, name: dto.name ?? null, bank: dto.bank ?? null }]
+      : current;
+    await this.settings.update({ alwaysSpendAccounts });
+    const r = await this.prisma.transaction.updateMany({
+      where: {
+        direction: 'OUT',
+        transferPairId: null,
+        note: { startsWith: SELF_TRANSFER_NOTE },
+        rawPayload: { path: ['counterpartyAccount'], equals: dto.accountNumber },
+        excludeFromStats: dto.enabled,
+      },
+      data: { excludeFromStats: !dto.enabled },
+    });
+    return { updated: r.count, alwaysSpendAccounts };
   }
 
   findOne(id: number) {

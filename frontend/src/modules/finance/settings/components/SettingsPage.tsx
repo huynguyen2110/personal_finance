@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CalendarRange, ChevronRight, CircleCheck, Info, MailSearch, RefreshCw, Save, Trash2 } from 'lucide-react';
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CalendarRange, ChevronRight, CircleCheck, Info, MailSearch, RefreshCw, Save, Trash2, Repeat } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import DatePicker from '@/components/shared/DatePicker';
 import TreeSelect from '@/components/shared/TreeSelect';
@@ -12,6 +12,9 @@ import { errorMessage } from '@/lib/api-client';
 import { invalidateFinanceData } from '@/lib/query-client';
 import { addMonths, currentMonthVN, formatMonthLabel, formatMonthRange, formatVNDate, formatVNDateTime, MAX_MONTH_START_DAY, MIN_MONTH_START_DAY, monthRange, todayVN } from '@/lib/dates';
 import { EMAIL_QUERY_KEYS, pollEmailsFromStart, purgeEmailBeforeStart, useEmailBeforeStart, useEmailStatus } from '@/modules/finance/email/lib';
+import Switch from '@/components/shared/Switch';
+import { formatVND } from '@/lib/money';
+import { setAlwaysSpend, useSelfTransferAccounts } from '@/modules/finance/transactions/lib';
 import { updateSettings, useSettings } from '../lib';
 
 export default function SettingsPage() {
@@ -43,6 +46,13 @@ export default function SettingsPage() {
               title: 'Loại email giao dịch',
               status: data ? (data.emailIncoming ? 'Cả tiền đến và tiền đi' : 'Chỉ tiền đi') : '…',
             },
+            {
+              href: '#self-transfer',
+              icon: Repeat,
+              tone: 'bg-violet-50 text-violet-700',
+              title: 'Chuyển cho chính bạn',
+              status: data ? (data.alwaysSpendAccounts.length ? `${data.alwaysSpendAccounts.length} tài khoản tính chi tiêu` : 'Không tính chi tiêu') : '…',
+            },
           ]}
         />
         <div className="flex flex-col gap-4 md:gap-6 max-w-5xl min-w-0">
@@ -53,6 +63,7 @@ export default function SettingsPage() {
               <MonthStartCard key={`m-${data.monthStartDay}`} initial={data.monthStartDay} />
               <EmailStartCard key={`e-${data.emailStartDate ?? ''}`} initial={data.emailStartDate} />
               <EmailDirectionCard key={`d-${data.emailIncoming}`} initial={data.emailIncoming} />
+              <SelfTransferCard />
             </>
           )}
         </div>
@@ -440,6 +451,89 @@ function EmailDirectionCard({ initial }: { initial: boolean }) {
           </button>
         </div>
       </div>
+    </section>
+  );
+}
+
+// Chuyển cho chính bạn: tiền chuyển sang tài khoản của chính bạn ở ngân hàng khác mặc định KHÔNG tính chi tiêu.
+// Mỗi tài khoản đã thấy trong email có công tắc "luôn tính chi tiêu" (VD tài khoản quỹ phòng) — áp cả giao dịch cũ lẫn email sau này.
+function SelfTransferCard() {
+  const qc = useQueryClient();
+  const { data: accounts, isLoading } = useSelfTransferAccounts();
+  const [saving, setSaving] = useState<string | null>(null);
+
+  async function toggle(a: { accountNumber: string; name: string | null; bank: string | null }, enabled: boolean) {
+    setSaving(a.accountNumber);
+    try {
+      const r = await setAlwaysSpend({ accountNumber: a.accountNumber, enabled, name: a.name, bank: a.bank });
+      toast.success(
+        `${enabled ? 'Luôn tính' : 'Không tính'} chi tiêu khi chuyển sang ${a.bank ?? 'tài khoản'} ••${a.accountNumber.slice(-4)} (cập nhật ${r.updated} giao dịch)`,
+      );
+      invalidateFinanceData(qc);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  return (
+    <section id="self-transfer" className="fin-card p-5 md:p-6 flex flex-col gap-5 scroll-mt-20">
+      <div className="flex items-start gap-3">
+        <span className="w-10 h-10 rounded-xl bg-violet-50 text-violet-700 flex items-center justify-center shrink-0">
+          <Repeat className="w-5 h-5" aria-hidden />
+        </span>
+        <div>
+          <h2 className="text-[16px] font-semibold text-slate-900">Chuyển cho chính bạn</h2>
+          <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+            Tiền chuyển sang tài khoản của chính bạn ở ngân hàng khác mặc định không tính chi tiêu. Bật cho tài khoản nào (VD tài khoản quỹ phòng)
+            thì mọi lần chuyển sang đó — cả trước đây lẫn sau này — được tính vào chi tiêu.
+          </p>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="h-24 rounded-xl bg-slate-50 animate-pulse" />
+      ) : !accounts?.length ? (
+        <p className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 text-xs text-slate-600">
+          Chưa thấy khoản nào chuyển cho chính bạn trong email ngân hàng.
+        </p>
+      ) : (
+        <ul className="rounded-xl border border-slate-200 divide-y divide-slate-100">
+          {accounts.map((a) => (
+            <li key={a.accountNumber} className="flex items-center justify-between gap-3 p-3.5">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-900 fin-num truncate">
+                  {a.bank ?? 'Tài khoản'} ••{a.accountNumber.slice(-4)}
+                  {a.name && <span className="font-normal text-slate-500"> · {a.name}</span>}
+                </p>
+                <p className="text-[11px] text-slate-500 fin-num">
+                  {a.count ? (
+                    <>
+                      {a.count} lần chuyển · tổng {formatVND(a.total)}
+                      {a.lastDate ? ` · gần nhất ${formatVNDate(a.lastDate)}` : ''}
+                      {!a.alwaysSpend && a.counted > 0 ? ` · đang tự tính ${a.counted} khoản` : ''}
+                    </>
+                  ) : (
+                    'Chưa có giao dịch'
+                  )}
+                </p>
+              </div>
+              <span className="flex items-center gap-2 shrink-0">
+                <span className={`text-xs font-semibold ${a.alwaysSpend ? 'text-teal-700' : 'text-slate-500'}`}>
+                  {a.alwaysSpend ? 'Tính chi tiêu' : 'Không tính'}
+                </span>
+                <Switch
+                  checked={a.alwaysSpend}
+                  onChange={(next) => toggle(a, next)}
+                  disabled={saving === a.accountNumber}
+                  label={`Luôn tính chi tiêu khi chuyển sang ${a.bank ?? 'tài khoản'} ••${a.accountNumber.slice(-4)}`}
+                />
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
